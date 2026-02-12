@@ -1,0 +1,4 @@
+donotcommit.txt
+logs/*
+venv/*
+src/__pycache__/*
