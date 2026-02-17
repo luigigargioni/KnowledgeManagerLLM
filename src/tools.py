@@ -1,13 +1,11 @@
 import copy
 import json
 import logging
-from pathlib import Path
 
+from config_loader import THERAPY_FILE
 from utils import load_markdown_for_llm
 
-logger = logging.getLogger("__main__")
-
-THERAPY_FILE = Path(__file__).parent.parent / "data" / "therapy.json"
+logger = logging.getLogger("knowledge_manager")
 
 
 def clear_conversation_history(self, keep_system=True):
