@@ -1,76 +1,155 @@
+import json
 from time import time
 
 import streamlit as st
 
 import prompts
 from chat import OllamaChat
-from config_loader import MODEL
+from config_loader import MODEL, PATIENT_ID, THERAPY_FILE
+from database import DatabaseManager
 from main import setup_logger
 from utils import get_system_info
 
-# Chat data
-model_name = MODEL
-system_prompt = prompts.system
+# ─── INIT (eseguito una sola volta per sessione browser) ─────────────────────
 
 if "logger" not in st.session_state:
     st.session_state.logger = setup_logger()
 logger = st.session_state.logger
 
+if "db" not in st.session_state:
+    db = DatabaseManager()
+    db_available = db.connect()
+    if db_available:
+        logger.info("[CONFIG] Database connected")
+        db.load_session(PATIENT_ID)
+        db.seed_test_data()
+    else:
+        logger.warning(
+            "[CONFIG] Database not available - session will not be persisted"
+        )
+    st.session_state.db = db
+    st.session_state.db_available = db_available
+
 if "chat" not in st.session_state:
-    chat = OllamaChat(model=model_name, system_prompt=system_prompt)
-    st.session_state.chat = chat
+    st.session_state.chat = OllamaChat(model=MODEL, system_prompt=prompts.system)
 
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
 
 
-# region streamlit
 st.set_page_config(page_title="KnowledgeManagerLLM", page_icon="🤖", layout="centered")
-
-# Titolo dell'applicazione
 st.title("KnowledgeManagerLLM")
 
 
-# Visualizzazione dei messaggi
 for message in st.session_state.conversation:
     with st.chat_message(message["role"]):
         st.markdown(message["message"])
 
-# Input per nuovi messaggi (non funzionale per ora)
-user_message = st.chat_input("Scrivi un messaggio...")
+user_message = st.chat_input("Write a message...")
 if user_message:
     with st.chat_message("user"):
         st.markdown(user_message)
     st.session_state.conversation.append({"role": "user", "message": user_message})
+
     with st.chat_message("assistant"):
         start = time()
-
         with st.spinner("Thinking..."):
             response_gen = st.session_state.chat.send_message(user_message)
+        elapsed = time() - start
 
         st.session_state.conversation.append(
             {"role": "assistant", "message": response_gen}
         )
+
+        logger.debug(f"[TIMING] Total elapsed time: {time() - start:.2f}s")
+        logger.info(f"[CHAT] ASSISTANT: {response_gen}")
+
         with st.container():
             st.markdown(response_gen)
-            st.badge(f"🕛{time() - start:.2f}s")
+            st.badge(f"🕛{elapsed:.2f}s")
 
-# Sidebar con informazioni
+
+# SIDEBAR
+
 with st.sidebar:
-    with st.expander("Info sistema"):
+    st.subheader("💾 Session")
+    db_status = "✅ Connected" if st.session_state.db_available else "❌ Not available"
+    st.caption(f"Database: {db_status}")
+
+    if st.button(
+        "Save therapy",
+        use_container_width=True,
+        disabled=not st.session_state.db_available,
+    ):
+        result = st.session_state.db.save_session(notes="Saved manually from Streamlit")
+        if result["status"] == "success":
+            v_id = result["version"]["id"]
+            logger.info(f"[SESSION] Therapy saved manually - version #{v_id}")
+            st.success(f"Version #{v_id} saved!")
+        else:
+            logger.error(f"[SESSION] Save failed: {result['message']}")
+            st.error(result["message"])
+
+    st.divider()
+    st.subheader("📋 Therapy")
+
+    therapy_path = THERAPY_FILE
+    if therapy_path.exists():
+        try:
+            therapy_data = json.loads(therapy_path.read_text(encoding="utf-8"))
+            patient_name = therapy_data.get("patient_name", "N/A")
+            conditions = therapy_data.get("medical_conditions", [])
+            activities = therapy_data.get("activities", [])
+
+            st.markdown(f"**Patient:** {patient_name}")
+
+            if conditions:
+                with st.expander(f"Medical conditions ({len(conditions)})"):
+                    for c in conditions:
+                        st.markdown(f"- {c}")
+
+            if activities:
+                with st.expander(f"Activities ({len(activities)})"):
+                    for act in activities:
+                        days_map = {
+                            0: "Mon",
+                            1: "Tue",
+                            2: "Wed",
+                            3: "Thu",
+                            4: "Fri",
+                            5: "Sat",
+                            6: "Sun",
+                        }
+                        days = ", ".join(
+                            days_map[d] for d in act.get("day_of_week", [])
+                        )
+
+                        st.markdown(
+                            f"**{act['name']}**  \n"
+                            f"🕐 {act['time']} · ⏱️ {act['duration_minutes']}min · 📅 {days}"
+                        )
+
+                        if act.get("dependencies"):
+                            st.caption(f"Depends on: {', '.join(act['dependencies'])}")
+                        st.write("")
+            else:
+                st.info("No activity")
+
+        except Exception as e:
+            logger.error(f"[UI] Error reading therapy.json: {e}")
+            st.error(f"Errore lettura terapia: {e}")
+    else:
+        st.warning("therapy.json not found")
+
+    st.divider()
+    with st.expander("⚙️ System info"):
         cpu_info, ram_info, gpu_info = get_system_info()
-
         st.markdown(
-            f" ⚙️ **CPU** : {cpu_info['model']} {cpu_info['cores']}/{cpu_info['threads']}"
+            f"**CPU:** {cpu_info['model']} {cpu_info['cores']}/{cpu_info['threads']}"
         )
-
-        st.markdown(f"🧠 **RAM** : {ram_info:.0f} GB")
-
-        if len(gpu_info) > 0:
+        st.markdown(f"🧠 **RAM:** {ram_info:.0f} GB")
+        if gpu_info:
             for info in gpu_info:
                 st.markdown(
-                    f"🎮 **GPU {info['gpu']}** : {info['name']} ({info['memory']})"
+                    f"🎮 **GPU {info['gpu']}:** {info['name']} ({info['memory']})"
                 )
-
-
-# endregion
