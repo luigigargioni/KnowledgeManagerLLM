@@ -21,8 +21,8 @@ if "db" not in st.session_state:
     db_available = db.connect()
     if db_available:
         logger.info("[CONFIG] Database connected")
-        db.load_session(PATIENT_ID)
         db.seed_test_data()
+        db.load_session(PATIENT_ID)
     else:
         logger.warning(
             "[CONFIG] Database not available - session will not be persisted"
@@ -31,7 +31,12 @@ if "db" not in st.session_state:
     st.session_state.db_available = db_available
 
 if "chat" not in st.session_state:
-    st.session_state.chat = OllamaChat(model=MODEL, system_prompt=prompts.system)
+    st.session_state.chat = OllamaChat(
+        model=MODEL,
+        system_prompt=prompts.system,
+        database_manager=st.session_state.db if st.session_state.db_available else None,
+    )
+    st.session_state.first_message = st.session_state.chat.conversation_history[-1]
 
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
@@ -40,6 +45,8 @@ if "conversation" not in st.session_state:
 st.set_page_config(page_title="KnowledgeManagerLLM", page_icon="🤖", layout="centered")
 st.title("KnowledgeManagerLLM")
 
+with st.chat_message(st.session_state.first_message["role"]):
+    st.markdown(st.session_state.first_message["content"])
 
 for message in st.session_state.conversation:
     with st.chat_message(message["role"]):
@@ -97,10 +104,20 @@ with st.sidebar:
     if therapy_path.exists():
         try:
             therapy_data = json.loads(therapy_path.read_text(encoding="utf-8"))
-            patient_name = therapy_data.get("patient_name", "N/A")
+            patient_name = therapy_data.get("patient_full_name", "N/A")
             conditions = therapy_data.get("medical_conditions", [])
             activities = therapy_data.get("activities", [])
+            expired_activities = therapy_data.get("expired_activities", [])
 
+            days_map = {
+                1: "Mon",
+                2: "Tue",
+                3: "Wed",
+                4: "Thu",
+                5: "Fri",
+                6: "Sat",
+                7: "Sun",
+            }
             st.markdown(f"**Patient:** {patient_name}")
 
             if conditions:
@@ -111,15 +128,6 @@ with st.sidebar:
             if activities:
                 with st.expander(f"Activities ({len(activities)})"):
                     for act in activities:
-                        days_map = {
-                            0: "Mon",
-                            1: "Tue",
-                            2: "Wed",
-                            3: "Thu",
-                            4: "Fri",
-                            5: "Sat",
-                            6: "Sun",
-                        }
                         days = ", ".join(
                             days_map[d] for d in act.get("day_of_week", [])
                         )
@@ -132,8 +140,24 @@ with st.sidebar:
                         if act.get("dependencies"):
                             st.caption(f"Depends on: {', '.join(act['dependencies'])}")
                         st.write("")
-            else:
-                st.info("No activity")
+
+            if expired_activities:
+                with st.expander(
+                    f"Activities that expired today ({len(expired_activities)})"
+                ):
+                    for act in expired_activities:
+                        days = ", ".join(
+                            days_map[d] for d in act.get("day_of_week", [])
+                        )
+
+                        st.markdown(
+                            f"**{act['name']}**  \nUntil: {act['valid_until']}  \n"
+                            f"🕐 {act['time']} · ⏱️ {act['duration_minutes']}min · 📅 {days}"
+                        )
+
+                        if act.get("dependencies"):
+                            st.caption(f"Depends on: {', '.join(act['dependencies'])}")
+                        st.write("")
 
         except Exception as e:
             logger.error(f"[UI] Error reading therapy.json: {e}")

@@ -7,7 +7,7 @@ from time import time
 import prompts as prompts
 import tools as tools
 from chat import OllamaChat
-from config_loader import FILE_LOG_LEVEL, MODEL, PATIENT_ID, TERMINAL_LOG_LEVEL
+from config_loader import FILE_LOG_LEVEL, MODEL, TERMINAL_LOG_LEVEL
 from database import DatabaseManager
 from utils import get_system_info
 
@@ -69,8 +69,8 @@ def main():
     db_available = db.connect()
     if db_available:
         logger.info("[CONFIG] Database connected")
-        db.load_session(PATIENT_ID)
         db.seed_test_data()
+        # db.load_session(PATIENT_ID)
     else:
         logger.warning(
             "[CONFIG] Database not available - session will not be persisted"
@@ -81,7 +81,11 @@ def main():
     system_prompt = prompts.system
 
     # Chat initialization
-    chat = OllamaChat(model=model_name, system_prompt=system_prompt)
+    chat = OllamaChat(
+        model=model_name,
+        system_prompt=system_prompt,
+        database_manager=db if db_available else None,
+    )
 
     print("=" * 60)
     print("  OLLAMA CHAT - Local LLM Interface")
@@ -90,6 +94,10 @@ def main():
     print("Commands: 'exit' or 'quit' to end session")
     print("=" * 60)
     print()
+
+    # print of first static message
+    logger.info(f"[CHAT] ASSISTANT: {chat.conversation_history[-1]['content']}")
+    print(f"\nAssistant: {chat.conversation_history[-1]['content']}\n")
 
     while True:
         try:

@@ -9,12 +9,51 @@ import tools as tools
 from config_loader import (
     OLLAMA_URL,
 )
+from database import DatabaseManager
 
 logger = logging.getLogger("knowledge_manager")
 
 
+def build_first_message(therapy_json):
+    therapy = json.loads(therapy_json)
+    first_message = (
+        f"Hi I'm your therapy management assistant!  \n"
+        f"The current patient is **{therapy['patient_full_name']}**. "
+        f"The activities of {therapy['patient_full_name']}'s therapy are:  \n"
+    )
+
+    days_map = {
+        1: "Mon",
+        2: "Tue",
+        3: "Wed",
+        4: "Thu",
+        5: "Fri",
+        6: "Sat",
+        7: "Sun",
+    }
+
+    for act in therapy["activities"]:
+        first_message += f"- {act['name']}   -  {act['time']}  -  {', '.join(days_map[d] for d in act.get('day_of_week', []))} \n"
+    first_message += "\n"
+
+    if len(therapy["expired_activities"]) > 0:
+        first_message += "The activities that are **not valid anymore** are:  \n"
+        for inv_act in therapy["expired_activities"]:
+            first_message += f"- {inv_act['time']} {inv_act['name']}  -  Valid until: {inv_act['valid_until']}  \n"
+        first_message += "\n"
+    first_message += "I can help you add new activity, change the the current activities or remove the one that are not necessary. What do you want to do?"
+
+    return first_message
+
+
 class OllamaChat:
-    def __init__(self, model="llama3", base_url=OLLAMA_URL, system_prompt=None):
+    def __init__(
+        self,
+        model="llama3",
+        base_url=OLLAMA_URL,
+        system_prompt=None,
+        database_manager: DatabaseManager = None,
+    ):
         """
         Inizializza il client Ollama
 
@@ -27,6 +66,8 @@ class OllamaChat:
         self.base_url = base_url
         self.api_endpoint = f"{base_url}/api/chat"
         self.conversation_history = []
+
+        self.database_manager = database_manager
 
         logger.info(f"[INIT] Model {model}")
 
@@ -51,12 +92,17 @@ class OllamaChat:
                 "content": f"get_current_datetime:{datetime.now().strftime('%Y-%m-%d %H:%M:%S %A')}",
             }
         )
-
+        therapy_json = tools.get_all_activities()
         self.conversation_history.append(
             {
                 "role": "tool",
-                "content": f"get_all_activities:{tools.get_all_activities()}",
+                "content": f"get_all_activities:{therapy_json}",
             }
+        )
+
+        first_message = build_first_message(therapy_json)
+        self.conversation_history.append(
+            {"role": "assistant", "content": first_message}
         )
 
     def execute_tool(self, tool_name, tool_arguments):
@@ -103,6 +149,18 @@ class OllamaChat:
         elif tool_name == "get_medicine_data":
             medicine_name = tool_arguments.get("medicine_name")
             return tools.get_medicine_data(medicine_name)
+
+        elif tool_name == "save_session":
+            if self.database_manager:
+                return json.dumps(self.database_manager.save_session())
+            else:
+                logger.warning(
+                    "[TOOL] The chat session is not associated with a database manager, cannot save session."
+                )
+                return {
+                    "status": "error",
+                    "message": "The chat session is not associated with a database manager, cannot save session.",
+                }
 
         else:
             logger.warning(f"[TOOL] Tool not found: {tool_name}")

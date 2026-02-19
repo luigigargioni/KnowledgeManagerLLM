@@ -59,3 +59,14 @@ def get_system_info():
         except Exception:
             pass
     return cpu_info, ram_info, gpu_info
+
+
+def hhmm_to_minutes(hhmm):
+    hours, minutes = map(int, hhmm.split(":"))
+    return hours * 60 + minutes
+
+
+def minutes_to_hhmm(total_minutes):
+    hours = total_minutes // 60
+    minutes = total_minutes % 60
+    return f"{hours:02d}:{minutes:02d}"

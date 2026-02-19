@@ -3,7 +3,7 @@ import json
 import logging
 
 from config_loader import THERAPY_FILE
-from utils import load_markdown_for_llm
+from utils import hhmm_to_minutes, load_markdown_for_llm, minutes_to_hhmm
 
 logger = logging.getLogger("knowledge_manager")
 
@@ -95,17 +95,6 @@ def get_all_activities():
     except Exception as e:
         logger.error(f"[THERAPY] Error getting activities: {e}")
         return json.dumps({"status": "error", "message": str(e)}, indent=2)
-
-
-def hhmm_to_minutes(hhmm):
-    hours, minutes = map(int, hhmm.split(":"))
-    return hours * 60 + minutes
-
-
-def minutes_to_hhmm(total_minutes):
-    hours = total_minutes // 60
-    minutes = total_minutes % 60
-    return f"{hours:02d}:{minutes:02d}"
 
 
 def find_conflicting_activity(new_activity, schedule):
@@ -443,23 +432,23 @@ tools_decl = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "clear_conversation_history",
-            "description": "Clears the conversation history. Use this function when the user wants to reset the session",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "keep_system_prompt": {
-                        "type": "boolean",
-                        "description": "If true, keeps the system prompt. Always set it to true unless the users explicitly say otherwise",
-                    }
-                },
-                "required": [],
-            },
-        },
-    },
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "name": "clear_conversation_history",
+    #         "description": "Clears the conversation history. Use this function when the user wants to reset the session",
+    #         "parameters": {
+    #             "type": "object",
+    #             "properties": {
+    #                 "keep_system_prompt": {
+    #                     "type": "boolean",
+    #                     "description": "If true, keeps the system prompt. Always set it to true unless the users explicitly say otherwise",
+    #                 }
+    #             },
+    #             "required": [],
+    #         },
+    #     },
+    # },
     {
         "type": "function",
         "function": {
@@ -583,6 +572,14 @@ tools_decl = [
                 },
                 "required": ["medicine_name"],
             },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_session",
+            "description": "Saves the current therapy configuration session inside the database. Run this when the user tells you they finished.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
 ]
