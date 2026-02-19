@@ -151,16 +151,7 @@ class OllamaChat:
             return tools.get_medicine_data(medicine_name)
 
         elif tool_name == "save_session":
-            if self.database_manager:
-                return json.dumps(self.database_manager.save_session())
-            else:
-                logger.warning(
-                    "[TOOL] The chat session is not associated with a database manager, cannot save session."
-                )
-                return {
-                    "status": "error",
-                    "message": "The chat session is not associated with a database manager, cannot save session.",
-                }
+            return tools.save_session(self.database_manager)
 
         else:
             logger.warning(f"[TOOL] Tool not found: {tool_name}")

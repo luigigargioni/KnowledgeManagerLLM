@@ -3,6 +3,7 @@ import json
 import logging
 
 from config_loader import THERAPY_FILE
+from database import DatabaseManager
 from utils import hhmm_to_minutes, load_markdown_for_llm, minutes_to_hhmm
 
 logger = logging.getLogger("knowledge_manager")
@@ -420,6 +421,19 @@ def remove_therapy_activity(activity_id):
 def get_medicine_data(medicine_name):
     data = load_markdown_for_llm(medicine_name.lower())
     return data
+
+
+def save_session(database_manager: DatabaseManager = None):
+    if database_manager:
+        return json.dumps(database_manager.save_session())
+    else:
+        logger.warning(
+            "[TOOL] The chat session is not associated with a database manager, cannot save session."
+        )
+        return {
+            "status": "error",
+            "message": "The chat session is not associated with a database manager, cannot save session.",
+        }
 
 
 # region Tools declaration

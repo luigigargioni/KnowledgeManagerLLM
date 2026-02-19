@@ -1,54 +1,11 @@
-import logging
-import sys
-from datetime import datetime
-from pathlib import Path
 from time import time
 
 import prompts as prompts
 import tools as tools
 from chat import OllamaChat
-from config_loader import FILE_LOG_LEVEL, MODEL, PATIENT_ID, TERMINAL_LOG_LEVEL
+from config_loader import MODEL, PATIENT_ID
 from database import DatabaseManager
-from utils import get_system_info
-
-
-def setup_logger():
-    """Configura il logger per scrivere su file di sessione nella cartella logs e su terminale"""
-
-    logs_dir = Path("../logs")
-    logs_dir.mkdir(exist_ok=True)
-
-    session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = logs_dir / f"chat_session_{session_timestamp}.log"
-
-    logger = logging.getLogger("knowledge_manager")
-    logger.setLevel(logging.DEBUG)
-
-    if logger.handlers:
-        return logger
-
-    file_formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
-
-    # File Handler
-    file_handler = logging.FileHandler(log_filename, encoding="utf-8")
-    file_handler.setLevel(FILE_LOG_LEVEL)
-    file_handler.setFormatter(file_formatter)
-
-    # Terminal Handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(TERMINAL_LOG_LEVEL)
-    console_formatter = logging.Formatter("%(levelname)s - %(message)s")
-    console_handler.setFormatter(console_formatter)
-
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-
-    logger.info(f"[SESSION] New chat session started ID:{session_timestamp}")
-
-    return logger
-
+from utils import get_system_info, setup_logger
 
 logger = setup_logger()
 

@@ -25,6 +25,6 @@ DB_CONNECTION_STRING = (
 
 
 THERAPY_FILE = Path(__file__).parent.parent / "data" / "therapy.json"
-
+LOGS_FOLDER = Path(__file__).parent.parent / "logs"
 
 PATIENT_ID = os.getenv("PATIENT_ID", "test")

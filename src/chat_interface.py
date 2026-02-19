@@ -7,8 +7,7 @@ import prompts
 from chat import OllamaChat
 from config_loader import MODEL, PATIENT_ID, THERAPY_FILE
 from database import DatabaseManager
-from main import setup_logger
-from utils import get_system_info
+from utils import get_system_info, setup_logger
 
 if "logger" not in st.session_state:
     st.session_state.logger = setup_logger()

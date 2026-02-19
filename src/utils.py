@@ -1,10 +1,20 @@
+import logging
 import os
 import platform
 import subprocess
+import sys
+from datetime import datetime
 
 import psutil
 
-from config_loader import CHECK_NVIDIA_GPU
+import prompts as prompts
+import tools as tools
+from config_loader import (
+    CHECK_NVIDIA_GPU,
+    FILE_LOG_LEVEL,
+    LOGS_FOLDER,
+    TERMINAL_LOG_LEVEL,
+)
 
 
 def load_markdown_for_llm(filename: str) -> str:
@@ -70,3 +80,41 @@ def minutes_to_hhmm(total_minutes):
     hours = total_minutes // 60
     minutes = total_minutes % 60
     return f"{hours:02d}:{minutes:02d}"
+
+
+def setup_logger():
+    """Configura il logger per scrivere su file di sessione nella cartella logs e su terminale"""
+
+    logs_dir = LOGS_FOLDER
+    logs_dir.mkdir(exist_ok=True)
+
+    session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_filename = logs_dir / f"chat_session_{session_timestamp}.log"
+
+    logger = logging.getLogger("knowledge_manager")
+    logger.setLevel(logging.DEBUG)
+
+    if logger.handlers:
+        return logger
+
+    file_formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
+
+    # File Handler
+    file_handler = logging.FileHandler(log_filename, encoding="utf-8")
+    file_handler.setLevel(FILE_LOG_LEVEL)
+    file_handler.setFormatter(file_formatter)
+
+    # Terminal Handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(TERMINAL_LOG_LEVEL)
+    console_formatter = logging.Formatter("%(levelname)s - %(message)s")
+    console_handler.setFormatter(console_formatter)
+
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    logger.info(f"[SESSION] New chat session started ID:{session_timestamp}")
+
+    return logger
