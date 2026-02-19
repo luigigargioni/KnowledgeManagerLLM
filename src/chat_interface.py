@@ -10,8 +10,6 @@ from database import DatabaseManager
 from main import setup_logger
 from utils import get_system_info
 
-# ─── INIT (eseguito una sola volta per sessione browser) ─────────────────────
-
 if "logger" not in st.session_state:
     st.session_state.logger = setup_logger()
 logger = st.session_state.logger
@@ -22,7 +20,9 @@ if "db" not in st.session_state:
     if db_available:
         logger.info("[CONFIG] Database connected")
         db.seed_test_data()
-        db.load_session(PATIENT_ID)
+        db.load_session(
+            PATIENT_ID
+        )  # COMMENTA QUESTA LINEA SE HAI BISOGNO DI TESTARE IL SISTEMA MODIFICANDO DIRETTAMENTE IL .JSON
     else:
         logger.warning(
             "[CONFIG] Database not available - session will not be persisted"

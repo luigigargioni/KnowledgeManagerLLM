@@ -7,7 +7,7 @@ from time import time
 import prompts as prompts
 import tools as tools
 from chat import OllamaChat
-from config_loader import FILE_LOG_LEVEL, MODEL, TERMINAL_LOG_LEVEL
+from config_loader import FILE_LOG_LEVEL, MODEL, PATIENT_ID, TERMINAL_LOG_LEVEL
 from database import DatabaseManager
 from utils import get_system_info
 
@@ -70,7 +70,9 @@ def main():
     if db_available:
         logger.info("[CONFIG] Database connected")
         db.seed_test_data()
-        # db.load_session(PATIENT_ID)
+        db.load_session(
+            PATIENT_ID
+        )  # COMMENTA QUESTA LINEA SE HAI BISOGNO DI TESTARE IL SISTEMA MODIFICANDO DIRETTAMENTE IL .JSON
     else:
         logger.warning(
             "[CONFIG] Database not available - session will not be persisted"
