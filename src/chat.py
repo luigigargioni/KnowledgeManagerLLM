@@ -2,12 +2,16 @@ import json
 import logging
 from datetime import datetime
 
-import requests
+from openai import APIConnectionError, APITimeoutError, OpenAI
 
 import prompts as prompts
 import tools as tools
 from config_loader import (
+    LLM_PROVIDER,
+    LLM_TIMEOUT,
+    MODEL,
     OLLAMA_URL,
+    OPENAI_API_KEY,
 )
 from session_extractor import (
     extract_and_save_conflict_resolutions,
@@ -16,6 +20,14 @@ from session_extractor import (
 from sql_db import DatabaseManager
 
 logger = logging.getLogger("knowledge_manager")
+
+
+def _make_client() -> OpenAI:
+    """Return an OpenAI-compatible client for the configured provider."""
+    if LLM_PROVIDER == "openai":
+        return OpenAI(api_key=OPENAI_API_KEY, timeout=LLM_TIMEOUT)
+    # Ollama exposes an OpenAI-compatible API at /v1
+    return OpenAI(base_url=f"{OLLAMA_URL}/v1", api_key="ollama", timeout=LLM_TIMEOUT)
 
 
 def build_first_message(therapy_json):
@@ -57,28 +69,26 @@ def build_first_message(therapy_json):
     return first_message
 
 
-class OllamaChat:
+class Chat:
     def __init__(
         self,
-        model="qwen2.5:14b",
-        base_url=OLLAMA_URL,
+        model=MODEL,
         system_prompt=None,
         database_manager: DatabaseManager = None,
         vector_db=None,
     ):
         """
-        Initialise the Ollama client.
+        Initialise the LLM client.
+        Supports both OpenAI cloud and Ollama (auto-detected from OPENAI_API_KEY).
 
         Args:
-            model: Model name to use (default: qwen2.5:14b)
-            base_url: Base URL of the Ollama API (default: http://localhost:11434)
+            model: Model name to use
             system_prompt: System prompt to configure the model behaviour
             database_manager: DatabaseManager instance for session persistence
             vector_db: VectorDBManager instance for RAG features
         """
         self.model = model
-        self.base_url = base_url
-        self.api_endpoint = f"{base_url}/api/chat"
+        self.client = _make_client()
         self.conversation_history = []
         self.session_ended = False
 
@@ -90,7 +100,7 @@ class OllamaChat:
             tools.set_vector_db(vector_db)
             logger.debug("[INIT] Vector DB injected into tools module")
 
-        logger.info(f"[INIT] Model {model}")
+        logger.info(f"[INIT] Provider={LLM_PROVIDER} Model={model}")
 
         self.tools = tools.tools_decl
         logger.info(f"[INIT] Loaded {len(self.tools)} tools")
@@ -102,7 +112,6 @@ class OllamaChat:
             logger.info(
                 f"[INIT] System prompt configured: {len(system_prompt)} characters"
             )
-            logger.debug(f"[SYSTEM_PROMPT] {system_prompt}")
         else:
             logger.info("[INIT] No system prompt provided")
 
@@ -185,7 +194,10 @@ class OllamaChat:
 
         elif tool_name == "update_therapy_activity":
             activity_id = tool_arguments.get("activity_id")
-            updates = tool_arguments.get("updates", {})
+            # Support both flat args (OpenAI style) and nested {updates: {...}} (legacy)
+            updates = tool_arguments.get("updates") or {
+                k: v for k, v in tool_arguments.items() if k != "activity_id"
+            }
             return tools.update_therapy_activity(activity_id, updates)
 
         elif tool_name == "remove_therapy_activity":
@@ -210,6 +222,44 @@ class OllamaChat:
             logger.warning(f"[TOOL] Tool not found: {tool_name}")
             return f"Tool '{tool_name}' not found"
 
+    def _normalize_messages(self) -> list[dict]:
+        """
+        Return a copy of the conversation history suitable for the OpenAI API.
+
+        Rules applied:
+        1. role=tool messages WITHOUT tool_call_id (init context injections) are
+           converted to role=system so OpenAI accepts them.
+        2. Any role=assistant message that appears before the first role=user is
+           also converted to role=system (OpenAI requires conversations to start
+           with a user turn; Ollama is more lenient but OpenAI is not).
+        """
+        # Determine the index of the first user message
+        first_user_idx = next(
+            (
+                i
+                for i, m in enumerate(self.conversation_history)
+                if m.get("role") == "user"
+            ),
+            len(self.conversation_history),
+        )
+
+        normalized = []
+        for i, msg in enumerate(self.conversation_history):
+            role = msg.get("role")
+            # Pre-conversation context: tool msgs without tool_call_id → system
+            if role == "tool" and "tool_call_id" not in msg:
+                normalized.append(
+                    {"role": "system", "content": f"[Context] {msg['content']}"}
+                )
+            # Pre-conversation assistant msg (e.g. the welcome message) → system
+            elif role == "assistant" and i < first_user_idx:
+                normalized.append(
+                    {"role": "system", "content": f"[Assistant intro] {msg['content']}"}
+                )
+            else:
+                normalized.append(msg)
+        return normalized
+
     def send_message(self, user_message):
         """
         Send a message to the model, maintaining conversation context.
@@ -227,41 +277,47 @@ class OllamaChat:
 
         # LLM can call at most 5 tools in a row
         max_iterations = 5
-        iteration = 0
 
-        while iteration < max_iterations:
-            iteration += 1
-
-            payload = {
-                "model": self.model,
-                "messages": self.conversation_history,
-                "tools": self.tools,
-                "stream": False,
-            }
-
+        for _ in range(max_iterations):
             try:
-                response = requests.post(self.api_endpoint, json=payload, timeout=120)
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=self._normalize_messages(),
+                    tools=self.tools,
+                )
 
-                response.raise_for_status()
-
-                result = response.json()
-                message = result.get("message", {})
-
-                tool_calls = message.get("tool_calls")
+                message = response.choices[0].message
+                tool_calls = message.tool_calls
 
                 if tool_calls:
-                    # Model requires tool calling
                     logger.debug(f"[TOOL] {len(tool_calls)} tool call(s) requested")
-                    self.conversation_history.append(message)
+
+                    # Record the assistant turn with its tool_calls
+                    self.conversation_history.append(
+                        {
+                            "role": "assistant",
+                            "content": message.content or "",
+                            "tool_calls": [
+                                {
+                                    "id": tc.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc.function.name,
+                                        "arguments": tc.function.arguments,
+                                    },
+                                }
+                                for tc in tool_calls
+                            ],
+                        }
+                    )
 
                     for tool_call in tool_calls:
-                        function = tool_call.get("function", {})
-                        tool_name = function.get("name")
-                        tool_arguments = function.get("arguments", {})
+                        tool_name = tool_call.function.name
+                        # OpenAI (and Ollama /v1) always returns arguments as a JSON string
+                        tool_arguments = json.loads(tool_call.function.arguments)
 
                         logger.debug(f"[TOOL] Executing: {tool_name}({tool_arguments})")
 
-                        # Running the tool
                         tool_result = self.execute_tool(tool_name, tool_arguments)
                         result_preview = (
                             str(tool_result)[:100] + "..."
@@ -271,30 +327,30 @@ class OllamaChat:
                         logger.debug(f"[TOOL] Result: {result_preview}")
 
                         self.conversation_history.append(
-                            {"role": "tool", "content": tool_result}
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": str(tool_result),
+                            }
                         )
 
-                    # continue #this continue can be used if the llm needs to call multiple tools in sequence. In the case in which it needs a result first to call another  one
-
                 else:
-                    assistant_message = message.get("content", "No response received")
+                    assistant_message = message.content or "No response received"
                     self.conversation_history.append(
                         {"role": "assistant", "content": assistant_message}
                     )
-
                     return assistant_message
 
-            except requests.exceptions.ConnectionError:
-                logger.error("[ERROR] Connection failed: Cannot connect to Ollama")
+            except APIConnectionError:
+                logger.error(
+                    f"[ERROR] Connection failed: Cannot connect to {LLM_PROVIDER} API"
+                )
                 return None
-            except requests.exceptions.Timeout:
+            except APITimeoutError:
                 logger.error("[ERROR] Request timeout")
                 return None
-            except requests.exceptions.RequestException as e:
-                logger.error(f"[ERROR] Request failed: {str(e)}")
-                return None
-            except json.JSONDecodeError:
-                logger.error("[ERROR] Invalid JSON response from server")
+            except Exception as e:
+                logger.error(f"[ERROR] Request failed: {e}")
                 return None
 
         logger.warning("[WARNING] Max iterations reached for tool calling")
@@ -373,3 +429,7 @@ class OllamaChat:
         logger.info("[SESSION] Session marked as ended")
 
         return result
+
+
+# Backward-compatible alias
+OllamaChat = Chat

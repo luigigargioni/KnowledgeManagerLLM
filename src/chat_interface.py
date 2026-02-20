@@ -200,7 +200,6 @@ if st.session_state.processing and st.session_state.pending_message:
 
     with st.chat_message("assistant"):
         start = time()
-        logger.info(f"[CHAT] USER: {user_message}")
         with st.spinner("Thinking..."):
             response_gen = st.session_state.chat.send_message(user_message)
         elapsed = time() - start

@@ -16,7 +16,8 @@ dependencies = [
     "streamlit",
     "sqlalchemy>=2.0.0",
     "psycopg2-binary>=2.9.0",
-    "chromadb"
+    "chromadb",
+    "openai>=1.0.0"
 ]
 
 [tool.ruff]

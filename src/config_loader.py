@@ -13,6 +13,10 @@ CHECK_NVIDIA_GPU = int(os.getenv("CHECK_NVIDIA_GPU", "0")) == 1
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "120"))
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# Auto-detect provider: use OpenAI if an API key is set, otherwise use Ollama
+LLM_PROVIDER = "openai" if OPENAI_API_KEY else "ollama"
+
 
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", "5432"))

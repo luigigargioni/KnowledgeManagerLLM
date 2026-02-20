@@ -1,31 +1,31 @@
 [
     {
-        "description": "Mario Rossi ha subito una crisi ipoglicemica acuta dopo una sessione di camminata veloce nel tardo pomeriggio. L'evento è stato causato dalla combinazione di esercizio fisico intenso e la terapia insulinica per il diabete di tipo 1. Sconsigliato esercizio fisico aerobico senza monitoraggio glicemico preventivo.",
-        "activity_name": "Camminata veloce",
+        "description": "Mario Rossi experienced an acute hypoglycemic crisis after a brisk walking session in the late afternoon. The event was caused by the combination of intense physical exercise and insulin therapy for type 1 diabetes. Aerobic exercise without prior blood glucose monitoring is not recommended.",
+        "activity_name": "Brisk walking",
         "event_type": "danger",
         "date": "2025-11-10"
     },
     {
-        "description": "La somministrazione di Aspirina (acido acetilsalicilico) ha causato un peggioramento della funzione renale con aumento significativo della creatinina sierica nel paziente con grave insufficienza renale. Il medico ha confermato l'incompatibilità di Aspirina con l'insufficienza renale grave.",
-        "activity_name": "Assunzione Aspirina",
+        "description": "The administration of Aspirin (acetylsalicylic acid) caused a worsening of renal function with a significant increase in serum creatinine in a patient with severe renal failure. The physician confirmed the incompatibility of Aspirin with severe renal impairment.",
+        "activity_name": "Aspirin intake",
         "event_type": "danger",
         "date": "2025-09-03"
     },
     {
-        "description": "Il paziente ha presentato dolore gastrico acuto e nausea dopo la somministrazione di Aulin (Nimesulide). In seguito, il medico ha sospeso la terapia con Aulin per incompatibilità con la grave insufficienza renale, che rappresenta una controindicazione assoluta per i FANS.",
-        "activity_name": "Assunzione Aulin",
+        "description": "The patient experienced acute stomach pain and nausea after the administration of Aulin (Nimesulide). Subsequently, the physician discontinued Aulin therapy due to incompatibility with severe renal failure, which represents an absolute contraindication for NSAIDs.",
+        "activity_name": "Aulin intake",
         "event_type": "danger",
         "date": "2025-07-18"
     },
     {
-        "description": "Dopo un pasto contenente glutine (pane normale), il paziente celiaco ha sviluppato sintomi gastrointestinali gravi: dolori addominali, diarrea e gonfiore persistente per 48 ore. Confermata intolleranza severa al glutine; dieta rigorosamente gluten-free obbligatoria.",
-        "activity_name": "Pasto con glutine",
+        "description": "After a meal containing gluten (regular bread), the celiac patient developed severe gastrointestinal symptoms: abdominal pain, diarrhea, and persistent bloating for 48 hours. Severe gluten intolerance confirmed; a strictly gluten-free diet is mandatory.",
+        "activity_name": "Meal with gluten",
         "event_type": "danger",
         "date": "2025-06-05"
     },
     {
-        "description": "L'attività cognitiva intensa nel primo pomeriggio (13:00-15:00) ha ripetutamente coinciso con episodi di sonnolenza post-prandiale, rendendo il paziente incapace di concentrarsi. Consigliato posticipare le attività cognitive al pomeriggio inoltrato (dopo le 16:00).",
-        "activity_name": "Attività cognitiva pomeriggio",
+        "description": "Intense cognitive activity in the early afternoon (1:00 PM–3:00 PM) repeatedly coincided with episodes of postprandial drowsiness, making the patient unable to concentrate. It is recommended to postpone cognitive activities to the late afternoon (after 4:00 PM).",
+        "activity_name": "Afternoon cognitive activity",
         "event_type": "warning",
         "date": "2025-10-22"
     }

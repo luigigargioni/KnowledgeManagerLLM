@@ -618,7 +618,7 @@ tools_decl = [
         "type": "function",
         "function": {
             "name": "update_therapy_activity",
-            "description": "Updates a activity in the therapy of the current patient. You need to specify the id of the activity to updated and the modified fields",
+            "description": "Updates an existing activity in the therapy of the current patient. Specify the activity_id and only the fields that need to change.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -626,12 +626,42 @@ tools_decl = [
                         "type": "string",
                         "description": "ID of the activity to update",
                     },
-                    "updates": {
-                        "type": "object",
-                        "description": "Object withe the fields to update (name, description, day_of_week, time, duration_minutes, dependencies, valid_from, valid_until)",
+                    "name": {
+                        "type": "string",
+                        "description": "New name of the activity",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "New description of the activity",
+                    },
+                    "day_of_week": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "New days of the week (1=Monday … 7=Sunday)",
+                    },
+                    "time": {
+                        "type": "string",
+                        "description": "New time (HH:MM)",
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "description": "New duration in minutes",
+                    },
+                    "dependencies": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "New list of dependency activity names",
+                    },
+                    "valid_from": {
+                        "type": "string",
+                        "description": "New valid_from date (YYYY-MM-DD)",
+                    },
+                    "valid_until": {
+                        "type": "string",
+                        "description": "New valid_until date (YYYY-MM-DD)",
                     },
                 },
-                "required": ["activity_id", "updates"],
+                "required": ["activity_id"],
             },
         },
     },

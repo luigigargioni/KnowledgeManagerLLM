@@ -12,9 +12,9 @@ When the caregiver saves a session this module:
 import json
 import logging
 
-import requests
+from openai import OpenAI
 
-from config_loader import LLM_TIMEOUT, MODEL, OLLAMA_URL
+from config_loader import LLM_PROVIDER, LLM_TIMEOUT, MODEL, OLLAMA_URL, OPENAI_API_KEY
 from prompts import _CONFLICT_EXTRACTION_PROMPT, _PREFERENCE_EXTRACTION_PROMPT
 
 logger = logging.getLogger("knowledge_manager")
@@ -36,28 +36,32 @@ def _format_conversation(conversation_history: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _make_extractor_client() -> OpenAI:
+    """Return an OpenAI-compatible client for the configured provider."""
+    if LLM_PROVIDER == "openai":
+        return OpenAI(api_key=OPENAI_API_KEY, timeout=LLM_TIMEOUT)
+    return OpenAI(base_url=f"{OLLAMA_URL}/v1", api_key="ollama", timeout=LLM_TIMEOUT)
+
+
 def _call_llm(system_prompt: str, user_text: str) -> list[dict]:
     """
-    Call the local Ollama LLM with a specialised system prompt.
+    Call the LLM with a specialised system prompt.
+    Works with both OpenAI cloud and local Ollama.
     Returns the parsed JSON list, or an empty list on failure.
     """
-    payload = {
-        "model": MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": f"Conversation to analyse:\n\n{user_text}",
-            },
-        ],
-        "stream": False,
-    }
+    client = _make_extractor_client()
     try:
-        response = requests.post(
-            f"{OLLAMA_URL}/api/chat", json=payload, timeout=LLM_TIMEOUT
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": f"Conversation to analyse:\n\n{user_text}",
+                },
+            ],
         )
-        response.raise_for_status()
-        content: str = response.json().get("message", {}).get("content", "[]").strip()
+        content: str = (response.choices[0].message.content or "[]").strip()
 
         # Strip markdown code fences if the model wraps the JSON
         if content.startswith("```"):

@@ -63,7 +63,7 @@ def main():
     )
 
     print("=" * 60)
-    print("  OLLAMA CHAT - Local LLM Interface")
+    print("  KnowledgeManagerLLM - LLM Chat Interface")
     print("=" * 60)
     print(f"Model: {model_name}")
     print("Commands: 'exit' or 'quit' to end session")

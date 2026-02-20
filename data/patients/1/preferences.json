@@ -1,18 +1,18 @@
 [
     {
-        "description": "Il paziente preferisce svolgere attività fisica al mattino presto, preferibilmente prima delle 9:00, quando si sente più energico.",
+        "description": "The patient prefers to perform physical activity early in the morning, preferably before 9:00 AM, when they feel more energetic.",
         "category": "schedule"
     },
     {
-        "description": "Il paziente preferisce pasti leggeri a pranzo (insalate, verdure, proteine magre) e tollera meglio una cena più abbondante.",
+        "description": "The patient prefers light lunches (salads, vegetables, lean proteins) and tolerates a more substantial dinner better.",
         "category": "food"
     },
     {
-        "description": "Il paziente preferisce assumere i farmaci immediatamente dopo i pasti principali per ridurre i disturbi gastrici.",
+        "description": "The patient prefers to take medications immediately after main meals to reduce gastric discomfort.",
         "category": "medication"
     },
     {
-        "description": "Il paziente gradisce camminare all'aperto piuttosto che usare attrezzature da ginnastica al chiuso. Preferisce percorsi nel parco vicino a casa.",
+        "description": "The patient prefers walking outdoors rather than using indoor gym equipment. They prefer routes in the park near their home.",
         "category": "activity"
     }
 ]
