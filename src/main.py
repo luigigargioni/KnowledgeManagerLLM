@@ -4,8 +4,9 @@ import prompts as prompts
 import tools as tools
 from chat import OllamaChat
 from config_loader import MODEL, PATIENT_ID
-from database import DatabaseManager
+from sql_db import DatabaseManager
 from utils import get_system_info, setup_logger
+from vector_db import VectorDBManager
 
 logger = setup_logger()
 
@@ -21,6 +22,20 @@ def main():
         for info in gpu_info:
             logger.info(f"[SYS] GPU {info['gpu']}: {info['name']} ({info['memory']})")
 
+    # Vector DB initialisation
+    vector_db = VectorDBManager()
+    vdb_available = vector_db.initialize()
+    if vdb_available:
+        seeded = vector_db.seed_medicines()
+        logger.info(
+            f"[CONFIG] Vector DB ready – {seeded} medicine file(s) newly indexed"
+        )
+        # Seed patient data from files (idempotent)
+        vector_db.seed_patient_data(str(PATIENT_ID))
+    else:
+        logger.warning("[CONFIG] Vector DB not available – RAG features disabled")
+        vector_db = None
+
     # Database connection
     db = DatabaseManager()
     db_available = db.connect()
@@ -29,7 +44,7 @@ def main():
         db.seed_test_data()
         db.load_session(
             PATIENT_ID
-        )  # COMMENTA QUESTA LINEA SE HAI BISOGNO DI TESTARE IL SISTEMA MODIFICANDO DIRETTAMENTE IL .JSON
+        )  # COMMENT THIS LINE if you need to test the system by editing the .JSON file directly
     else:
         logger.warning(
             "[CONFIG] Database not available - session will not be persisted"
@@ -37,13 +52,14 @@ def main():
 
     # Chat data
     model_name = MODEL
-    system_prompt = prompts.system
+    system_prompt = prompts._THERAPY_MANAGER_PROMPT
 
     # Chat initialization
     chat = OllamaChat(
         model=model_name,
         system_prompt=system_prompt,
         database_manager=db if db_available else None,
+        vector_db=vector_db,
     )
 
     print("=" * 60)
@@ -64,10 +80,10 @@ def main():
 
             # Manual exit
             if user_input.lower() in ["exit", "quit", "esci"]:
-                if db_available:
-                    result = db.save_session()
-                    if result["status"] == "success":
-                        v_id = result["version"]["id"]
+                result = chat.end_session()
+                if result.get("status") == "success":
+                    v_id = result.get("version", {}).get("id")
+                    if v_id:
                         print(f"\n[Terapia salvata nel database - versione #{v_id}]")
 
                 logger.info("[SESSION] Chat session ended by user")
@@ -86,11 +102,11 @@ def main():
                 print(f"\nAssistant: {response}\n")
 
         except KeyboardInterrupt:
-            if db_available:
-                result = db.save_session()
-                if result["status"] == "success":
-                    v_id = result["version"]["id"]
-                    print(f"\n[Terapia salvata nel database - versione #{v_id}]")
+            result = chat.end_session()
+            if result.get("status") == "success":
+                v_id = result.get("version", {}).get("id")
+                if v_id:
+                    print(f"\n[Therapy saved to database – version #{v_id}]")
 
             logger.info("[SESSION] Chat interrupted by user (Ctrl+C)")
             print("\n\nSession interrupted. Goodbye!")

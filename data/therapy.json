@@ -1,8 +1,9 @@
 {
-    "patient_id": "mario_rossi",
-    "patient_name": "Mario Rossi",
+    "patient_id": 1,
+    "patient_full_name": "Mario Rossi",
     "gender": "Male",
-    "age": "67",
+    "birth_date": "1957-05-15T00:00:00",
+    "age": 68,
     "medical_conditions": [
         "Diabete di tipo 1",
         "Celiachia",
@@ -10,64 +11,89 @@
     ],
     "activities": [
         {
-            "activity_id": "lb_001",
             "name": "Misurazione glicemia",
-            "description": "Controllo glicemia a digiuno",
+            "time": "07:30",
+            "valid_from": null,
+            "activity_id": "lb_001",
             "day_of_week": [
-                0,
-                2,
+                1,
+                3,
                 5
             ],
-            "time": "07:30",
-            "duration_minutes": 10,
+            "description": "Controllo glicemia a digiuno",
+            "valid_until": null,
             "dependencies": [],
-            "valid_from": null,
-            "valid_until": null
+            "duration_minutes": 10
         },
         {
-            "activity_id": "lb_002",
             "name": "Colazione",
-            "description": "Colazione salata con proteine",
+            "time": "08:00",
+            "valid_from": null,
+            "activity_id": "lb_002",
             "day_of_week": [
-                0,
-                2,
+                1,
+                3,
                 5
             ],
-            "time": "08:00",
-            "duration_minutes": 20,
+            "description": "Colazione salata con proteine",
+            "valid_until": null,
             "dependencies": [
                 "Misurazione glicemia"
             ],
-            "valid_from": null,
-            "valid_until": null
+            "duration_minutes": 20
         },
         {
-            "activity_id": "lw_001",
             "name": "Light walk",
-            "description": "A light 1-hour walk in the morning.",
-            "day_of_week": [
-                0
-            ],
             "time": "08:35",
-            "duration_minutes": 60,
-            "dependencies": [],
             "valid_from": null,
-            "valid_until": null
+            "activity_id": "lw_001",
+            "day_of_week": [
+                1,
+                3
+            ],
+            "description": "A light 1-hour walk in the morning.",
+            "valid_until": null,
+            "dependencies": [],
+            "duration_minutes": 60
         },
         {
-            "activity_id": "wo_1",
-            "name": "Light workout",
-            "description": "A light 1-hour workout in the morning.",
-            "day_of_week": [
-                0,
-                2,
-                4
-            ],
-            "time": "09:30",
-            "duration_minutes": 60,
-            "dependencies": [],
+            "name": "Pranzo",
+            "time": "12:00",
             "valid_from": null,
-            "valid_until": null
+            "activity_id": "lu_001",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "description": "",
+            "valid_until": null,
+            "dependencies": [],
+            "duration_minutes": 60
+        },
+        {
+            "name": "Take Tachipirina",
+            "time": "13:00",
+            "valid_from": null,
+            "activity_id": "ta_001",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "description": "Take 1000 mg Tachipirina tablet once daily.",
+            "valid_until": null,
+            "dependencies": [],
+            "duration_minutes": 5
         }
-    ]
+    ],
+    "expired_activities": []
 }

@@ -3,10 +3,28 @@ import json
 import logging
 
 from config_loader import THERAPY_FILE
-from database import DatabaseManager
-from utils import hhmm_to_minutes, load_markdown_for_llm, minutes_to_hhmm
+from sql_db import DatabaseManager
+from utils import hhmm_to_minutes, minutes_to_hhmm
 
 logger = logging.getLogger("knowledge_manager")
+
+# ─── Vector DB reference (injected at startup via set_vector_db) ──────────────
+_vector_db = None
+
+
+def set_vector_db(vdb) -> None:
+    """Inject the VectorDBManager instance used by all tools."""
+    global _vector_db
+    _vector_db = vdb
+    logger.info("[TOOLS] VectorDBManager injected")
+
+
+def _get_patient_id() -> str:
+    """Read the current patient_id from therapy.json."""
+    try:
+        return str(_load_therapy().get("patient_id", "unknown"))
+    except Exception:
+        return "unknown"
 
 
 def clear_conversation_history(self, keep_system=True):
@@ -24,12 +42,12 @@ def clear_conversation_history(self, keep_system=True):
 
 
 def _ensure_data_dir():
-    """Crea la cartella data se non esiste"""
+    """Create the data directory if it does not exist."""
     THERAPY_FILE.parent.mkdir(exist_ok=True)
 
 
 def _load_therapy():
-    """Carica il file therapy.json"""
+    """Load therapy.json and return its contents as a dict."""
     _ensure_data_dir()
 
     if not THERAPY_FILE.exists():
@@ -48,7 +66,7 @@ def _load_therapy():
 
 
 def _save_therapy(data):
-    """Salva il file therapy.json"""
+    """Persist the given data dict to therapy.json."""
     _ensure_data_dir()
 
     try:
@@ -64,10 +82,10 @@ def _save_therapy(data):
 
 def get_all_activities():
     """
-    Ottiene tutte le attività terapeutiche
+    Retrieve all therapy activities.
 
     Returns:
-        str: JSON formattato con tutte le attività
+        str: JSON-formatted string with all activities
     """
     try:
         data = _load_therapy()
@@ -76,7 +94,7 @@ def get_all_activities():
             return json.dumps(
                 {
                     "status": "success",
-                    "message": "Nessuna attività configurata",
+                    "message": "No activities configured",
                     "patient_id": data.get("patient_id", ""),
                     "patient_name": data.get("patient_name", ""),
                     "activities": [],
@@ -176,26 +194,41 @@ def find_scheduling_conflicts(new_activity, schedule):
                     - Modify the conflicting activity
                 """
 
-        return {
+        # Query past conflict resolution hints from the vector DB
+        past_hints: list[dict] = []
+        if _vector_db is not None:
+            conflict_query = (
+                f"Scheduling conflict between {new_activity['name']} "
+                f"and {conflicting_activity['name']}"
+            )
+            past_hints = _vector_db.query_conflict_resolutions(conflict_query)
+
+        result: dict = {
             "status": "failure",
-            "message": f"""The activity '{new_activity["name"]}' cannot be scheduled at {new_activity["time"]}
-                    because overlaps with the activity named '{conflicting_activity["name"]}'.
-                    {suggestion_string}
-                    """,
+            "message": (
+                f"The activity '{new_activity['name']}' cannot be scheduled at "
+                f"{new_activity['time']} because it overlaps with the activity "
+                f"named '{conflicting_activity['name']}'.\n{suggestion_string}"
+            ),
         }
+        if past_hints:
+            result["past_resolution_hints"] = past_hints
+
+        return result
     else:
         return None
 
 
 def add_therapy_activity(activity_data):
     """
-    Aggiunge una nuova attività terapeutica
+    Add a new therapy activity.
 
     Args:
-        activity_data: dict con i dati dell'attività (activity_id, name, description, day_of_week, time, duration_minutes, dependencies, valid_from, valid_until)
+        activity_data: dict with activity fields (activity_id, name, description,
+                       day_of_week, time, duration_minutes, dependencies, valid_from, valid_until)
 
     Returns:
-        str: Messaggio di conferma o errore
+        str: JSON-formatted confirmation or error message
     """
     try:
         data = _load_therapy()
@@ -243,18 +276,25 @@ def add_therapy_activity(activity_data):
             "valid_until": activity_data.get("valid_until"),
         }
 
-        conflicting_activity = find_scheduling_conflicts(
-            new_activity, data["activities"]
-        )
-
-        if conflicting_activity:
-            return json.dumps(
-                {
-                    "status": "failure",
-                    "message": f"""The activity '{new_activity["name"]}' cannot be scheduled at {new_activity["time"]}
-                    because overlaps with the activity {json.dumps(conflicting_activity)}""",
-                }
+        # ── Patient history check (RAG) ─────────────────────────────────────
+        history_warnings: list[dict] = []
+        if _vector_db is not None:
+            patient_id = _get_patient_id()
+            activity_query = (
+                f"{new_activity['name']} {new_activity.get('description', '')}"
             )
+            history_warnings = _vector_db.query_patient_history(
+                patient_id, activity_query
+            )
+
+        # ── Scheduling conflict check ────────────────────────────────────────
+        conflict = find_scheduling_conflicts(new_activity, data["activities"])
+
+        if conflict:
+            result = dict(conflict)
+            if history_warnings:
+                result["patient_history_warnings"] = history_warnings
+            return json.dumps(result, indent=2, ensure_ascii=False)
         else:
             data["activities"].append(new_activity)
             data["activities"].sort(
@@ -266,15 +306,15 @@ def add_therapy_activity(activity_data):
                 f"[THERAPY] Added activity: {new_activity['activity_id']} - {new_activity['name']}"
             )
 
-            return json.dumps(
-                {
-                    "status": "success",
-                    "message": f"Activity '{new_activity['name']}' successfully added",
-                    "activity": new_activity,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
+            result = {
+                "status": "success",
+                "message": f"Activity '{new_activity['name']}' successfully added",
+                "activity": new_activity,
+            }
+            if history_warnings:
+                result["patient_history_warnings"] = history_warnings
+
+            return json.dumps(result, indent=2, ensure_ascii=False)
 
     except Exception as e:
         logger.error(f"[THERAPY] Error adding activity: {e}")
@@ -283,14 +323,14 @@ def add_therapy_activity(activity_data):
 
 def update_therapy_activity(activity_id, updates):
     """
-    Aggiorna un'attività esistente
+    Update an existing therapy activity.
 
     Args:
-        activity_id: ID dell'attività da aggiornare
-        updates: dict con i campi da aggiornare
+        activity_id: ID of the activity to update
+        updates: dict with the fields to update
 
     Returns:
-        str: Messaggio di conferma o errore
+        str: JSON-formatted confirmation or error message
     """
     try:
         data = _load_therapy()
@@ -320,15 +360,22 @@ def update_therapy_activity(activity_id, updates):
         temp_activities = copy.deepcopy(data["activities"])
         temp_activities.pop(activity_index)
 
-        conflicting_activity = find_conflicting_activity(activity, temp_activities)
-        if conflicting_activity:
-            return json.dumps(
-                {
-                    "status": "failure",
-                    "message": f"""The activity '{activity["name"]}' cannot be updated
-                    because the new time overlaps with the activity {json.dumps(conflicting_activity)}""",
-                }
+        # ── Patient history check (RAG) ─────────────────────────────────────
+        history_warnings: list[dict] = []
+        if _vector_db is not None:
+            patient_id = _get_patient_id()
+            activity_query = f"{activity['name']} {activity.get('description', '')}"
+            history_warnings = _vector_db.query_patient_history(
+                patient_id, activity_query
             )
+
+        # ── Scheduling conflict check ────────────────────────────────────────
+        conflict = find_scheduling_conflicts(activity, temp_activities)
+        if conflict:
+            result = dict(conflict)
+            if history_warnings:
+                result["patient_history_warnings"] = history_warnings
+            return json.dumps(result, indent=2, ensure_ascii=False)
         else:
             _save_therapy(data)
 
@@ -336,15 +383,15 @@ def update_therapy_activity(activity_id, updates):
             logger.debug(f"[THERAPY] Old: {old_activity}")
             logger.debug(f"[THERAPY] New: {activity}")
 
-            return json.dumps(
-                {
-                    "status": "success",
-                    "message": f"The activity '{activity['name']}' has been updated successfully",
-                    "activity": activity,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
+            result = {
+                "status": "success",
+                "message": f"The activity '{activity['name']}' has been updated successfully",
+                "activity": activity,
+            }
+            if history_warnings:
+                result["patient_history_warnings"] = history_warnings
+
+            return json.dumps(result, indent=2, ensure_ascii=False)
 
     except Exception as e:
         logger.error(f"[THERAPY] Error updating activity: {e}")
@@ -353,18 +400,18 @@ def update_therapy_activity(activity_id, updates):
 
 def remove_therapy_activity(activity_id):
     """
-    Rimuove un'attività terapeutica
+    Remove a therapy activity.
 
     Args:
-        activity_id: ID dell'attività da rimuovere
+        activity_id: ID of the activity to remove
 
     Returns:
-        str: Messaggio di conferma o errore
+        str: JSON-formatted confirmation or error message
     """
     try:
         data = _load_therapy()
 
-        # Trova e rimuovi l'attività
+        # Find and remove the activity
         activity_index = None
         removed_activity = {}
         dependent_acivities = []
@@ -418,9 +465,46 @@ def remove_therapy_activity(activity_id):
         return json.dumps({"status": "error", "message": str(e)}, indent=2)
 
 
-def get_medicine_data(medicine_name):
-    data = load_markdown_for_llm(medicine_name.lower())
-    return data
+def get_medicine_data(medicine_name: str) -> str:
+    """
+    RAG-based medicine data retrieval.
+    Queries the ChromaDB medicines collection for the most relevant document(s).
+    Falls back to a 'not available' message if the vector DB is not initialised.
+    """
+    if _vector_db is not None:
+        return _vector_db.query_medicines(medicine_name)
+    logger.warning("[TOOLS] Vector DB not available – cannot retrieve medicine data")
+    return f"Medicine data for '{medicine_name}' is not available (vector DB not initialised)."
+
+
+def get_patient_preferences() -> str:
+    """
+    Retrieve all known preferences for the current patient from ChromaDB.
+    Returns a JSON-formatted string for the LLM to consume.
+    """
+    if _vector_db is None:
+        logger.warning("[TOOLS] Vector DB not available – cannot retrieve preferences")
+        return json.dumps(
+            {"status": "error", "message": "Vector DB not available"},
+            indent=2,
+        )
+    patient_id = _get_patient_id()
+    prefs = _vector_db.query_patient_preferences(patient_id)
+    if not prefs:
+        return json.dumps(
+            {
+                "status": "success",
+                "patient_id": patient_id,
+                "preferences": [],
+                "message": "No preferences recorded for this patient.",
+            },
+            indent=2,
+        )
+    return json.dumps(
+        {"status": "success", "patient_id": patient_id, "preferences": prefs},
+        indent=2,
+        ensure_ascii=False,
+    )
 
 
 def save_session(database_manager: DatabaseManager = None):
@@ -481,7 +565,7 @@ tools_decl = [
                 - activity_id (unique)
                 - name
                 - day_of_week: list of integers representing days of the week with 0=Monday and 6=Sunday
-                - time (formato HH:MM)
+                - time (format HH:MM)
                 - duration_minutes. 
                 Optional: description, dependencies (list of activities names), valid_from, valid_until""",
             "parameters": {
@@ -575,17 +659,33 @@ tools_decl = [
         "type": "function",
         "function": {
             "name": "get_medicine_data",
-            "description": "Get the description of a medice uses",
+            "description": (
+                "Get pharmacological data for a medicine via semantic search "
+                "(uses RAG on the medicines vector database). "
+                "Always call this before adding any medicine-related activity."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "medicine_name": {
                         "type": "string",
-                        "description": "Simple name of the medicine to search (e.g. aulin, tachipirina, aspirina)",
+                        "description": "Name of the medicine (e.g. aulin, tachipirina, aspirina)",
                     }
                 },
                 "required": ["medicine_name"],
             },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_patient_preferences",
+            "description": (
+                "Retrieve all known preferences and habits of the current patient. "
+                "Use this to personalise therapy suggestions "
+                "(e.g. preferred activity time, food preferences, medication habits)."
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
     {

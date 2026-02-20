@@ -6,12 +6,27 @@ import streamlit as st
 import prompts
 from chat import OllamaChat
 from config_loader import MODEL, PATIENT_ID, THERAPY_FILE
-from database import DatabaseManager
+from sql_db import DatabaseManager
 from utils import get_system_info, setup_logger
+from vector_db import VectorDBManager
 
 if "logger" not in st.session_state:
     st.session_state.logger = setup_logger()
 logger = st.session_state.logger
+
+if "vector_db" not in st.session_state:
+    vdb = VectorDBManager()
+    vdb_available = vdb.initialize()
+    if vdb_available:
+        seeded = vdb.seed_medicines()
+        logger.info(
+            f"[CONFIG] Vector DB ready – {seeded} medicine file(s) newly indexed"
+        )
+        vdb.seed_patient_data(str(PATIENT_ID))
+        st.session_state.vector_db = vdb
+    else:
+        logger.warning("[CONFIG] Vector DB not available – RAG features disabled")
+        st.session_state.vector_db = None
 
 if "db" not in st.session_state:
     db = DatabaseManager()
@@ -32,17 +47,27 @@ if "db" not in st.session_state:
 if "chat" not in st.session_state:
     st.session_state.chat = OllamaChat(
         model=MODEL,
-        system_prompt=prompts.system,
+        system_prompt=prompts._THERAPY_MANAGER_PROMPT,
         database_manager=st.session_state.db if st.session_state.db_available else None,
+        vector_db=st.session_state.vector_db,
     )
     st.session_state.first_message = st.session_state.chat.conversation_history[-1]
 
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
 
+if "session_ended" not in st.session_state:
+    st.session_state.session_ended = False
+
 
 st.set_page_config(page_title="KnowledgeManagerLLM", page_icon="🤖", layout="centered")
 st.title("KnowledgeManagerLLM")
+
+if st.session_state.session_ended:
+    st.success(
+        "✅ Session saved. The conversation has been closed. "
+        "Refresh the page to start a new session."
+    )
 
 with st.chat_message(st.session_state.first_message["role"]):
     st.markdown(st.session_state.first_message["content"])
@@ -51,7 +76,10 @@ for message in st.session_state.conversation:
     with st.chat_message(message["role"]):
         st.markdown(message["message"])
 
-user_message = st.chat_input("Write a message...")
+user_message = st.chat_input(
+    "Write a message...",
+    disabled=st.session_state.session_ended,
+)
 if user_message:
     with st.chat_message("user"):
         st.markdown(user_message)
@@ -59,6 +87,7 @@ if user_message:
 
     with st.chat_message("assistant"):
         start = time()
+        logger.info(f"[CHAT] USER: {user_message}")
         with st.spinner("Thinking..."):
             response_gen = st.session_state.chat.send_message(user_message)
         elapsed = time() - start
@@ -67,12 +96,18 @@ if user_message:
             {"role": "assistant", "message": response_gen}
         )
 
-        logger.debug(f"[TIMING] Total elapsed time: {time() - start:.2f}s")
+        logger.debug(f"[TIMING] Total elapsed time: {elapsed:.2f}s")
         logger.info(f"[CHAT] ASSISTANT: {response_gen}")
 
         with st.container():
             st.markdown(response_gen)
             st.badge(f"🕛{elapsed:.2f}s")
+
+    # Check if the LLM triggered save_session during this turn
+    if st.session_state.chat.session_ended and not st.session_state.session_ended:
+        logger.info("[UI] Session ended via LLM tool call – locking chat input")
+        st.session_state.session_ended = True
+        st.rerun()
 
 
 # SIDEBAR
@@ -85,16 +120,25 @@ with st.sidebar:
     if st.button(
         "Save therapy",
         use_container_width=True,
-        disabled=not st.session_state.db_available,
+        disabled=not st.session_state.db_available or st.session_state.session_ended,
     ):
-        result = st.session_state.db.save_session(notes="Saved manually from Streamlit")
-        if result["status"] == "success":
-            v_id = result["version"]["id"]
-            logger.info(f"[SESSION] Therapy saved manually - version #{v_id}")
+        logger.info("[UI] Save therapy button clicked – running end_session")
+        with st.spinner("Saving session and extracting knowledge..."):
+            result = st.session_state.chat.end_session()
+        if result.get("status") == "success":
+            v_id = result.get("version", {}).get("id")
+            logger.info(f"[SESSION] Therapy saved manually – version #{v_id}")
+            st.session_state.session_ended = True
             st.success(f"Version #{v_id} saved!")
+            st.rerun()
+        elif result.get("status") == "skipped":
+            msg = result.get("message", "Session already ended")
+            logger.warning(f"[SESSION] Save skipped: {msg}")
+            st.info(msg)
         else:
-            logger.error(f"[SESSION] Save failed: {result['message']}")
-            st.error(result["message"])
+            msg = result.get("message", "Unknown error")
+            logger.error(f"[SESSION] Save failed: {msg}")
+            st.error(msg)
 
     st.divider()
     st.subheader("📋 Therapy")
@@ -176,3 +220,4 @@ with st.sidebar:
                 st.markdown(
                     f"🎮 **GPU {info['gpu']}:** {info['name']} ({info['memory']})"
                 )
+        st.markdown(f"🤖 **LLM Model:** {MODEL}")

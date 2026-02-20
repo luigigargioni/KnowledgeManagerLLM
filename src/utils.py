@@ -1,5 +1,4 @@
 import logging
-import os
 import platform
 import subprocess
 import sys
@@ -15,31 +14,6 @@ from config_loader import (
     LOGS_FOLDER,
     TERMINAL_LOG_LEVEL,
 )
-
-
-def load_markdown_for_llm(filename: str) -> str:
-    """
-    Legge un file .md dalla cartella data/facts/ e restituisce il contenuto come stringa.
-
-    Args:
-        filename: nome del file (con o senza estensione .md)
-
-    Returns:
-        Il contenuto del file come stringa
-    """
-    if not filename.endswith(".md"):
-        filename += ".md"
-
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    filepath = os.path.join(base_dir, "data", "facts", filename)
-
-    if not os.path.exists(filepath):
-        return f"File non found: {filepath}"
-
-    with open(filepath, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    return content
 
 
 def get_system_info():

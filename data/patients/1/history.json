@@ -1,0 +1,32 @@
+[
+    {
+        "description": "Mario Rossi ha subito una crisi ipoglicemica acuta dopo una sessione di camminata veloce nel tardo pomeriggio. L'evento è stato causato dalla combinazione di esercizio fisico intenso e la terapia insulinica per il diabete di tipo 1. Sconsigliato esercizio fisico aerobico senza monitoraggio glicemico preventivo.",
+        "activity_name": "Camminata veloce",
+        "event_type": "danger",
+        "date": "2025-11-10"
+    },
+    {
+        "description": "La somministrazione di Aspirina (acido acetilsalicilico) ha causato un peggioramento della funzione renale con aumento significativo della creatinina sierica nel paziente con grave insufficienza renale. Il medico ha confermato l'incompatibilità di Aspirina con l'insufficienza renale grave.",
+        "activity_name": "Assunzione Aspirina",
+        "event_type": "danger",
+        "date": "2025-09-03"
+    },
+    {
+        "description": "Il paziente ha presentato dolore gastrico acuto e nausea dopo la somministrazione di Aulin (Nimesulide). In seguito, il medico ha sospeso la terapia con Aulin per incompatibilità con la grave insufficienza renale, che rappresenta una controindicazione assoluta per i FANS.",
+        "activity_name": "Assunzione Aulin",
+        "event_type": "danger",
+        "date": "2025-07-18"
+    },
+    {
+        "description": "Dopo un pasto contenente glutine (pane normale), il paziente celiaco ha sviluppato sintomi gastrointestinali gravi: dolori addominali, diarrea e gonfiore persistente per 48 ore. Confermata intolleranza severa al glutine; dieta rigorosamente gluten-free obbligatoria.",
+        "activity_name": "Pasto con glutine",
+        "event_type": "danger",
+        "date": "2025-06-05"
+    },
+    {
+        "description": "L'attività cognitiva intensa nel primo pomeriggio (13:00-15:00) ha ripetutamente coinciso con episodi di sonnolenza post-prandiale, rendendo il paziente incapace di concentrarsi. Consigliato posticipare le attività cognitive al pomeriggio inoltrato (dopo le 16:00).",
+        "activity_name": "Attività cognitiva pomeriggio",
+        "event_type": "warning",
+        "date": "2025-10-22"
+    }
+]

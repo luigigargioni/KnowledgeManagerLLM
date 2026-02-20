@@ -9,7 +9,11 @@ import tools as tools
 from config_loader import (
     OLLAMA_URL,
 )
-from database import DatabaseManager
+from session_extractor import (
+    extract_and_save_conflict_resolutions,
+    extract_and_save_patient_preferences,
+)
+from sql_db import DatabaseManager
 
 logger = logging.getLogger("knowledge_manager")
 
@@ -49,25 +53,35 @@ def build_first_message(therapy_json):
 class OllamaChat:
     def __init__(
         self,
-        model="llama3",
+        model="qwen2.5:14b",
         base_url=OLLAMA_URL,
         system_prompt=None,
         database_manager: DatabaseManager = None,
+        vector_db=None,
     ):
         """
-        Inizializza il client Ollama
+        Initialise the Ollama client.
 
         Args:
-            model: Nome del modello da utilizzare (default: llama3)
-            base_url: URL base dell'API Ollama (default: http://localhost:11434)
-            system_prompt: Prompt di sistema per configurare il comportamento del modello
+            model: Model name to use (default: qwen2.5:14b)
+            base_url: Base URL of the Ollama API (default: http://localhost:11434)
+            system_prompt: System prompt to configure the model behaviour
+            database_manager: DatabaseManager instance for session persistence
+            vector_db: VectorDBManager instance for RAG features
         """
         self.model = model
         self.base_url = base_url
         self.api_endpoint = f"{base_url}/api/chat"
         self.conversation_history = []
+        self.session_ended = False
 
         self.database_manager = database_manager
+        self.vector_db = vector_db
+
+        # Inject the vector DB into the tools module so all tool functions can use it
+        if vector_db is not None:
+            tools.set_vector_db(vector_db)
+            logger.debug("[INIT] Vector DB injected into tools module")
 
         logger.info(f"[INIT] Model {model}")
 
@@ -100,6 +114,31 @@ class OllamaChat:
             }
         )
 
+        # Inject patient preferences as initial context
+        if vector_db is not None:
+            patient_id = tools._get_patient_id()
+            prefs = vector_db.query_patient_preferences(patient_id)
+            if prefs:
+                self.conversation_history.append(
+                    {
+                        "role": "tool",
+                        "content": (
+                            "get_patient_preferences:"
+                            + json.dumps(
+                                {
+                                    "status": "success",
+                                    "patient_id": patient_id,
+                                    "preferences": prefs,
+                                },
+                                ensure_ascii=False,
+                            )
+                        ),
+                    }
+                )
+                logger.info(
+                    f"[INIT] Injected {len(prefs)} patient preference(s) into initial context"
+                )
+
         first_message = build_first_message(therapy_json)
         self.conversation_history.append(
             {"role": "assistant", "content": first_message}
@@ -107,14 +146,14 @@ class OllamaChat:
 
     def execute_tool(self, tool_name, tool_arguments):
         """
-        Esegue un tool in base al nome
+        Execute a tool by name.
 
         Args:
-            tool_name: Nome del tool da eseguire
-            tool_arguments: Argomenti del tool (dict)
+            tool_name: Name of the tool to execute
+            tool_arguments: Tool arguments (dict)
 
         Returns:
-            str: Risultato dell'esecuzione del tool
+            str: Result of the tool execution
         """
 
         if tool_name == "get_current_datetime":
@@ -150,23 +189,30 @@ class OllamaChat:
             medicine_name = tool_arguments.get("medicine_name")
             return tools.get_medicine_data(medicine_name)
 
+        elif tool_name == "get_patient_preferences":
+            return tools.get_patient_preferences()
+
         elif tool_name == "save_session":
-            return tools.save_session(self.database_manager)
+            logger.info(
+                "[TOOL] save_session triggered by LLM – running full end_session flow"
+            )
+            result = self.end_session()
+            return json.dumps(result, ensure_ascii=False)
 
         else:
             logger.warning(f"[TOOL] Tool not found: {tool_name}")
-            return f"Tool '{tool_name}' non trovato"
+            return f"Tool '{tool_name}' not found"
 
     def send_message(self, user_message):
         """
-        Invia un messaggio al modello mantenendo il contesto della conversazione
-        Gestisce automaticamente le chiamate ai tools
+        Send a message to the model, maintaining conversation context.
+        Automatically handles tool calls.
 
         Args:
-            user_message: Il messaggio dell'utente da inviare
+            user_message: The user message to send
 
         Returns:
-            str: La risposta del modello, o None in caso di errore
+            str: The model response, or None on error
         """
         logger.info(f"[CHAT] USER: {user_message}")
 
@@ -224,9 +270,7 @@ class OllamaChat:
                     # continue #this continue can be used if the llm needs to call multiple tools in sequence. In the case in which it needs a result first to call another  one
 
                 else:
-                    assistant_message = message.get(
-                        "content", "Nessuna risposta ricevuta"
-                    )
+                    assistant_message = message.get("content", "No response received")
                     self.conversation_history.append(
                         {"role": "assistant", "content": assistant_message}
                     )
@@ -247,7 +291,78 @@ class OllamaChat:
                 return None
 
         logger.warning("[WARNING] Max iterations reached for tool calling")
-        return "Errore: troppe chiamate ai tools"
+        return "Error: too many tool calls"
 
     def get_history(self):
         return self.conversation_history
+
+    def end_session(self) -> dict:
+        """
+        Perform full end-of-session processing:
+        1. Extract conflict resolutions from the conversation and persist to ChromaDB.
+        2. Extract patient preferences from the conversation and upsert to ChromaDB.
+        3. Save the therapy session to the PostgreSQL database.
+        4. Mark the session as ended (self.session_ended = True).
+
+        Idempotent: if already ended, returns immediately.
+        Returns the save_session result dict.
+        """
+        if self.session_ended:
+            logger.warning(
+                "[SESSION] end_session called but session is already ended – skipping"
+            )
+            return {"status": "skipped", "message": "Session already ended"}
+
+        logger.info("[SESSION] Starting end-of-session processing")
+
+        # ── Vector DB extraction ────────────────────────────────────────────
+        if self.vector_db is not None:
+            patient_id = tools._get_patient_id()
+            logger.info(
+                f"[SESSION] Running vector DB extraction for patient {patient_id}"
+            )
+
+            logger.debug(
+                "[SESSION] Extracting conflict resolutions from conversation history"
+            )
+            n_conflicts = extract_and_save_conflict_resolutions(
+                self.conversation_history, self.vector_db, patient_id
+            )
+            logger.info(f"[SESSION] Conflict resolutions saved: {n_conflicts}")
+
+            logger.debug(
+                "[SESSION] Extracting patient preferences from conversation history"
+            )
+            n_prefs = extract_and_save_patient_preferences(
+                self.conversation_history, self.vector_db, patient_id
+            )
+            logger.info(f"[SESSION] Patient preferences saved/updated: {n_prefs}")
+        else:
+            logger.warning(
+                "[SESSION] Vector DB not available – skipping knowledge extraction"
+            )
+
+        # ── PostgreSQL save ────────────────────────────────────────────────
+        if self.database_manager:
+            logger.debug("[SESSION] Persisting therapy to PostgreSQL")
+            result = self.database_manager.save_session()
+            if result.get("status") == "success":
+                v_id = result.get("version", {}).get("id")
+                logger.info(
+                    f"[SESSION] Therapy persisted to PostgreSQL – version #{v_id}"
+                )
+            else:
+                logger.error(
+                    f"[SESSION] PostgreSQL save failed: {result.get('message')}"
+                )
+        else:
+            logger.warning(
+                "[SESSION] No database manager – therapy not persisted to PostgreSQL"
+            )
+            result = {"status": "skipped", "message": "No database manager available"}
+
+        # ── Mark session as ended ────────────────────────────────────────────
+        self.session_ended = True
+        logger.info("[SESSION] Session marked as ended")
+
+        return result

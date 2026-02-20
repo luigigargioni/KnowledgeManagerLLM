@@ -1,0 +1,22 @@
+[
+    {
+        "description": "Il paziente ha rifiutato la camminata mattutina a causa del freddo eccessivo. Il conflitto è stato risolto proponendo un'attività fisica alternativa al chiuso (esercizi di stretching leggero in casa) con la stessa durata. Il paziente ha accettato con soddisfazione.",
+        "activity_name": "Camminata mattutina",
+        "date": "2025-10-14"
+    },
+    {
+        "description": "Il paziente ha espresso disagio nel partecipare a sessioni di gruppo per la terapia occupazionale, preferendo il lavoro individuale. Il conflitto è stato risolto permettendo al paziente di svolgere le stesse attività in modalità individuale supervisionata, con revisione mensile della preferenza.",
+        "activity_name": "Terapia occupazionale di gruppo",
+        "date": "2025-08-27"
+    },
+    {
+        "description": "Il paziente si è rifiutato di seguire la dieta gluten-free proposta dal nutrizionista in quanto la riteneva troppo restrittiva socialmente. Il conflitto è stato risolto coinvolgendo il medico curante per ribadire l'obbligatorietà della dieta e fornendo al paziente una lista di ricette e ristoranti gluten-friendly nelle vicinanze, riducendo così la percezione di limitazione sociale.",
+        "activity_name": "Dieta gluten-free",
+        "date": "2025-06-20"
+    },
+    {
+        "description": "Il paziente ha resistito all'automonitoraggio glicemico pre-esercizio, ritenendolo scomodo. Il conflitto è stato risolto concordando l'uso di un glucometro a lettura rapida (< 5 secondi) e integrando la misurazione come primo passo del rituale di preparazione all'attività fisica, rendendola automatica e non percepita come un ostacolo.",
+        "activity_name": "Monitoraggio glicemico pre-esercizio",
+        "date": "2025-11-25"
+    }
+]

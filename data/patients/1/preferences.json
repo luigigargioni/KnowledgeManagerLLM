@@ -1,0 +1,18 @@
+[
+    {
+        "description": "Il paziente preferisce svolgere attività fisica al mattino presto, preferibilmente prima delle 9:00, quando si sente più energico.",
+        "category": "schedule"
+    },
+    {
+        "description": "Il paziente preferisce pasti leggeri a pranzo (insalate, verdure, proteine magre) e tollera meglio una cena più abbondante.",
+        "category": "food"
+    },
+    {
+        "description": "Il paziente preferisce assumere i farmaci immediatamente dopo i pasti principali per ridurre i disturbi gastrici.",
+        "category": "medication"
+    },
+    {
+        "description": "Il paziente gradisce camminare all'aperto piuttosto che usare attrezzature da ginnastica al chiuso. Preferisce percorsi nel parco vicino a casa.",
+        "category": "activity"
+    }
+]

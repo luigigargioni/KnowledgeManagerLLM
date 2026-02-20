@@ -11,6 +11,7 @@ TERMINAL_LOG_LEVEL = os.getenv("TERMINAL_LOG_LEVEL", "WARNING")
 MODEL = os.getenv("MODEL", "qwen2.5:14b")
 CHECK_NVIDIA_GPU = int(os.getenv("CHECK_NVIDIA_GPU", "0")) == 1
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "120"))
 
 
 DB_HOST = os.getenv("DB_HOST", "localhost")
@@ -26,5 +27,8 @@ DB_CONNECTION_STRING = (
 
 THERAPY_FILE = Path(__file__).parent.parent / "data" / "therapy.json"
 LOGS_FOLDER = Path(__file__).parent.parent / "logs"
+MEDICINES_FOLDER = Path(__file__).parent.parent / "data" / "medicines"
+PATIENTS_DATA_FOLDER = Path(__file__).parent.parent / "data" / "patients"
+CHROMA_DB_PATH = Path(__file__).parent.parent / "chromadb"
 
-PATIENT_ID = os.getenv("PATIENT_ID", "test")
+PATIENT_ID = os.getenv("PATIENT_ID", "1")
