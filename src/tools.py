@@ -1,6 +1,7 @@
 import copy
 import json
 import logging
+from datetime import datetime
 
 from config_loader import THERAPY_FILE
 from utils import hhmm_to_minutes, minutes_to_hhmm
@@ -24,20 +25,6 @@ def _get_patient_id() -> str:
         return str(_load_therapy().get("patient_id", "unknown"))
     except Exception:
         return "unknown"
-
-
-def clear_conversation_history(self, keep_system=True):
-    if (
-        keep_system
-        and self.conversation_history
-        and self.conversation_history[0]["role"] == "system"
-    ):
-        system_msg = self.conversation_history[0]
-        self.conversation_history = [system_msg]
-        return "Conversation history has been cleared. System prompt kept."
-    else:
-        self.conversation_history = []
-        return "Conversation history has been completely cleared."
 
 
 def _ensure_data_dir():
@@ -105,16 +92,94 @@ def get_all_activities():
             )
 
         logger.info(f"[THERAPY] Retrieved {len(data['activities'])} activities")
-        data.update(
-            {
-                "status": "success",
-            }
-        )
-        return json.dumps(data, indent=2, ensure_ascii=False)
+        result = dict(data)
+        result["status"] = "success"
+        return json.dumps(result, indent=2, ensure_ascii=False)
 
     except Exception as e:
         logger.error(f"[THERAPY] Error getting activities: {e}")
         return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+def _parse_activity_date(d):
+    """Parse a date string accepting YYYY-MM-DD or ISO 8601. Returns None if d is None/unparseable."""
+    if d is None:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(d, fmt)
+        except ValueError:
+            continue
+    logger.warning(f"[TOOLS] Cannot parse date: {d!r} – treating as unbounded")
+    return None
+
+
+def _validate_date_field(value, field_name: str):
+    """Return an error message string if *value* is a non-None string in an
+    unrecognised date format; return None when the value is acceptable."""
+    if value is None:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            datetime.strptime(value, fmt)
+            return None
+        except ValueError:
+            continue
+    return (
+        f"Invalid date format for '{field_name}': expected YYYY-MM-DD, "
+        f"got '{value}'"
+    )
+
+
+def _validate_time_field(value, field_name: str = "time"):
+    """Return an error message if *value* is not a valid HH:MM string; None if acceptable."""
+    import re
+
+    if value is None:
+        return None
+    if not re.fullmatch(r"\d{2}:\d{2}", value):
+        return (
+            f"Invalid time format for '{field_name}': expected HH:MM (e.g. 08:30), "
+            f"got '{value}'"
+        )
+    h, m = int(value[:2]), int(value[3:])
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        return (
+            f"Invalid time value for '{field_name}': hours must be 00-23 and minutes 00-59, "
+            f"got '{value}'"
+        )
+    return None
+
+
+def _validate_day_of_week_field(value, field_name: str = "day_of_week"):
+    """Return an error message if *value* is not a non-empty list of integers in [1, 7];
+    return None if acceptable."""
+    if value is None:
+        return None
+    if not isinstance(value, list) or len(value) == 0:
+        return f"'{field_name}' must be a non-empty list of day numbers (1=Mon … 7=Sun)"
+    invalid = [d for d in value if not isinstance(d, int) or not (1 <= d <= 7)]
+    if invalid:
+        return (
+            f"'{field_name}' contains invalid day value(s) {invalid}; "
+            "allowed range is 1 (Monday) to 7 (Sunday)"
+        )
+    return None
+
+
+def _date_ranges_overlap(from1, until1, from2, until2) -> bool:
+    """Return True if two [from, until] date ranges overlap. None means unbounded."""
+    s1 = _parse_activity_date(from1)
+    e1 = _parse_activity_date(until1)
+    s2 = _parse_activity_date(from2)
+    e2 = _parse_activity_date(until2)
+    # Range 1 starts strictly after range 2 ends
+    if e2 is not None and s1 is not None and s1 > e2:
+        return False
+    # Range 2 starts strictly after range 1 ends
+    if e1 is not None and s2 is not None and s2 > e1:
+        return False
+    return True
 
 
 def find_conflicting_activity(new_activity, schedule):
@@ -122,59 +187,118 @@ def find_conflicting_activity(new_activity, schedule):
     new_end = new_start + new_activity["duration_minutes"]
     new_days = set(new_activity["day_of_week"])
 
-    for act in schedule:
+    # Sort by start time so the early-exit break is always valid,
+    # regardless of whether the caller passes an already-sorted list.
+    sorted_schedule = sorted(schedule, key=lambda a: hhmm_to_minutes(a["time"]))
+
+    for act in sorted_schedule:
         act_start = hhmm_to_minutes(act["time"])
 
-        # If we surpass the new activity ending date we exit the loop
+        # If we surpass the new activity ending time we can stop
         if act_start >= new_end:
             break
 
-        # Check if the activity take place in the same day
+        # Check if the activity takes place on the same day(s)
         if not new_days & set(act["day_of_week"]):
             continue
 
-        # Check overlap
+        # Check if both activities' validity periods overlap
+        if not _date_ranges_overlap(
+            new_activity.get("valid_from"),
+            new_activity.get("valid_until"),
+            act.get("valid_from"),
+            act.get("valid_until"),
+        ):
+            continue
+
+        # Check time overlap
         act_end = act_start + act["duration_minutes"]
         if new_start < act_end:
-            return act  # the loop stops at the first conflict (which is technically the only possible)
+            return act
 
     return None  # no conflict
 
 
 def find_earlier_time(activity, schedule):
-    conflicting_activity = find_conflicting_activity(activity, schedule)
-    if conflicting_activity:
-        # loop to search for a new possible time
-        conflict_time = hhmm_to_minutes(conflicting_activity["time"])
+    """Return the latest valid start time strictly before (or equal to) the
+    current start time, fitting the activity in a free gap.
 
-        # anticipate
-        new_time = conflict_time - activity["duration_minutes"]
-
-        if new_time < 0:
-            return None
-
-        activity["time"] = minutes_to_hhmm(new_time)
-        return find_earlier_time(activity, schedule)
-    else:
+    Instead of recursing one slot at a time this function collects *all*
+    candidate end-times (the start of every existing activity that sits at
+    or before the current position) and tries them from latest to earliest.
+    This avoids the former recursive approach that could return None even
+    when a valid earlier gap exists.
+    """
+    duration = activity["duration_minutes"]
+    if duration <= 0:
         return activity["time"]
+
+    current_start = hhmm_to_minutes(activity["time"])
+
+    # Build a sorted (descending) list of candidate end-times.
+    # Each candidate places the new activity to end exactly when an existing
+    # one begins, working from the current position backwards.
+    # Only consider activities that share at least one day with the new activity
+    # so that cross-day activities don't distort the available time windows.
+    new_days = set(activity["day_of_week"])
+    candidate_ends = sorted(
+        {
+            hhmm_to_minutes(act["time"])
+            for act in schedule
+            if hhmm_to_minutes(act["time"]) <= current_start
+            and new_days & set(act["day_of_week"])
+        }
+        | {current_start},
+        reverse=True,
+    )
+
+    for cand_end in candidate_ends:
+        cand_start = cand_end - duration
+        if cand_start < 0:
+            continue
+        test_activity = {**activity, "time": minutes_to_hhmm(cand_start)}
+        if find_conflicting_activity(test_activity, schedule) is None:
+            return minutes_to_hhmm(cand_start)
+
+    return None
 
 
 def find_later_time(activity, schedule):
-    conflicting_activity = find_conflicting_activity(activity, schedule)
-    if conflicting_activity:
-        # loop to search for a new possible time
-        conflict_time = hhmm_to_minutes(conflicting_activity["time"])
+    """Return the earliest valid start time at or after the current end time.
 
-        # anticipate
-        new_time = conflict_time + conflicting_activity["duration_minutes"]
-
-        if new_time > 24 * 60:
-            return None
-
-        activity["time"] = minutes_to_hhmm(new_time)
-        return find_later_time(activity, schedule)
-    else:
+    Collects candidate start-times (the end of every existing activity that
+    overlaps or immediately follows the current slot) and returns the first
+    one that fits within the day without conflicts.
+    """
+    duration = activity["duration_minutes"]
+    if duration <= 0:
         return activity["time"]
+
+    current_start = hhmm_to_minutes(activity["time"])
+    current_end = current_start + duration
+
+    # Candidate start-times: begin right after each activity whose end time
+    # falls at or after the current activity's end (i.e. all activities that
+    # could conflict or immediately follow).
+    # Only consider activities that share at least one day with the new activity.
+    new_days = set(activity["day_of_week"])
+    candidate_starts = sorted(
+        {
+            hhmm_to_minutes(act["time"]) + act["duration_minutes"]
+            for act in schedule
+            if hhmm_to_minutes(act["time"]) + act["duration_minutes"] >= current_end
+            and new_days & set(act["day_of_week"])
+        }
+    )
+
+    for cand_start in candidate_starts:
+        if cand_start + duration > 24 * 60:
+            break
+        test_activity = {**activity, "time": minutes_to_hhmm(cand_start)}
+        if find_conflicting_activity(test_activity, schedule) is None:
+            return minutes_to_hhmm(cand_start)
+
+    return None
 
 
 def find_scheduling_conflicts(new_activity, schedule, patient_id: str = None):
@@ -254,6 +378,54 @@ def add_therapy_activity(activity_data):
                     indent=2,
                 )
 
+        # Validate time format (must be HH:MM)
+        time_err = _validate_time_field(activity_data.get("time"), "time")
+        if time_err:
+            return json.dumps({"status": "error", "message": time_err}, indent=2)
+
+        # Validate optional date fields (must be YYYY-MM-DD or ISO 8601)
+        for date_field in ("valid_from", "valid_until"):
+            date_err = _validate_date_field(activity_data.get(date_field), date_field)
+            if date_err:
+                return json.dumps({"status": "error", "message": date_err}, indent=2)
+
+        # Validate that valid_from precedes valid_until when both are provided
+        vf = activity_data.get("valid_from")
+        vu = activity_data.get("valid_until")
+        if vf and vu:
+            vf_dt = _parse_activity_date(vf)
+            vu_dt = _parse_activity_date(vu)
+            if vf_dt and vu_dt and vf_dt > vu_dt:
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": f"'valid_from' ({vf}) must be before or equal to 'valid_until' ({vu})",
+                    },
+                    indent=2,
+                )
+
+        # Validate day_of_week (non-empty, values 1–7)
+        dow_err = _validate_day_of_week_field(
+            activity_data.get("day_of_week"), "day_of_week"
+        )
+        if dow_err:
+            return json.dumps({"status": "error", "message": dow_err}, indent=2)
+
+        # Validate duration_minutes (must be a positive integer)
+        duration = activity_data.get("duration_minutes", 0)
+        # Auto-coerce whole-number floats (e.g. 30.0 → 30) that some LLMs produce
+        if isinstance(duration, float) and duration.is_integer():
+            duration = int(duration)
+            activity_data["duration_minutes"] = duration
+        if not isinstance(duration, int) or duration <= 0:
+            return json.dumps(
+                {
+                    "status": "error",
+                    "message": "duration_minutes must be a positive integer (e.g. 30, not 30.0)",
+                },
+                indent=2,
+            )
+
         # Verify unique actvitiy_id
         if any(
             act["activity_id"] == activity_data["activity_id"]
@@ -279,10 +451,50 @@ def add_therapy_activity(activity_data):
             "valid_until": activity_data.get("valid_until"),
         }
 
+        patient_id = _get_patient_id()
+
+        # Validate that all declared dependencies exist in the current schedule
+        if new_activity.get("dependencies"):
+            existing_ids = {act["activity_id"] for act in data["activities"]}
+            missing_deps = [
+                dep for dep in new_activity["dependencies"] if dep not in existing_ids
+            ]
+            if missing_deps:
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": (
+                            f"Dependencies not found in schedule: {', '.join(missing_deps)}. "
+                            "Use the exact activity_id."
+                        ),
+                    },
+                    indent=2,
+                )
+
+            # Validate temporal ordering: every dependency must end before this activity starts
+            new_start = hhmm_to_minutes(new_activity["time"])
+            activity_map = {act["activity_id"]: act for act in data["activities"]}
+            for dep_id in new_activity["dependencies"]:
+                dep = activity_map.get(dep_id)
+                if dep:
+                    dep_end = hhmm_to_minutes(dep["time"]) + dep["duration_minutes"]
+                    if dep_end > new_start:
+                        return json.dumps(
+                            {
+                                "status": "error",
+                                "message": (
+                                    f"Temporal ordering violation: dependency '{dep_id}' "
+                                    f"({dep['name']}) ends at {minutes_to_hhmm(dep_end)}, "
+                                    f"which is after the scheduled start time {new_activity['time']} "
+                                    "of this activity."
+                                ),
+                            },
+                            indent=2,
+                        )
+
         # ── Patient history check (RAG) ─────────────────────────────────────
         history_warnings: list[dict] = []
         if _vector_db is not None:
-            patient_id = _get_patient_id()
             activity_query = (
                 f"{new_activity['name']} {new_activity.get('description', '')}"
             )
@@ -355,28 +567,127 @@ def update_therapy_activity(activity_id, updates):
                 indent=2,
             )
 
-        activity = data["activities"][activity_index]
-        old_activity = activity.copy()
+        old_activity = copy.deepcopy(data["activities"][activity_index])
 
+        # Build the validated/updated activity on a *copy* so that the stored
+        # data is never mutated before all checks pass.
+        updated_activity = copy.deepcopy(old_activity)
         for key, value in updates.items():
             if key != "activity_id":
-                activity[key] = value
+                updated_activity[key] = value
 
-        temp_activities = copy.deepcopy(data["activities"])
-        temp_activities.pop(activity_index)
+        # Schedule without this activity for conflict/dependency checks
+        temp_activities = [
+            a for i, a in enumerate(data["activities"]) if i != activity_index
+        ]
+
+        patient_id = _get_patient_id()
+
+        # Validate time format if it is being updated (must be HH:MM)
+        if "time" in updates:
+            time_err = _validate_time_field(updates["time"], "time")
+            if time_err:
+                return json.dumps({"status": "error", "message": time_err}, indent=2)
+
+        # Validate optional date fields (must be YYYY-MM-DD or ISO 8601)
+        for date_field in ("valid_from", "valid_until"):
+            if date_field in updates:
+                date_err = _validate_date_field(updates[date_field], date_field)
+                if date_err:
+                    return json.dumps(
+                        {"status": "error", "message": date_err}, indent=2
+                    )
+
+        # Validate that valid_from precedes valid_until (consider merged values from both
+        # the update and the existing activity so partial updates are handled correctly)
+        merged_vf = updates.get("valid_from", updated_activity.get("valid_from"))
+        merged_vu = updates.get("valid_until", updated_activity.get("valid_until"))
+        if merged_vf and merged_vu:
+            vf_dt = _parse_activity_date(merged_vf)
+            vu_dt = _parse_activity_date(merged_vu)
+            if vf_dt and vu_dt and vf_dt > vu_dt:
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": f"'valid_from' ({merged_vf}) must be before or equal to 'valid_until' ({merged_vu})",
+                    },
+                    indent=2,
+                )
+
+        # Validate day_of_week if being updated (non-empty, values 1–7)
+        if "day_of_week" in updates:
+            dow_err = _validate_day_of_week_field(updates["day_of_week"], "day_of_week")
+            if dow_err:
+                return json.dumps({"status": "error", "message": dow_err}, indent=2)
+
+        # Validate duration_minutes if being updated (must be a positive integer)
+        if "duration_minutes" in updates:
+            duration = updates["duration_minutes"]
+            # Auto-coerce whole-number floats (e.g. 30.0 → 30) that some LLMs produce
+            if isinstance(duration, float) and duration.is_integer():
+                duration = int(duration)
+                updates["duration_minutes"] = duration
+                updated_activity["duration_minutes"] = duration
+            if not isinstance(duration, int) or duration <= 0:
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": "duration_minutes must be a positive integer (e.g. 30, not 30.0)",
+                    },
+                    indent=2,
+                )
+
+        # Validate that updated dependencies exist in the schedule
+        new_deps = updates.get("dependencies")
+        if new_deps is not None:
+            existing_ids = {act["activity_id"] for act in temp_activities}
+            missing_deps = [dep for dep in new_deps if dep not in existing_ids]
+            if missing_deps:
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": (
+                            f"Dependencies not found in schedule: {', '.join(missing_deps)}. "
+                            "Use the exact activity_id."
+                        ),
+                    },
+                    indent=2,
+                )
+
+            # Validate temporal ordering: every dependency must end before this activity starts
+            updated_start = hhmm_to_minutes(updated_activity["time"])
+            activity_map = {act["activity_id"]: act for act in temp_activities}
+            for dep_id in new_deps:
+                dep = activity_map.get(dep_id)
+                if dep:
+                    dep_end = hhmm_to_minutes(dep["time"]) + dep["duration_minutes"]
+                    if dep_end > updated_start:
+                        return json.dumps(
+                            {
+                                "status": "error",
+                                "message": (
+                                    f"Temporal ordering violation: dependency '{dep_id}' "
+                                    f"({dep['name']}) ends at {minutes_to_hhmm(dep_end)}, "
+                                    f"which is after the scheduled start time {updated_activity['time']} "
+                                    "of this activity."
+                                ),
+                            },
+                            indent=2,
+                        )
 
         # ── Patient history check (RAG) ─────────────────────────────────────
         history_warnings: list[dict] = []
         if _vector_db is not None:
-            patient_id = _get_patient_id()
-            activity_query = f"{activity['name']} {activity.get('description', '')}"
+            activity_query = (
+                f"{updated_activity['name']} {updated_activity.get('description', '')}"
+            )
             history_warnings = _vector_db.query_patient_history(
                 patient_id, activity_query
             )
 
         # ── Scheduling conflict check ────────────────────────────────────────
         conflict = find_scheduling_conflicts(
-            activity, temp_activities, patient_id=patient_id
+            updated_activity, temp_activities, patient_id=patient_id
         )
         if conflict:
             result = dict(conflict)
@@ -384,6 +695,38 @@ def update_therapy_activity(activity_id, updates):
                 result["patient_history_warnings"] = history_warnings
             return json.dumps(result, indent=2, ensure_ascii=False)
         else:
+            # ── Dependent ordering check ──────────────────────────────────────
+            # If time or duration changed, verify that every activity that lists
+            # this one as a dependency still starts after it ends.
+            if "time" in updates or "duration_minutes" in updates:
+                updated_end = (
+                    hhmm_to_minutes(updated_activity["time"])
+                    + updated_activity["duration_minutes"]
+                )
+                violations = []
+                for act in temp_activities:
+                    if activity_id in act.get("dependencies", []):
+                        if hhmm_to_minutes(act["time"]) < updated_end:
+                            violations.append(
+                                f"'{act['name']}' starts at {act['time']} but "
+                                f"'{updated_activity['name']}' would end at "
+                                f"{minutes_to_hhmm(updated_end)}"
+                            )
+                if violations:
+                    return json.dumps(
+                        {
+                            "status": "error",
+                            "message": (
+                                "Temporal ordering violation: the update would cause "
+                                "this activity to end after the start of its "
+                                f"dependent(s): {'; '.join(violations)}"
+                            ),
+                        },
+                        indent=2,
+                    )
+
+            # All checks passed – commit the update
+            data["activities"][activity_index] = updated_activity
             data["activities"].sort(
                 key=lambda act: int(act["time"][:2]) * 60 + int(act["time"][3:])
             )
@@ -391,12 +734,12 @@ def update_therapy_activity(activity_id, updates):
 
             logger.info(f"[THERAPY] Updated activity: {activity_id}")
             logger.debug(f"[THERAPY] Old: {old_activity}")
-            logger.debug(f"[THERAPY] New: {activity}")
+            logger.debug(f"[THERAPY] New: {updated_activity}")
 
             result = {
                 "status": "success",
-                "message": f"The activity '{activity['name']}' has been updated successfully",
-                "activity": activity,
+                "message": f"The activity '{updated_activity['name']}' has been updated successfully",
+                "activity": updated_activity,
             }
             if history_warnings:
                 result["patient_history_warnings"] = history_warnings
@@ -421,18 +764,14 @@ def remove_therapy_activity(activity_id):
     try:
         data = _load_therapy()
 
-        # Find and remove the activity
+        # First pass: locate the activity to remove
         activity_index = None
         removed_activity = {}
-        dependent_acivities = []
-
         for i, act in enumerate(data["activities"]):
-            if activity_id in act["dependencies"]:
-                dependent_acivities.append(act["name"])
-
             if act["activity_id"] == activity_id:
                 activity_index = i
                 removed_activity = act
+                break
 
         if activity_index is None:
             return json.dumps(
@@ -443,12 +782,23 @@ def remove_therapy_activity(activity_id):
                 indent=2,
             )
 
-        if len(dependent_acivities) > 0:
+        # Second pass: check dependents using the activity's ID.
+        # Dependencies are stored as lists of activity IDs.
+        activity_name = removed_activity["name"]
+        dependent_activities = [
+            act["name"]
+            for act in data["activities"]
+            if activity_id in act.get("dependencies", [])
+        ]
+
+        if dependent_activities:
             return json.dumps(
                 {
                     "status": "error",
-                    "message": f"""Couldn't remove the activity because it is a dependency 
-                    of the following activities {",".join(dependent_acivities)}""",
+                    "message": (
+                        f"Cannot remove '{activity_name}' because it is a dependency "
+                        f"of: {', '.join(dependent_activities)}."
+                    ),
                 },
                 indent=2,
             )
@@ -487,9 +837,11 @@ def get_medicine_data(medicine_name: str) -> str:
     return f"Medicine data for '{medicine_name}' is not available (vector DB not initialised)."
 
 
-def get_patient_preferences() -> str:
+def get_patient_preferences(query: str = "") -> str:
     """
-    Retrieve all known preferences for the current patient from ChromaDB.
+    Retrieve known preferences for the current patient from ChromaDB.
+    If *query* is provided, performs a semantic search and returns the closest matches.
+    If *query* is empty, returns all preferences for the patient.
     Returns a JSON-formatted string for the LLM to consume.
     """
     if _vector_db is None:
@@ -499,7 +851,7 @@ def get_patient_preferences() -> str:
             indent=2,
         )
     patient_id = _get_patient_id()
-    prefs = _vector_db.query_patient_preferences(patient_id)
+    prefs = _vector_db.query_patient_preferences(patient_id, query=query)
     if not prefs:
         return json.dumps(
             {
@@ -527,23 +879,6 @@ tools_decl = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
-    # {
-    #     "type": "function",
-    #     "function": {
-    #         "name": "clear_conversation_history",
-    #         "description": "Clears the conversation history. Use this function when the user wants to reset the session",
-    #         "parameters": {
-    #             "type": "object",
-    #             "properties": {
-    #                 "keep_system_prompt": {
-    #                     "type": "boolean",
-    #                     "description": "If true, keeps the system prompt. Always set it to true unless the users explicitly say otherwise",
-    #                 }
-    #             },
-    #             "required": [],
-    #         },
-    #     },
-    # },
     {
         "type": "function",
         "function": {
@@ -593,7 +928,7 @@ tools_decl = [
                     "dependencies": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "List of activities names that need to be completed before the current activity",
+                        "description": "List of activity_ids that must be completed before the current activity (use activity_id values, not names)",
                     },
                     "valid_from": {
                         "type": "string",
@@ -650,7 +985,7 @@ tools_decl = [
                     "dependencies": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "New list of dependency activity names",
+                        "description": "New list of dependency activity_ids (use activity_id values, not names)",
                     },
                     "valid_from": {
                         "type": "string",
@@ -708,11 +1043,21 @@ tools_decl = [
         "function": {
             "name": "get_patient_preferences",
             "description": (
-                "Retrieve all known preferences and habits of the current patient. "
-                "Use this to personalise therapy suggestions "
-                "(e.g. preferred activity time, food preferences, medication habits)."
+                "Retrieve known preferences and habits of the current patient. "
+                "Provide an optional 'query' to narrow results to a specific topic "
+                "(e.g. 'food', 'morning routine', 'medication timing'); "
+                "omit it to retrieve all preferences."
             ),
-            "parameters": {"type": "object", "properties": {}, "required": []},
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Optional topic to search within the patient's preferences (e.g. 'food', 'exercise', 'sleep'). Leave empty to retrieve all preferences.",
+                    }
+                },
+                "required": [],
+            },
         },
     },
     {

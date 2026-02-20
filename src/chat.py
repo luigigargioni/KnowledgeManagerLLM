@@ -56,7 +56,12 @@ def build_first_message(therapy_json):
         first_message += "\n *No activities found for this patient*.  \n\n"
     else:
         for act in therapy["activities"]:
-            first_message += f"- {act['name']}   -  {act['time']}  -  {', '.join(days_map[d] for d in act.get('day_of_week', []))} \n"
+            line = f"- {act['name']}   -  {act['time']}  -  {', '.join(days_map[d] for d in act.get('day_of_week', []))}"
+            valid_from = act.get("valid_from")
+            valid_until = act.get("valid_until")
+            if valid_from or valid_until:
+                line += f"  (valid: {valid_from or '…'} → {valid_until or '…'})"
+            first_message += line + "  \n"
         first_message += "\n"
 
     if len(therapy.get("expired_activities", [])) > 0:
@@ -118,42 +123,17 @@ class Chat:
         # Initialization of useful data
         self.conversation_history.append(
             {
-                "role": "tool",
+                "role": "system",
                 "content": f"get_current_datetime:{datetime.now().strftime('%Y-%m-%d %H:%M:%S %A')}",
             }
         )
         therapy_json = tools.get_all_activities()
         self.conversation_history.append(
             {
-                "role": "tool",
+                "role": "system",
                 "content": f"get_all_activities:{therapy_json}",
             }
         )
-
-        # Inject patient preferences as initial context
-        if vector_db is not None:
-            patient_id = tools._get_patient_id()
-            prefs = vector_db.query_patient_preferences(patient_id)
-            if prefs:
-                self.conversation_history.append(
-                    {
-                        "role": "tool",
-                        "content": (
-                            "get_patient_preferences:"
-                            + json.dumps(
-                                {
-                                    "status": "success",
-                                    "patient_id": patient_id,
-                                    "preferences": prefs,
-                                },
-                                ensure_ascii=False,
-                            )
-                        ),
-                    }
-                )
-                logger.info(
-                    f"[INIT] Injected {len(prefs)} patient preference(s) into initial context"
-                )
 
         first_message = build_first_message(therapy_json)
         self.conversation_history.append(
@@ -176,14 +156,6 @@ class Chat:
             now = datetime.now()
             result = now.strftime("%Y-%m-%d %H:%M:%S %A")
             return result
-
-        elif tool_name == "get_devices":
-            result = tools.get_devices()
-            return result
-
-        elif tool_name == "clear_conversation_history":
-            keep_system = tool_arguments.get("keep_system_prompt", True)
-            return tools.clear_conversation_history(self, keep_system)
 
         # THERAPY MANAGEMENT TOOLS
         elif tool_name == "get_therapy_activities":
@@ -209,7 +181,8 @@ class Chat:
             return tools.get_medicine_data(medicine_name)
 
         elif tool_name == "get_patient_preferences":
-            return tools.get_patient_preferences()
+            query = tool_arguments.get("query", "")
+            return tools.get_patient_preferences(query)
 
         elif tool_name == "save_session":
             logger.info(
@@ -275,8 +248,8 @@ class Chat:
 
         self.conversation_history.append({"role": "user", "content": user_message})
 
-        # LLM can call at most 5 tools in a row
-        max_iterations = 5
+        # LLM can call at most n tools in a row
+        max_iterations = 10
 
         for _ in range(max_iterations):
             try:
@@ -354,7 +327,9 @@ class Chat:
                 return None
 
         logger.warning("[WARNING] Max iterations reached for tool calling")
-        return "Error: too many tool calls"
+        error_msg = "I'm sorry, I could not complete the request because too many operations were needed. Please try rephrasing or breaking the request into smaller steps."
+        self.conversation_history.append({"role": "assistant", "content": error_msg})
+        return error_msg
 
     def get_history(self):
         return self.conversation_history

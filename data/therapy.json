@@ -38,7 +38,7 @@
             "description": "Colazione salata con proteine",
             "valid_until": null,
             "dependencies": [
-                "Misurazione glicemia"
+                "lb_001"
             ],
             "duration_minutes": 20
         },

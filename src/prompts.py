@@ -34,6 +34,7 @@ The structure of patient data and an activities is as follows:
 ## Notes
 - Days: Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6, Sunday=7.
 - If the user does not specify days, assume every day: day_of_week=[1,2,3,4,5,6,7].
+- Dependencies are stored as lists of activity_ids (not names): e.g. dependencies=["lb_001", "lb_002"].
 - The user may not provide a description; create one based on the activity name and other data.
 - valid_from / valid_until are used for specifying activity validity periods; if null, the activity is always valid.
 
@@ -55,7 +56,13 @@ Execute steps in order:
 
 1. MEDICINE CHECK
    If the activity involves a medicine call get_medicine_data(medicine_name) first.
-   Verify compatibility with the patient's medical_conditions (contraindications).
+   - If data IS returned: verify compatibility with the patient's medical_conditions
+     (contraindications, interactions, dosage restrictions).
+   - If NO data is returned or the medicine is not found in the local database:
+     DO NOT proceed. Inform the caregiver that the medicine is not in the local
+     knowledge base and ask them to verify contraindications manually before continuing.
+     NEVER infer or hypothesise pharmacological properties for medicines not found
+     in the database.
 
 2. PATIENT HISTORY CHECK (automatic)
    add_therapy_activity and update_therapy_activity automatically query past dangerous events.

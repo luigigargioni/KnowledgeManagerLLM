@@ -11,6 +11,7 @@ When the caregiver saves a session this module:
 
 import json
 import logging
+import re
 
 from openai import OpenAI
 
@@ -23,7 +24,10 @@ logger = logging.getLogger("knowledge_manager")
 def _format_conversation(conversation_history: list[dict]) -> str:
     """
     Turn the raw conversation history into readable text for the extractor.
-    Skips system and tool messages – only user and assistant turns are kept.
+    Only user and assistant turns are included; tool results are excluded because
+    they contain raw JSON with patient data that inflates the context and is not
+    useful for preference/conflict extraction.
+    System messages and init-context tool injections are also skipped.
     """
     lines = []
     for msg in conversation_history:
@@ -32,7 +36,8 @@ def _format_conversation(conversation_history: list[dict]) -> str:
         if role == "user":
             lines.append(f"Caregiver: {content}")
         elif role == "assistant":
-            lines.append(f"Assistant: {content}")
+            if content:
+                lines.append(f"Assistant: {content}")
     return "\n".join(lines)
 
 
@@ -63,13 +68,12 @@ def _call_llm(system_prompt: str, user_text: str) -> list[dict]:
         )
         content: str = (response.choices[0].message.content or "[]").strip()
 
-        # Strip markdown code fences if the model wraps the JSON
+        # Strip markdown code fences if the model wraps the JSON.
+        # Handles: ```json, ```JSON, ```, trailing whitespace/blank lines.
         if content.startswith("```"):
-            lines = content.splitlines()
-            # remove first line (``` or ```json) and last line (```)
-            content = "\n".join(
-                lines[1:-1] if lines and lines[-1].strip() == "```" else lines[1:]
-            )
+            content = re.sub(r"^```[a-zA-Z]*\s*\n?", "", content)
+            content = re.sub(r"\n?```\s*$", "", content.rstrip())
+            content = content.strip()
 
         parsed = json.loads(content)
         if isinstance(parsed, list):

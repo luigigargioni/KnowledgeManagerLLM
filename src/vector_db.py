@@ -34,6 +34,9 @@ COLLECTION_PATIENT_PREFERENCES = "patient_preferences"
 # (distance range: 0 = identical, 2 = opposite; reasonable duplicate threshold ≈ 0.20–0.30)
 PREFERENCE_DEDUP_THRESHOLD = 0.25
 
+# Cosine distance threshold below which two conflict resolutions are considered duplicates
+CONFLICT_DEDUP_THRESHOLD = 0.25
+
 
 class VectorDBManager:
     def __init__(self, db_path: str = None):
@@ -229,12 +232,16 @@ class VectorDBManager:
             distances = results.get("distances", [[]])[0]
 
             for doc, meta, dist in zip(docs, metas, distances):
-                if dist < 0.70:  # cosine distance threshold for relevance
+                # Apply a tighter distance threshold for safety-critical "danger" events
+                # so they are surfaced even when the semantic match is imperfect.
+                event_type = meta.get("event_type", "warning")
+                threshold = 0.85 if event_type == "danger" else 0.70
+                if dist < threshold:
                     events.append(
                         {
                             "description": doc,
                             "activity_name": meta.get("activity_name", ""),
-                            "event_type": meta.get("event_type", ""),
+                            "event_type": event_type,
                             "date": meta.get("date", ""),
                             "relevance_score": round(1 - dist, 3),
                         }
@@ -335,8 +342,33 @@ class VectorDBManager:
     def add_conflict_resolution(
         self, description: str, patient_id: str, activity_name: str = ""
     ) -> bool:
-        """Persist a conflict resolution pattern."""
+        """Persist a conflict resolution pattern.
+        Replaces semantically duplicate entries (cosine distance < CONFLICT_DEDUP_THRESHOLD)
+        so repeated sessions with the same conflict do not accumulate redundant records.
+        """
         try:
+            total = self._conflict_resolutions.count()
+            action = "added"
+
+            if total > 0:
+                existing = self._conflict_resolutions.query(
+                    query_texts=[description],
+                    n_results=min(3, total),
+                    where={"patient_id": str(patient_id)},
+                )
+                existing_ids: list[str] = existing.get("ids", [[]])[0]
+                distances: list[float] = existing.get("distances", [[]])[0]
+
+                for ex_id, dist in zip(existing_ids, distances):
+                    if dist < CONFLICT_DEDUP_THRESHOLD:
+                        self._conflict_resolutions.delete(ids=[ex_id])
+                        logger.info(
+                            f"[VECTOR_DB] Replaced duplicate conflict resolution {ex_id} "
+                            f"for patient {patient_id}"
+                        )
+                        action = "replaced"
+                        break
+
             resolution_id = (
                 f"cr_{patient_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_"
                 f"{str(uuid.uuid4())[:8]}"
@@ -352,7 +384,7 @@ class VectorDBManager:
                     }
                 ],
             )
-            logger.info(f"[VECTOR_DB] Added conflict resolution: {resolution_id}")
+            logger.info(f"[VECTOR_DB] Conflict resolution {action}: {resolution_id}")
             return True
         except Exception as e:
             logger.error(f"[VECTOR_DB] add_conflict_resolution error: {e}")

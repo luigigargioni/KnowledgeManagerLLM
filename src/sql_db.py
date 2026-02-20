@@ -71,24 +71,6 @@ class Patient(Base):
         }
 
 
-class Caregiver(Base):
-    __tablename__ = "caregivers"
-
-    id = Column(Integer, primary_key=True, autoincrement=True, unique=True)
-    name = Column(String(255), nullable=False)
-    email = Column(String(255))
-    created_at = Column(DateTime, default=datetime.now, nullable=False)
-    # preferences?
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "email": self.email,
-            "created_at": self.created_at.isoformat(),
-        }
-
-
 class TherapyVersion(Base):
     __tablename__ = "therapy_versions"
 
@@ -281,34 +263,6 @@ class DatabaseManager:
                 logger.error(f"[DB] Error updating patient: {e}")
                 return {"status": "error", "message": str(e)}
 
-    # ─── CAREGIVERS ─────────────────────────────
-
-    def create_caregiver(self, name: str, email: str = None) -> dict:
-        with self.get_session() as session:
-            try:
-                caregiver = Caregiver(name=name, email=email)
-                session.add(caregiver)
-                session.commit()
-                session.refresh(caregiver)
-                logger.info(f"[DB] Created caregiver: {name} (ID: {caregiver.id})")
-                return {"status": "success", "caregiver": caregiver.to_dict()}
-            except SQLAlchemyError as e:
-                session.rollback()
-                logger.error(f"[DB] Error creating caregiver: {e}")
-                return {"status": "error", "message": str(e)}
-
-    def get_all_caregivers(self) -> dict:
-        with self.get_session() as session:
-            try:
-                caregivers = session.query(Caregiver).order_by(Caregiver.name).all()
-                return {
-                    "status": "success",
-                    "caregivers": [c.to_dict() for c in caregivers],
-                }
-            except SQLAlchemyError as e:
-                logger.error(f"[DB] Error getting caregivers: {e}")
-                return {"status": "error", "message": str(e)}
-
     # Therapies
 
     def save_therapy_version(
@@ -442,17 +396,26 @@ class DatabaseManager:
             logger.info(
                 f"[DB] Loading therapy version {therapy['id']} for patient ID {patient_id}"
             )
+
+            def _parse_date(d: str) -> datetime:
+                """Accept YYYY-MM-DD or ISO 8601 datetime strings."""
+                for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
+                    try:
+                        return datetime.strptime(d, fmt)
+                    except ValueError:
+                        continue
+                raise ValueError(f"Unrecognised date format: {d!r}")
+
             valid_activities = [
                 x
                 for x in therapy["activities"]
                 if not x["valid_until"]
-                or datetime.strptime(x["valid_until"], "%Y-%m-%d") > datetime.now()
+                or _parse_date(x["valid_until"]) > datetime.now()
             ]
             expired_activities = [
                 x
                 for x in therapy["activities"]
-                if x["valid_until"]
-                and datetime.strptime(x["valid_until"], "%Y-%m-%d") <= datetime.now()
+                if x["valid_until"] and _parse_date(x["valid_until"]) <= datetime.now()
             ]
             data = {
                 "patient_id": patient["id"],
@@ -560,7 +523,7 @@ class DatabaseManager:
                 "day_of_week": [1, 3, 5],
                 "time": "08:00",
                 "duration_minutes": 20,
-                "dependencies": ["Misurazione glicemia"],
+                "dependencies": ["lb_001"],
                 "valid_from": None,
                 "valid_until": None,
             },

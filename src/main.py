@@ -43,7 +43,7 @@ def main():
         logger.info("[CONFIG] Database connected")
         db.seed_test_data()
         db.load_session(
-            DEFAULT_PATIENT_ID
+            int(DEFAULT_PATIENT_ID)
         )  # COMMENT THIS LINE if you need to test the system by editing the .JSON file directly
     else:
         logger.warning(
