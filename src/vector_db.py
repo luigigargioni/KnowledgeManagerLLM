@@ -290,10 +290,11 @@ class VectorDBManager:
         return count
 
     def query_conflict_resolutions(
-        self, conflict_description: str, n_results: int = 3
+        self, conflict_description: str, patient_id: str = None, n_results: int = 3
     ) -> list[dict]:
         """
         Retrieve past conflict resolution patterns similar to the current conflict.
+        When patient_id is provided, results are filtered to that patient only.
         Returns a list of resolution dicts.
         """
         try:
@@ -301,10 +302,14 @@ class VectorDBManager:
             if total == 0:
                 return []
 
-            results = self._conflict_resolutions.query(
-                query_texts=[conflict_description],
-                n_results=min(n_results, total),
-            )
+            query_kwargs: dict = {
+                "query_texts": [conflict_description],
+                "n_results": min(n_results, total),
+            }
+            if patient_id is not None:
+                query_kwargs["where"] = {"patient_id": str(patient_id)}
+
+            results = self._conflict_resolutions.query(**query_kwargs)
             items = []
             docs = results.get("documents", [[]])[0]
             metas = results.get("metadatas", [[]])[0]
@@ -465,6 +470,55 @@ class VectorDBManager:
 
     # ─── Seed helpers (file-based) ────────────────────────────────────────────
 
+    def seed_patient_preferences(self, patient_id: str, preferences: list[dict]) -> int:
+        """
+        Seed static preferences from a file using deterministic IDs derived from
+        a content hash. Unlike upsert_patient_preference, this method NEVER
+        overwrites dynamically learned preferences already stored in ChromaDB.
+        Already-seeded entries (same hash) are silently skipped.
+        Returns the number of newly inserted preferences.
+        """
+        import hashlib
+
+        existing_ids: set[str] = set(self._patient_preferences.get()["ids"])
+        count = 0
+
+        for pref in preferences:
+            desc = pref.get("description", "").strip()
+            if not desc:
+                continue
+            content_hash = hashlib.md5(desc.encode("utf-8")).hexdigest()[:12]
+            pref_id = f"pref_seed_{patient_id}_{content_hash}"
+
+            if pref_id in existing_ids:
+                logger.debug(
+                    f"[VECTOR_DB] Seed preference already present, skipping: {pref_id}"
+                )
+                continue
+
+            try:
+                self._patient_preferences.add(
+                    documents=[desc],
+                    ids=[pref_id],
+                    metadatas=[
+                        {
+                            "patient_id": str(patient_id),
+                            "category": pref.get("category", "other"),
+                            "date": "seed",
+                        }
+                    ],
+                )
+                count += 1
+            except Exception as e:
+                logger.error(
+                    f"[VECTOR_DB] seed_patient_preferences error for {pref_id}: {e}"
+                )
+
+        logger.info(
+            f"[VECTOR_DB] Seeded {count} preference(s) for patient {patient_id}"
+        )
+        return count
+
     def seed_patient_data(self, patient_id: str, patients_folder: Path = None) -> None:
         """
         Load and index history events, preferences and conflict resolutions for a patient
@@ -512,14 +566,11 @@ class VectorDBManager:
         if preferences_file.exists():
             try:
                 preferences = _json.loads(preferences_file.read_text(encoding="utf-8"))
-                for pref in preferences:
-                    self.upsert_patient_preference(
-                        patient_id=patient_id,
-                        preference_text=pref["description"],
-                        category=pref.get("category", "other"),
-                    )
+                n = self.seed_patient_preferences(
+                    patient_id=patient_id, preferences=preferences
+                )
                 logger.info(
-                    f"[VECTOR_DB] Seeded {len(preferences)} preference(s) for patient "
+                    f"[VECTOR_DB] Seeded {n} new preference(s) for patient "
                     f"{patient_id} from {preferences_file}"
                 )
             except Exception as e:

@@ -3,7 +3,6 @@ import json
 import logging
 
 from config_loader import THERAPY_FILE
-from sql_db import DatabaseManager
 from utils import hhmm_to_minutes, minutes_to_hhmm
 
 logger = logging.getLogger("knowledge_manager")
@@ -91,12 +90,14 @@ def get_all_activities():
         data = _load_therapy()
 
         if not data.get("activities"):
+            # therapy.json uses 'patient_full_name'; older/default dicts may use 'patient_name'
+            full_name = data.get("patient_full_name") or data.get("patient_name", "")
             return json.dumps(
                 {
                     "status": "success",
                     "message": "No activities configured",
                     "patient_id": data.get("patient_id", ""),
-                    "patient_name": data.get("patient_name", ""),
+                    "patient_full_name": full_name,
                     "activities": [],
                 },
                 indent=2,
@@ -176,7 +177,7 @@ def find_later_time(activity, schedule):
         return activity["time"]
 
 
-def find_scheduling_conflicts(new_activity, schedule):
+def find_scheduling_conflicts(new_activity, schedule, patient_id: str = None):
     conflicting_activity = find_conflicting_activity(new_activity, schedule)
     if conflicting_activity:
         anticipate_time = find_earlier_time(copy.deepcopy(new_activity), schedule)
@@ -201,7 +202,9 @@ def find_scheduling_conflicts(new_activity, schedule):
                 f"Scheduling conflict between {new_activity['name']} "
                 f"and {conflicting_activity['name']}"
             )
-            past_hints = _vector_db.query_conflict_resolutions(conflict_query)
+            past_hints = _vector_db.query_conflict_resolutions(
+                conflict_query, patient_id=patient_id
+            )
 
         result: dict = {
             "status": "failure",
@@ -288,7 +291,9 @@ def add_therapy_activity(activity_data):
             )
 
         # ── Scheduling conflict check ────────────────────────────────────────
-        conflict = find_scheduling_conflicts(new_activity, data["activities"])
+        conflict = find_scheduling_conflicts(
+            new_activity, data["activities"], patient_id=patient_id
+        )
 
         if conflict:
             result = dict(conflict)
@@ -370,13 +375,18 @@ def update_therapy_activity(activity_id, updates):
             )
 
         # ── Scheduling conflict check ────────────────────────────────────────
-        conflict = find_scheduling_conflicts(activity, temp_activities)
+        conflict = find_scheduling_conflicts(
+            activity, temp_activities, patient_id=patient_id
+        )
         if conflict:
             result = dict(conflict)
             if history_warnings:
                 result["patient_history_warnings"] = history_warnings
             return json.dumps(result, indent=2, ensure_ascii=False)
         else:
+            data["activities"].sort(
+                key=lambda act: int(act["time"][:2]) * 60 + int(act["time"][3:])
+            )
             _save_therapy(data)
 
             logger.info(f"[THERAPY] Updated activity: {activity_id}")
@@ -507,19 +517,6 @@ def get_patient_preferences() -> str:
     )
 
 
-def save_session(database_manager: DatabaseManager = None):
-    if database_manager:
-        return json.dumps(database_manager.save_session())
-    else:
-        logger.warning(
-            "[TOOL] The chat session is not associated with a database manager, cannot save session."
-        )
-        return {
-            "status": "error",
-            "message": "The chat session is not associated with a database manager, cannot save session.",
-        }
-
-
 # region Tools declaration
 tools_decl = [
     {
@@ -564,7 +561,7 @@ tools_decl = [
                 Requires: 
                 - activity_id (unique)
                 - name
-                - day_of_week: list of integers representing days of the week with 0=Monday and 6=Sunday
+                - day_of_week: list of integers representing days of the week with 1=Monday and 7=Sunday
                 - time (format HH:MM)
                 - duration_minutes. 
                 Optional: description, dependencies (list of activities names), valid_from, valid_until""",
@@ -583,7 +580,7 @@ tools_decl = [
                     "day_of_week": {
                         "type": "array",
                         "items": {"type": "integer"},
-                        "description": "Days of the week the activity takes place (0=Monday, 6=Sunday)",
+                        "description": "Days of the week the activity takes place (1=Monday, 7=Sunday)",
                     },
                     "time": {
                         "type": "string",

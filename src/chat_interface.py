@@ -5,15 +5,121 @@ import streamlit as st
 
 import prompts
 from chat import OllamaChat
-from config_loader import MODEL, PATIENT_ID, THERAPY_FILE
+from config_loader import DEFAULT_PATIENT_ID, MODEL, PATIENTS_DATA_FOLDER, THERAPY_FILE
 from sql_db import DatabaseManager
 from utils import get_system_info, setup_logger
 from vector_db import VectorDBManager
+
+# Must be the first Streamlit command
+st.set_page_config(page_title="KnowledgeManagerLLM", page_icon="🤖", layout="centered")
+
+# Prevent Streamlit from dimming the sidebar during script execution
+st.markdown(
+    """
+    <style>
+    section[data-testid="stSidebar"] { opacity: 1 !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 if "logger" not in st.session_state:
     st.session_state.logger = setup_logger()
 logger = st.session_state.logger
 
+# ── DB connection (once, not patient-specific) ──────────────────────────────
+if "db" not in st.session_state:
+    db = DatabaseManager()
+    db_available = db.connect()
+    if db_available:
+        logger.info("[CONFIG] Database connected")
+        db.seed_test_data()
+    else:
+        logger.warning(
+            "[CONFIG] Database not available - session will not be persisted"
+        )
+    st.session_state.db = db
+    st.session_state.db_available = db_available
+
+
+# ── Patient list helper ───────────────────────────────────────────────────
+def get_available_patients() -> list[tuple[str, str]]:
+    """Return (id, name) pairs for every patient that has a data folder."""
+    result = []
+    if not PATIENTS_DATA_FOLDER.exists():
+        return result
+    for folder in sorted(PATIENTS_DATA_FOLDER.iterdir()):
+        if not folder.is_dir():
+            continue
+        pid = folder.name
+        name = f"Patient {pid}"
+        if st.session_state.get("db_available"):
+            try:
+                r = st.session_state.db.get_patient(int(pid))
+                if r.get("status") == "success":
+                    name = r["patient"]["name"]
+            except Exception:
+                pass
+        result.append((pid, name))
+    return result
+
+
+available_patients = get_available_patients()
+patient_ids = [p[0] for p in available_patients]
+patient_labels = {p[0]: p[1] for p in available_patients}
+
+if "selected_patient_id" not in st.session_state:
+    # Restore from URL (survives F5), fall back to env default
+    st.session_state.selected_patient_id = st.query_params.get(
+        "patient", DEFAULT_PATIENT_ID
+    )
+
+if "processing" not in st.session_state:
+    st.session_state.processing = False
+
+if "pending_message" not in st.session_state:
+    st.session_state.pending_message = None
+
+# ── Sidebar – patient selector (top) ───────────────────────────────────────
+with st.sidebar:
+    st.subheader("👤 Patient")
+    if available_patients:
+        selectbox_options = [f"{patient_labels[pid]} — ID {pid}" for pid in patient_ids]
+        current_idx = (
+            patient_ids.index(st.session_state.selected_patient_id)
+            if st.session_state.selected_patient_id in patient_ids
+            else 0
+        )
+        chosen = st.selectbox(
+            "Select patient",
+            options=selectbox_options,
+            index=current_idx,
+            label_visibility="collapsed",
+            disabled=st.session_state.processing,
+        )
+        chosen_id = patient_ids[selectbox_options.index(chosen)]
+        if chosen_id != st.session_state.selected_patient_id:
+            # Patient changed: persist in URL and reset all patient-specific state
+            for key in [
+                "chat",
+                "vector_db",
+                "conversation",
+                "session_ended",
+                "first_message",
+                "session_loaded_for",
+                "processing",
+                "pending_message",
+            ]:
+                st.session_state.pop(key, None)
+            st.session_state.selected_patient_id = chosen_id
+            st.query_params["patient"] = chosen_id
+            logger.info(f"[UI] Patient switched to ID {chosen_id}")
+            st.rerun()
+    else:
+        st.warning("No patient data folders found.")
+    st.divider()
+
+# ── Vector DB (once per patient selection) ──────────────────────────────────
 if "vector_db" not in st.session_state:
     vdb = VectorDBManager()
     vdb_available = vdb.initialize()
@@ -22,28 +128,22 @@ if "vector_db" not in st.session_state:
         logger.info(
             f"[CONFIG] Vector DB ready – {seeded} medicine file(s) newly indexed"
         )
-        vdb.seed_patient_data(str(PATIENT_ID))
+        vdb.seed_patient_data(st.session_state.selected_patient_id)
         st.session_state.vector_db = vdb
     else:
         logger.warning("[CONFIG] Vector DB not available – RAG features disabled")
         st.session_state.vector_db = None
 
-if "db" not in st.session_state:
-    db = DatabaseManager()
-    db_available = db.connect()
-    if db_available:
-        logger.info("[CONFIG] Database connected")
-        db.seed_test_data()
-        db.load_session(
-            PATIENT_ID
-        )  # COMMENTA QUESTA LINEA SE HAI BISOGNO DI TESTARE IL SISTEMA MODIFICANDO DIRETTAMENTE IL .JSON
-    else:
-        logger.warning(
-            "[CONFIG] Database not available - session will not be persisted"
+# ── Load therapy session for the selected patient ────────────────────────────
+if st.session_state.get("session_loaded_for") != st.session_state.selected_patient_id:
+    if st.session_state.db_available:
+        st.session_state.db.load_session(int(st.session_state.selected_patient_id))
+        logger.info(
+            f"[CONFIG] Session loaded for patient {st.session_state.selected_patient_id}"
         )
-    st.session_state.db = db
-    st.session_state.db_available = db_available
+    st.session_state.session_loaded_for = st.session_state.selected_patient_id
 
+# ── Chat (once per patient selection) ────────────────────────────────────────
 if "chat" not in st.session_state:
     st.session_state.chat = OllamaChat(
         model=MODEL,
@@ -59,15 +159,18 @@ if "conversation" not in st.session_state:
 if "session_ended" not in st.session_state:
     st.session_state.session_ended = False
 
+# processing and pending_message are initialized earlier (before sidebar)
 
-st.set_page_config(page_title="KnowledgeManagerLLM", page_icon="🤖", layout="centered")
+
+# ── Main UI ───────────────────────────────────────────────────────────────
 st.title("KnowledgeManagerLLM")
 
 if st.session_state.session_ended:
     st.success(
         "✅ Session saved. The conversation has been closed. "
-        "Refresh the page to start a new session."
+        "Refresh the page or change patient to start a new session."
     )
+
 
 with st.chat_message(st.session_state.first_message["role"]):
     st.markdown(st.session_state.first_message["content"])
@@ -78,9 +181,19 @@ for message in st.session_state.conversation:
 
 user_message = st.chat_input(
     "Write a message...",
-    disabled=st.session_state.session_ended,
+    disabled=st.session_state.session_ended or st.session_state.processing,
 )
-if user_message:
+
+# Phase 1: new input from the user → save it and rerun with processing=True
+# so the sidebar renders with disabled widgets before the blocking call.
+if user_message and not st.session_state.processing:
+    st.session_state.pending_message = user_message
+    st.session_state.processing = True
+    st.rerun()
+
+# Phase 2: actually process the pending message
+if st.session_state.processing and st.session_state.pending_message:
+    user_message = st.session_state.pending_message
     with st.chat_message("user"):
         st.markdown(user_message)
     st.session_state.conversation.append({"role": "user", "message": user_message})
@@ -103,15 +216,18 @@ if user_message:
             st.markdown(response_gen)
             st.badge(f"🕛{elapsed:.2f}s")
 
+    st.session_state.pending_message = None
+    st.session_state.processing = False
+
     # Check if the LLM triggered save_session during this turn
     if st.session_state.chat.session_ended and not st.session_state.session_ended:
         logger.info("[UI] Session ended via LLM tool call – locking chat input")
         st.session_state.session_ended = True
-        st.rerun()
+
+    st.rerun()
 
 
-# SIDEBAR
-
+# ── Sidebar – session, therapy, system info ──────────────────────────────────
 with st.sidebar:
     st.subheader("💾 Session")
     db_status = "✅ Connected" if st.session_state.db_available else "❌ Not available"
@@ -120,7 +236,9 @@ with st.sidebar:
     if st.button(
         "Save therapy",
         use_container_width=True,
-        disabled=not st.session_state.db_available or st.session_state.session_ended,
+        disabled=not st.session_state.db_available
+        or st.session_state.session_ended
+        or st.session_state.processing,
     ):
         logger.info("[UI] Save therapy button clicked – running end_session")
         with st.spinner("Saving session and extracting knowledge..."):
@@ -212,12 +330,12 @@ with st.sidebar:
     with st.expander("⚙️ System info"):
         cpu_info, ram_info, gpu_info = get_system_info()
         st.markdown(
-            f"**CPU:** {cpu_info['model']} {cpu_info['cores']}/{cpu_info['threads']}"
+            f":computer: **CPU:** {cpu_info['model']} {cpu_info['cores']}/{cpu_info['threads']}"
         )
-        st.markdown(f"🧠 **RAM:** {ram_info:.0f} GB")
+        st.markdown(f":brain: **RAM:** {ram_info:.0f} GB")
         if gpu_info:
             for info in gpu_info:
                 st.markdown(
-                    f"🎮 **GPU {info['gpu']}:** {info['name']} ({info['memory']})"
+                    f":video_game: **GPU {info['gpu']}:** {info['name']} ({info['memory']})"
                 )
-        st.markdown(f"🤖 **LLM Model:** {MODEL}")
+        st.markdown(f":space_invader: **LLM Model:** {MODEL}")

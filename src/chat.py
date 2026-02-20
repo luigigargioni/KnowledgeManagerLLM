@@ -20,10 +20,14 @@ logger = logging.getLogger("knowledge_manager")
 
 def build_first_message(therapy_json):
     therapy = json.loads(therapy_json)
+    # Support both key names for robustness
+    patient_name = therapy.get("patient_full_name") or therapy.get(
+        "patient_name", "Unknown"
+    )
     first_message = (
         f"Hi I'm your therapy management assistant!  \n"
-        f"The current patient is **{therapy['patient_full_name']}**. "
-        f"The activities of {therapy['patient_full_name']}'s therapy are:  \n"
+        f"The current patient is **{patient_name}**. "
+        f"The activities of {patient_name}'s therapy are:  \n"
     )
 
     days_map = {
@@ -36,13 +40,16 @@ def build_first_message(therapy_json):
         7: "Sun",
     }
 
-    for act in therapy["activities"]:
-        first_message += f"- {act['name']}   -  {act['time']}  -  {', '.join(days_map[d] for d in act.get('day_of_week', []))} \n"
-    first_message += "\n"
+    if therapy.get("activities") is None or len(therapy.get("activities", [])) == 0:
+        first_message += "\n *No activities found for this patient*.  \n\n"
+    else:
+        for act in therapy["activities"]:
+            first_message += f"- {act['name']}   -  {act['time']}  -  {', '.join(days_map[d] for d in act.get('day_of_week', []))} \n"
+        first_message += "\n"
 
-    if len(therapy["expired_activities"]) > 0:
+    if len(therapy.get("expired_activities", [])) > 0:
         first_message += "The activities that are **not valid anymore** are:  \n"
-        for inv_act in therapy["expired_activities"]:
+        for inv_act in therapy.get("expired_activities", []):
             first_message += f"- {inv_act['time']} {inv_act['name']}  -  Valid until: {inv_act['valid_until']}  \n"
         first_message += "\n"
     first_message += "I can help you add new activity, change the the current activities or remove the one that are not necessary. What do you want to do?"

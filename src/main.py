@@ -3,7 +3,7 @@ from time import time
 import prompts as prompts
 import tools as tools
 from chat import OllamaChat
-from config_loader import MODEL, PATIENT_ID
+from config_loader import DEFAULT_PATIENT_ID, MODEL
 from sql_db import DatabaseManager
 from utils import get_system_info, setup_logger
 from vector_db import VectorDBManager
@@ -31,7 +31,7 @@ def main():
             f"[CONFIG] Vector DB ready – {seeded} medicine file(s) newly indexed"
         )
         # Seed patient data from files (idempotent)
-        vector_db.seed_patient_data(str(PATIENT_ID))
+        vector_db.seed_patient_data(str(DEFAULT_PATIENT_ID))
     else:
         logger.warning("[CONFIG] Vector DB not available – RAG features disabled")
         vector_db = None
@@ -43,7 +43,7 @@ def main():
         logger.info("[CONFIG] Database connected")
         db.seed_test_data()
         db.load_session(
-            PATIENT_ID
+            DEFAULT_PATIENT_ID
         )  # COMMENT THIS LINE if you need to test the system by editing the .JSON file directly
     else:
         logger.warning(

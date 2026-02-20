@@ -31,4 +31,4 @@ MEDICINES_FOLDER = Path(__file__).parent.parent / "data" / "medicines"
 PATIENTS_DATA_FOLDER = Path(__file__).parent.parent / "data" / "patients"
 CHROMA_DB_PATH = Path(__file__).parent.parent / "chromadb"
 
-PATIENT_ID = os.getenv("PATIENT_ID", "1")
+DEFAULT_PATIENT_ID = os.getenv("DEFAULT_PATIENT_ID", "1")

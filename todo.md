@@ -1,9 +1,9 @@
 # TODO
 
 
-1. Valutare l'utilizzo del formato TOON [libreria qui](https://github.com/toon-format/toon-python) per velocizzare l'analisi dei JSON da parte dell'llm --> Per ora niente: leggendo meglio, essendo uno standard nuovo i modelli non sono ancora allenati e quindi bisogna istruirli. Nel nostro caso il JSON è molto corto quindi il risparmio sarebbe minimo. Ad ora il gioco non vale la candela.
+1. Evaluate the use of the TOON format [library](https://github.com/toon-format/toon-python) to speed up JSON analysis by the LLM --> For now, no: upon further reading, since it is a new standard the models are not yet trained on it and therefore need to be instructed. In our case the JSON is very short, so the savings would be minimal. At the moment, it’s not worth the effort.
 
 
 
-# Note / da discutere
-- Se un farmaco richiede di essere assunto a stomaco pieno e supponiamo che ci sia un conflitto per l'orario che ha scelto l'utente. Ha senso che l'algoritmo deterministico suggerisca di anticipare prima di pranzo? L'LLM dovrebbe quindi combinare sia il check semantico che quello deterministico per risolvere i conflitti? (possibile limitazione o future work)
+# Notes / To Discuss
+- If a medication needs to be taken on a full stomach and we assume there is a conflict with the time chosen by the user, does it make sense for the deterministic algorithm to suggest taking it before lunch? Should the LLM therefore combine both the semantic check and the deterministic one to resolve conflicts? (possible limitation or future work)
