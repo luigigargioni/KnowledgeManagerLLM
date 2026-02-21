@@ -1,10 +1,10 @@
-# Aspirina
-Aspirina è un farmaco a base del principio attivo Acido Acetilsalicilico, appartenente alla categoria degli Antiaggreganti piastrinici, Antipiretici, Analgesici FANS e nello specifico Acido salicilico e derivati.
+# Aspirin
+Aspirin is a drug based on the active ingredient Acetylsalicylic Acid, belonging to the category of Antiplatelet agents, Antipyretics, Analgesics NSAIDs and specifically Salicylic acid and derivatives.
 
-## Come usare Aspirina
-- Adulti :1 o 2 bustine di granulato come dose singola, ripetendo, se necessario, la dose ad intervalli di 4-8 ore fino a 2-3 volte al giorno. Non superare mai il dosaggio massimo di 2 bustine 3 volte al giorno. Assumere il medicinale dopo i pasti principali o, comunque, a stomaco pieno.
+## How to use Aspirin
+- Adults: 1 or 2 sachets of granules as a single dose, repeating, if necessary, the dose at intervals of 4-8 hours up to 2-3 times a day. Never exceed the maximum dosage of 2 sachets 3 times a day. Take the medicine after main meals or, in any case, on a full stomach.
 
-## Quando non dev'essere usato Aspirina
-- ipersensibilità al principio attivo (Acido Acetilsalicilico), ad altri analgesici (antidolorifici) /antipiretici (antifebbrili) / farmaci antinfiammatori non steroidei (FANS) o ad uno qualsiasi degli eccipienti;
+## When Aspirin should not be used
+- hypersensitivity to the active ingredient (Acetylsalicylic Acid), to other analgesics (painkillers) / antipyretics (fever reducers) / non-steroidal anti-inflammatory drugs (NSAIDs) or to any of the excipients;
 
-- insufficienza renale, cardiaca o epatica gravi
+- severe renal, cardiac or hepatic insufficiency

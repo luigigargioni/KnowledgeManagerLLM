@@ -37,11 +37,13 @@ PREFERENCE_DEDUP_THRESHOLD = 0.25
 # Cosine distance threshold below which two conflict resolutions are considered duplicates
 CONFLICT_DEDUP_THRESHOLD = 0.25
 
-# Maximum cosine distance accepted for a medicine lookup to be considered a valid match.
-# Queries whose best result exceeds this threshold are treated as "not found" so the LLM
-# never receives pharmacological data for the wrong medicine.
-# (all-MiniLM-L6-v2 + cosine; short name vs full .md document → typical match ≈ 0.30–0.55)
-MEDICINE_DISTANCE_THRESHOLD = 0.60
+# Maximum cosine distance accepted for a medicine lookup to be considered a valid match
+# when NO name-based match is found.
+# A name-based match (query normalised ⊇ or == medicine name) always wins regardless of
+# distance, so this threshold only acts as a guard against returning completely unrelated
+# medicine data when the requested drug is genuinely absent from the knowledge base.
+# (all-MiniLM-L6-v2 + cosine; short name vs full .md document → typical match ≈ 0.30–0.65)
+MEDICINE_DISTANCE_THRESHOLD = 0.80
 
 
 class VectorDBManager:
@@ -168,9 +170,30 @@ class VectorDBManager:
             if not docs:
                 return f"No medicine information found for: {query}"
 
-            # Filter out documents whose cosine distance exceeds the threshold.
-            # This prevents returning data for the wrong medicine when the queried
-            # medicine is simply not present in the local knowledge base.
+            metadatas: list[dict] = results.get("metadatas", [[]])[0]
+
+            # ── Step 1: name-based lookup (always wins) ──────────────────────
+            # Normalise the query and check whether any indexed medicine name is
+            # a substring of (or equal to) the query, or vice-versa.
+            # This handles cases like query="Aulin" matching metadata name="aulin"
+            # even when the embedding distance of the short name vs the full .md
+            # document would otherwise exceed the threshold.
+            query_norm = query.strip().lower()
+            name_matched = [
+                doc
+                for doc, meta in zip(docs, metadatas)
+                if query_norm in meta.get("name", "").lower()
+                or meta.get("name", "").lower() in query_norm
+            ]
+            if name_matched:
+                logger.info(
+                    f"[VECTOR_DB] query_medicines: name-based match for '{query}'"
+                )
+                return "\n\n---\n\n".join(name_matched)
+
+            # ── Step 2: distance-based fallback ─────────────────────────────
+            # Only used when the medicine name is not directly in the query
+            # (e.g. a description like "anti-inflammatory for headache").
             matched = [
                 doc
                 for doc, dist in zip(docs, distances)

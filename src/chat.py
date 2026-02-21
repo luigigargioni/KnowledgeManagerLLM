@@ -39,9 +39,12 @@ def build_first_message(therapy_json):
     first_message = (
         f"Hi I'm your therapy management assistant!  \n"
         f"The current patient is **{patient_name}**. "
-        f"The activities of {patient_name}'s therapy are:  \n"
+        # f"The activities of {patient_name}'s therapy are:  \n"
+        f"The activities of {patient_name}'s therapy are reported in left panel.\n\n"
     )
 
+    # Commented out to avoid confusion with the therapy activities that are now displayed in the left panel.
+    """
     days_map = {
         1: "Mon",
         2: "Tue",
@@ -69,6 +72,8 @@ def build_first_message(therapy_json):
         for inv_act in therapy.get("expired_activities", []):
             first_message += f"- {inv_act['time']} {inv_act['name']}  -  Valid until: {inv_act['valid_until']}  \n"
         first_message += "\n"
+    """
+
     first_message += "I can help you add new activity, change the the current activities or remove the one that are not necessary. What do you want to do?"
 
     return first_message
@@ -183,6 +188,14 @@ class Chat:
         elif tool_name == "get_patient_preferences":
             query = tool_arguments.get("query", "")
             return tools.get_patient_preferences(query)
+
+        elif tool_name == "get_patient_history_events":
+            query = tool_arguments.get("query", "")
+            return tools.get_patient_history_events(query)
+
+        elif tool_name == "get_conflict_resolution_hints":
+            query = tool_arguments.get("query", "")
+            return tools.get_conflict_resolution_hints(query)
 
         elif tool_name == "save_session":
             logger.info(

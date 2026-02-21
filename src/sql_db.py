@@ -488,9 +488,9 @@ class DatabaseManager:
                 gender="Male",
                 birth_date=birth_date,
                 medical_conditions=[
-                    "Diabete di tipo 1",
-                    "Celiachia",
-                    "Forte insufficienza renale",
+                    "Type 1 Diabetes",
+                    "Celiac Disease",
+                    "Severe Kidney Insufficiency",
                 ],
             )
             if create_result["status"] == "error":

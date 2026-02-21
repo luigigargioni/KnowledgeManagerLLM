@@ -1,1 +1,27 @@
-[]
+[
+    {
+        "description": "The caregiver proposed adding 'Take Ibuprofen 400 mg' as a PRN pain-relief activity. The activity was rejected: Ibuprofen is an NSAID and is absolutely contraindicated in patients with severe renal failure, regardless of dose or route. Even short-term use can precipitate acute kidney injury and accelerate CKD progression. The caregiver was instructed to use only Paracetamol (already in the therapy as Tachipirina) for pain management, and to consult the nephrologist before adding any new analgesic.",
+        "activity_name": "Take Ibuprofen",
+        "date": "2025-08-19"
+    },
+    {
+        "description": "The caregiver requested adding a 'Potassium supplement (banana + orange juice)' as a mid-morning snack activity to counteract fatigue. The activity was flagged as potentially dangerous: patients with severe renal failure have impaired potassium excretion and are at high risk of hyperkalaemia, which can cause life-threatening cardiac arrhythmias. The caregiver was advised to avoid high-potassium foods (bananas, oranges, tomatoes, potatoes). The activity was rejected and replaced with a low-potassium snack (apple, rice cake) pending nephrologist guidance on the patient's current potassium levels.",
+        "activity_name": "Potassium-rich snack",
+        "date": "2025-09-30"
+    },
+    {
+        "description": "The caregiver proposed adding a 'Swimming session' activity on Tuesday and Thursday evenings at 20:00 (60 min). The assistant flagged a risk specific to Type 1 Diabetes: prolonged aerobic exercise in the evening can cause delayed nocturnal hypoglycaemia 6–12 hours later (while the patient is asleep and unmonitored). The caregiver decided to keep the evening swimming but added a mandatory 'Blood glucose check before sleep' activity at 22:00 on those days, and agreed to provide a small carbohydrate snack post-swim as a precaution.",
+        "activity_name": "Evening swimming session",
+        "date": "2025-12-17"
+    },
+    {
+        "description": "The caregiver requested adding a 'Phosphorus and calcium supplement (standard OTC formula)' activity to address bone health. The activity was flagged as problematic: in severe renal failure, phosphorus cannot be adequately excreted, leading to hyperphosphataemia, secondary hyperparathyroidism and vascular calcification. Standard calcium-phosphate supplements are therefore contraindicated. The activity was rejected and the caregiver was directed to request a nephrology consultation to evaluate whether a phosphate binder plus renal-specific vitamin D analogue (calcitriol) would be appropriate instead.",
+        "activity_name": "Phosphorus-calcium supplement",
+        "date": "2026-01-22"
+    },
+    {
+        "description": "The caregiver proposed adding a 'Post-workout isotonic sports drink (electrolyte rehydration)' activity after the morning walk. The assistant flagged multiple incompatibilities for this patient: (1) Most commercial isotonic drinks contain significant sodium, which must be restricted in CKD to limit fluid retention and hypertension. (2) They also contain potassium, dangerous in hyperkalaemia-prone CKD patients. (3) Sugar content is incompatible with Type 1 Diabetes management without an insulin correction. The activity was rejected. The caregiver was advised that plain water is the appropriate rehydration choice for this patient after moderate exercise.",
+        "activity_name": "Post-workout sports drink",
+        "date": "2026-02-10"
+    }
+]

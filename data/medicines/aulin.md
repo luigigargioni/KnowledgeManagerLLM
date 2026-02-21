@@ -1,16 +1,16 @@
 # Aulin
-Aulin - Compressa, Granulato è un farmaco a base del principio attivo Nimesulide, appartenente alla categoria degli Analgesici FANS e nello specifico Altri farmaci antinfiammatori e antireumatici, non steroidei. Aulin è usato per il trattamento del dolore acuto e dei dolori mestruali.
+Aulin - Tablet, Granules is a drug based on the active ingredient Nimesulide, belonging to the category of Analgesics NSAIDs and specifically Other non-steroidal anti-inflammatory and antirheumatic drugs. Aulin is used for the treatment of acute pain and menstrual pain.
 
-## Come usare Aulin
-Aulin 100 mg compresse (o 100 mg granulato) deve essere usato per il minor tempo possibile, in base alle esigenze cliniche. Inoltre, gli effetti indesiderati possono essere minimizzati usando la dose minima efficace per il minor tempo necessario a controllare i sintomi.
-La durata massima di un ciclo di trattamento con Nimesulide è di 15 giorni.
-- Adulti: Compresse o granulato per sospensione orale: una compressa o bustina da 100 mg due volte al giorno
-- Anziani: Nei pazienti anziani non occorre ridurre la dose giornaliera.
-- Insufficienza epatica: L'uso di Aulin 100 mg compresse (o 100 mg granulato) è controindicato in pazienti con insufficienza epatica
-## Quando non dev'essere usato Aulin
-- Alcolismo, dipendenza da droghe.
-- Disturbi gravi della coagulazione.
-- Scompenso cardiaco grave.
-- Insufficienza renale grave.
-- Insufficienza epatica.
-- Pazienti con febbre e/o sintomi influenzali.
+## How to use Aulin
+Aulin 100 mg tablets (or 100 mg granules) should be used for the shortest time possible, based on clinical needs. Moreover, side effects can be minimized by using the minimum effective dose for the shortest time needed to control symptoms.
+The maximum duration of a Nimesulide treatment cycle is 15 days.
+- Adults: Tablets or granules for oral suspension: one tablet or sachet of 100 mg twice daily
+- Elderly: In elderly patients, there is no need to reduce the daily dose.
+- Hepatic impairment: The use of Aulin 100 mg tablets (or 100 mg granules) is contraindicated in patients with hepatic impairment
+## When Aulin should not be used
+- Alcoholism, drug addiction.
+- Severe coagulation disorders.
+- Severe heart failure.
+- Severe renal impairment.
+- Hepatic impairment.
+- Patients with fever and/or flu-like symptoms.

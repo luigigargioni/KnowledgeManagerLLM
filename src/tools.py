@@ -869,6 +869,76 @@ def get_patient_preferences(query: str = "") -> str:
     )
 
 
+def get_patient_history_events(query: str) -> str:
+    """
+    Proactive RAG lookup against the patient history collection.
+    Returns past danger/warning events semantically similar to *query*.
+    Call this before proposing or adding any non-medicine activity so that
+    hazardous patterns are surfaced to the caregiver immediately.
+    """
+    if _vector_db is None:
+        logger.warning(
+            "[TOOLS] Vector DB not available – cannot retrieve patient history"
+        )
+        return json.dumps(
+            {"status": "error", "message": "Vector DB not available"},
+            indent=2,
+        )
+    patient_id = _get_patient_id()
+    events = _vector_db.query_patient_history(patient_id, query)
+    if not events:
+        return json.dumps(
+            {
+                "status": "success",
+                "patient_id": patient_id,
+                "events": [],
+                "message": "No relevant history events found for this activity.",
+            },
+            indent=2,
+        )
+    return json.dumps(
+        {"status": "success", "patient_id": patient_id, "events": events},
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+def get_conflict_resolution_hints(query: str) -> str:
+    """
+    Proactive RAG lookup against the conflict_resolutions collection.
+    Returns past resolutions (rejections, modifications, alternatives) that are
+    semantically similar to *query*.
+    Call this whenever the caregiver requests an activity that might conflict with
+    safety rules, medical conditions, or past decisions, to surface prior context
+    before asking the caregiver what to do.
+    """
+    if _vector_db is None:
+        logger.warning(
+            "[TOOLS] Vector DB not available – cannot retrieve conflict hints"
+        )
+        return json.dumps(
+            {"status": "error", "message": "Vector DB not available"},
+            indent=2,
+        )
+    patient_id = _get_patient_id()
+    hints = _vector_db.query_conflict_resolutions(query, patient_id=patient_id)
+    if not hints:
+        return json.dumps(
+            {
+                "status": "success",
+                "patient_id": patient_id,
+                "hints": [],
+                "message": "No past resolution hints found for this activity.",
+            },
+            indent=2,
+        )
+    return json.dumps(
+        {"status": "success", "patient_id": patient_id, "hints": hints},
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
 # region Tools declaration
 tools_decl = [
     {
@@ -1057,6 +1127,50 @@ tools_decl = [
                     }
                 },
                 "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_patient_history_events",
+            "description": (
+                "Retrieve past danger and warning events for the current patient "
+                "that are semantically related to a given activity or topic. "
+                "Call this BEFORE proposing or adding any activity to check whether "
+                "a similar activity has caused harm in the past."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Description of the activity or topic to look up in the patient's safety history (e.g. 'potassium-rich snack', 'brisk walk', 'NSAID pain relief').",
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_conflict_resolution_hints",
+            "description": (
+                "Retrieve past conflict resolutions, rejected activities, and prior "
+                "caregiver decisions that are semantically related to a given activity or topic. "
+                "Call this BEFORE proposing options to the caregiver so that previous decisions "
+                "are taken into account and surfaced."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Description of the activity or conflict to look up in past resolution records (e.g. 'potassium snack renal failure', 'NSAID analgesic', 'evening aerobic exercise diabetes').",
+                    }
+                },
+                "required": ["query"],
             },
         },
     },
