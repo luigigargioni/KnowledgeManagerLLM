@@ -37,6 +37,12 @@ PREFERENCE_DEDUP_THRESHOLD = 0.25
 # Cosine distance threshold below which two conflict resolutions are considered duplicates
 CONFLICT_DEDUP_THRESHOLD = 0.25
 
+# Maximum cosine distance accepted for a medicine lookup to be considered a valid match.
+# Queries whose best result exceeds this threshold are treated as "not found" so the LLM
+# never receives pharmacological data for the wrong medicine.
+# (all-MiniLM-L6-v2 + cosine; short name vs full .md document → typical match ≈ 0.30–0.55)
+MEDICINE_DISTANCE_THRESHOLD = 0.60
+
 
 class VectorDBManager:
     def __init__(self, db_path: str = None):
@@ -154,12 +160,35 @@ class VectorDBManager:
             results = self._medicines.query(
                 query_texts=[query],
                 n_results=min(n_results, total),
+                include=["documents", "distances", "metadatas"],
             )
             docs: list[str] = results.get("documents", [[]])[0]
+            distances: list[float] = results.get("distances", [[]])[0]
+
             if not docs:
                 return f"No medicine information found for: {query}"
 
-            return "\n\n---\n\n".join(docs)
+            # Filter out documents whose cosine distance exceeds the threshold.
+            # This prevents returning data for the wrong medicine when the queried
+            # medicine is simply not present in the local knowledge base.
+            matched = [
+                doc
+                for doc, dist in zip(docs, distances)
+                if dist <= MEDICINE_DISTANCE_THRESHOLD
+            ]
+
+            if not matched:
+                logger.info(
+                    f"[VECTOR_DB] query_medicines: no match within threshold for '{query}' "
+                    f"(best distance={distances[0]:.3f} > {MEDICINE_DISTANCE_THRESHOLD})"
+                )
+                return (
+                    f"Medicine '{query}' was not found in the local knowledge base "
+                    f"(no sufficiently similar entry; best distance={distances[0]:.3f}). "
+                    "Do NOT proceed – ask the caregiver to verify contraindications manually."
+                )
+
+            return "\n\n---\n\n".join(matched)
         except Exception as e:
             logger.error(f"[VECTOR_DB] query_medicines error: {e}")
             return f"Error querying medicine data: {e}"

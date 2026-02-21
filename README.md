@@ -42,7 +42,7 @@ A conversational AI assistant that helps caregivers manage a patient's therapy s
 ### Session lifecycle
 
 1. **Startup** – load patient from PostgreSQL → write `data/therapy.json` → seed ChromaDB collections → initialise chat with context (datetime, current activities, patient preferences).
-2. **Conversation loop** – for each caregiver message the LLM may call up to 5 tools in sequence:
+2. **Conversation loop** – for each caregiver message the LLM may call up to 10 tools in sequence:
    - `get_medicine_data` – RAG lookup against the medicines collection (mandatory before any medicine activity).
    - `get_patient_preferences` – retrieve known patient habits for personalised suggestions.
    - `add_therapy_activity` / `update_therapy_activity` / `remove_therapy_activity` – mutate `therapy.json`; each write automatically triggers a scheduling conflict check and a patient-history safety check.
