@@ -32,7 +32,6 @@ if "db" not in st.session_state:
     db = DatabaseManager()
     db_available = db.connect()
     if db_available:
-        logger.info("[CONFIG] Database connected")
         db.seed_test_data()
     else:
         logger.warning(
@@ -125,9 +124,6 @@ if "vector_db" not in st.session_state:
     vdb_available = vdb.initialize()
     if vdb_available:
         seeded = vdb.seed_medicines()
-        logger.info(
-            f"[CONFIG] Vector DB ready – {seeded} medicine file(s) newly indexed"
-        )
         vdb.seed_patient_data(st.session_state.selected_patient_id)
         st.session_state.vector_db = vdb
     else:
@@ -138,9 +134,7 @@ if "vector_db" not in st.session_state:
 if st.session_state.get("session_loaded_for") != st.session_state.selected_patient_id:
     if st.session_state.db_available:
         st.session_state.db.load_session(int(st.session_state.selected_patient_id))
-        logger.info(
-            f"[CONFIG] Session loaded for patient {st.session_state.selected_patient_id}"
-        )
+
     st.session_state.session_loaded_for = st.session_state.selected_patient_id
 
 # ── Chat (once per patient selection) ────────────────────────────────────────

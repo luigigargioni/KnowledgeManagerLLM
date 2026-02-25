@@ -125,10 +125,7 @@ def _validate_date_field(value, field_name: str):
             return None
         except ValueError:
             continue
-    return (
-        f"Invalid date format for '{field_name}': expected YYYY-MM-DD, "
-        f"got '{value}'"
-    )
+    return f"Invalid date format for '{field_name}': expected YYYY-MM-DD, got '{value}'"
 
 
 def _validate_time_field(value, field_name: str = "time"):
@@ -784,9 +781,9 @@ def remove_therapy_activity(activity_id):
 
         # Second pass: check dependents using the activity's ID.
         # Dependencies are stored as lists of activity IDs.
-        activity_name = removed_activity["name"]
+        activity_name = removed_activity["activity_id"]
         dependent_activities = [
-            act["name"]
+            act["activity_id"]
             for act in data["activities"]
             if activity_id in act.get("dependencies", [])
         ]

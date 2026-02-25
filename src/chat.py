@@ -373,21 +373,12 @@ class Chat:
                 f"[SESSION] Running vector DB extraction for patient {patient_id}"
             )
 
-            logger.debug(
-                "[SESSION] Extracting conflict resolutions from conversation history"
-            )
             n_conflicts = extract_and_save_conflict_resolutions(
                 self.conversation_history, self.vector_db, patient_id
-            )
-            logger.info(f"[SESSION] Conflict resolutions saved: {n_conflicts}")
-
-            logger.debug(
-                "[SESSION] Extracting patient preferences from conversation history"
             )
             n_prefs = extract_and_save_patient_preferences(
                 self.conversation_history, self.vector_db, patient_id
             )
-            logger.info(f"[SESSION] Patient preferences saved/updated: {n_prefs}")
         else:
             logger.warning(
                 "[SESSION] Vector DB not available – skipping knowledge extraction"
@@ -395,13 +386,13 @@ class Chat:
 
         # ── PostgreSQL save ────────────────────────────────────────────────
         if self.database_manager:
-            logger.debug("[SESSION] Persisting therapy to PostgreSQL")
+            logger.info("[SESSION] Persisting therapy to PostgreSQL")
             result = self.database_manager.save_session()
             if result.get("status") == "success":
                 v_id = result.get("version", {}).get("id")
-                logger.info(
-                    f"[SESSION] Therapy persisted to PostgreSQL – version #{v_id}"
-                )
+                # logger.info(
+                #    f"[SESSION] Therapy persisted to PostgreSQL – version #{v_id}"
+                # ) REDUNDANT LOG
             else:
                 logger.error(
                     f"[SESSION] PostgreSQL save failed: {result.get('message')}"
