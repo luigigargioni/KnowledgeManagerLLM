@@ -1,0 +1,48 @@
+{
+    "patient_id": 2,
+    "patient_full_name": "Viola Bellini",
+    "gender": "Female",
+    "birth_date": "1950-02-22T00:00:00",
+    "medical_conditions": [
+        "Insomnia"
+    ],
+    "activities": [
+        {
+            "name": "Breakfast",
+            "time": "10:00",
+            "valid_from": null,
+            "activity_id": "br_001",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5
+            ],
+            "description": "Breakfast",
+            "valid_until": null,
+            "dependencies": [],
+            "duration_minutes": 20
+        },
+        {
+            "name": "Lunch",
+            "time": "13:00",
+            "valid_from": null,
+            "activity_id": "lu_001",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "description": "",
+            "valid_until": null,
+            "dependencies": [],
+            "duration_minutes": 60
+        }
+    ],
+    "expired_activities": []
+}

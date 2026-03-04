@@ -6,6 +6,7 @@ Usa SQLAlchemy come ORM con psycopg2 come driver
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy import (
     Column,
@@ -21,7 +22,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
-from config_loader import DB_CONNECTION_STRING, THERAPY_FILE
+from config_loader import DB_CONNECTION_STRING, PATIENTS_DATA_FOLDER, THERAPY_FILE
 
 logger = logging.getLogger("knowledge_manager")
 
@@ -468,104 +469,62 @@ class DatabaseManager:
             logger.error(f"[DB] save_session error: {e}")
             return {"status": "error", "message": str(e)}
 
-    def seed_test_data(self) -> dict:
+    def seed_test_data(self, patient_id: str, patients_folder: Path = None) -> dict:
         """
         Inserisce dati di test nel database.
         Idempotente: non crea duplicati se eseguita più volte.
         """
-        result = self.get_patient_by_name("Mario Rossi")
 
-        if result["status"] == "success":
-            patient_id = result["patient"]["id"]
-            logger.info(
-                f"[DB] seed: patient Mario Rossi already exists (ID: {patient_id}), skipping"
-            )
+        folder = (patients_folder or PATIENTS_DATA_FOLDER) / str(patient_id)
+        therapy_file = folder / "therapy.json"
+
+        if therapy_file.exists():
+            try:
+                therapy = json.loads(therapy_file.read_text(encoding="utf-8"))
+            except Exception as e:
+                logger.error(f"[DB] Failed to load therapy file{therapy_file}: {e}")
         else:
-            # Crea il paziente
-            birth_date = datetime(1957, 5, 15)
-            create_result = self.create_patient(
-                name="Mario Rossi",
-                gender="Male",
-                birth_date=birth_date,
-                medical_conditions=[
-                    "Type 1 Diabetes",
-                    "Celiac Disease",
-                    "Severe Kidney Insufficiency",
-                ],
+            logger.debug(
+                f"[DB] No therapy file found for patient {patient_id} at {therapy_file}"
             )
-            if create_result["status"] == "error":
-                return create_result
 
-            patient_id = create_result["patient"]["id"]
-            logger.info(f"[DB] seed: patient Mario Rossi created (ID: {patient_id})")
+        if therapy:
+            name = therapy["patient_full_name"] or "Mario Rossi"
+            result = self.get_patient_by_name(name)
 
-        latest = self.get_latest_therapy(patient_id)
-        if latest["therapy"] is not None:
-            logger.info("[DB] seed: therapy version already exists, skipping")
-            return {"status": "success", "message": "Seed already applied"}
+            if result["status"] == "success":
+                patient_id = result["patient"]["id"]
+                logger.info(
+                    f"[DB] seed: patient {name} already exists (ID: {patient_id}), skipping"
+                )
+            else:
+                # Crea il paziente
+                birth_date = datetime.strptime(
+                    therapy["birth_date"], "%Y-%m-%dT%H:%M:%S"
+                ) or datetime(1957, 5, 15)
+                create_result = self.create_patient(
+                    name=name,
+                    gender=therapy["gender"] or "Unknown",
+                    birth_date=birth_date,
+                    medical_conditions=therapy["medical_conditions"] or [],
+                )
+                if create_result["status"] == "error":
+                    return create_result
 
-        activities = [
-            {
-                "activity_id": "lb_001",
-                "name": "Misurazione glicemia",
-                "description": "Controllo glicemia a digiuno",
-                "day_of_week": [1, 3, 5],
-                "time": "07:30",
-                "duration_minutes": 10,
-                "dependencies": [],
-                "valid_from": None,
-                "valid_until": None,
-            },
-            {
-                "activity_id": "lb_002",
-                "name": "Colazione",
-                "description": "Colazione salata con proteine",
-                "day_of_week": [1, 3, 5],
-                "time": "08:00",
-                "duration_minutes": 20,
-                "dependencies": ["lb_001"],
-                "valid_from": None,
-                "valid_until": None,
-            },
-            {
-                "activity_id": "lw_001",
-                "name": "Light walk",
-                "description": "A light 1-hour walk in the morning.",
-                "day_of_week": [1],
-                "time": "08:35",
-                "duration_minutes": 60,
-                "dependencies": [],
-                "valid_from": None,
-                "valid_until": None,
-            },
-            {
-                "activity_id": "lu_001",
-                "name": "Pranzo",
-                "description": "",
-                "day_of_week": [1, 2, 3, 4, 5, 6, 7],
-                "time": "12:00",
-                "duration_minutes": 60,
-                "dependencies": [],
-                "valid_from": None,
-                "valid_until": None,
-            },
-            {
-                "activity_id": "ta_001",
-                "name": "Take Tachipirina",
-                "description": "Take 1000 mg Tachipirina tablet once daily.",
-                "day_of_week": [1, 2, 3, 4, 5, 6, 7],
-                "time": "13:00",
-                "duration_minutes": 5,
-                "dependencies": [],
-                "valid_from": None,
-                "valid_until": None,
-            },
-        ]
+                patient_id = create_result["patient"]["id"]
+                logger.info(f"[DB] seed: patient {name} created (ID: {patient_id})")
 
-        result = self.save_therapy_version(
-            patient_id=patient_id, activities=activities, notes="Initial seed data"
-        )
-        return result
+            latest = self.get_latest_therapy(patient_id)
+            if latest["therapy"] is not None:
+                logger.info("[DB] seed: therapy version already exists, skipping")
+                return {"status": "success", "message": "Seed already applied"}
+
+            activities = therapy["activities"] or []
+
+            result = self.save_therapy_version(
+                patient_id=patient_id, activities=activities, notes="Initial seed data"
+            )
+            return result
 
 
 # endregion

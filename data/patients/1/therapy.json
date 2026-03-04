@@ -1,0 +1,100 @@
+{
+    "patient_id": 1,
+    "patient_full_name": "Mario Rossi",
+    "gender": "Male",
+    "birth_date": "1957-05-15T00:00:00",
+    "age": 68,
+    "medical_conditions": [
+        "Type 1 Diabetes",
+        "Celiac Disease",
+        "Severe Renal Failure"
+    ],
+    "activities": [
+        {
+            "name": "Blood Glucose Measurement",
+            "time": "07:30",
+            "valid_from": null,
+            "activity_id": "lb_001",
+            "day_of_week": [
+                1,
+                3,
+                5
+            ],
+            "description": "Fasting blood glucose check",
+            "valid_until": null,
+            "dependencies": [],
+            "duration_minutes": 10
+        },
+        {
+            "name": "Breakfast",
+            "time": "08:00",
+            "valid_from": null,
+            "activity_id": "lb_002",
+            "day_of_week": [
+                1,
+                3,
+                5
+            ],
+            "description": "Savory breakfast with protein",
+            "valid_until": null,
+            "dependencies": [
+                "lb_001"
+            ],
+            "duration_minutes": 20
+        },
+        {
+            "name": "Physiotherapy Session",
+            "time": "09:35",
+            "valid_from": null,
+            "activity_id": "pt_001",
+            "day_of_week": [
+                1,
+                3,
+                5
+            ],
+            "description": "A physiotherapy session to maintain joint flexibility and muscle strength.",
+            "valid_until": null,
+            "dependencies": [],
+            "duration_minutes": 30
+        },
+        {
+            "name": "Lunch",
+            "time": "13:00",
+            "valid_from": null,
+            "activity_id": "lu_001",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "description": "",
+            "valid_until": null,
+            "dependencies": [],
+            "duration_minutes": 60
+        },
+        {
+            "name": "Dinner",
+            "time": "19:00",
+            "valid_from": null,
+            "activity_id": "dn_001",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "description": "A gluten-free and low-carb dinner suitable for a patient with celiac disease and type 1 diabetes.",
+            "valid_until": null,
+            "dependencies": [],
+            "duration_minutes": 60
+        }
+    ],
+    "expired_activities": []
+}

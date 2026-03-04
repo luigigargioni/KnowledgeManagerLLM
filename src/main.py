@@ -41,7 +41,7 @@ def main():
     db_available = db.connect()
     if db_available:
         logger.info("[CONFIG] Database connected")
-        db.seed_test_data()
+        db.seed_test_data(patient_id=str(DEFAULT_PATIENT_ID))
         db.load_session(
             int(DEFAULT_PATIENT_ID)
         )  # COMMENT THIS LINE if you need to test the system by editing the .JSON file directly

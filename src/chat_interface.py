@@ -32,7 +32,7 @@ if "db" not in st.session_state:
     db = DatabaseManager()
     db_available = db.connect()
     if db_available:
-        db.seed_test_data()
+        db.seed_test_data(patient_id=str(DEFAULT_PATIENT_ID))
     else:
         logger.warning(
             "[CONFIG] Database not available - session will not be persisted"
@@ -292,7 +292,14 @@ with st.sidebar:
                         )
 
                         if act.get("dependencies"):
-                            st.caption(f"Depends on: {', '.join(act['dependencies'])}")
+                            dep_names = []
+                            for dep in act["dependencies"]:
+                                dep_names += [
+                                    x["name"]
+                                    for x in activities
+                                    if x["activity_id"] == dep
+                                ]
+                            st.caption(f"Depends on: {', '.join(dep_names)}")
                         st.write("")
 
             if expired_activities:
