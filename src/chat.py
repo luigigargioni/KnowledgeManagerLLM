@@ -136,7 +136,7 @@ class Chat:
         self.conversation_history.append(
             {
                 "role": "system",
-                "content": f"get_all_activities:{therapy_json}",
+                "content": f"get_therapy_activities:{therapy_json}",
             }
         )
 

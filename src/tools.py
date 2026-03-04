@@ -217,6 +217,42 @@ def find_conflicting_activity(new_activity, schedule):
 
 
 def find_earlier_time(activity, schedule):
+    conflicting_activity = find_conflicting_activity(activity, schedule)
+    if conflicting_activity:
+        # loop to search for a new possible time
+        conflict_time = hhmm_to_minutes(conflicting_activity["time"])
+
+        # anticipate
+        new_time = conflict_time - activity["duration_minutes"]
+
+        if new_time < 0:
+            return None
+
+        activity["time"] = minutes_to_hhmm(new_time)
+        return find_earlier_time(activity, schedule)
+    else:
+        return activity["time"]
+
+
+def find_later_time(activity, schedule):
+    conflicting_activity = find_conflicting_activity(activity, schedule)
+    if conflicting_activity:
+        # loop to search for a new possible time
+        conflict_time = hhmm_to_minutes(conflicting_activity["time"])
+
+        # anticipate
+        new_time = conflict_time + conflicting_activity["duration_minutes"]
+
+        if new_time > 24 * 60:
+            return None
+
+        activity["time"] = minutes_to_hhmm(new_time)
+        return find_later_time(activity, schedule)
+    else:
+        return activity["time"]
+
+
+def find_earlier_time_new(activity, schedule):
     """Return the latest valid start time strictly before (or equal to) the
     current start time, fitting the activity in a free gap.
 
@@ -260,7 +296,7 @@ def find_earlier_time(activity, schedule):
     return None
 
 
-def find_later_time(activity, schedule):
+def find_later_time_new(activity, schedule):
     """Return the earliest valid start time at or after the current end time.
 
     Collects candidate start-times (the end of every existing activity that
