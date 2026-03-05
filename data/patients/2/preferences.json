@@ -1,1 +1,6 @@
-[]
+[
+    {
+        "description": "The patient refuses to do physical activities in the morning due to their insomnia. They prefer to have walks in the early afternoon when they have enough energy.",
+        "category": "activity"
+    }
+]

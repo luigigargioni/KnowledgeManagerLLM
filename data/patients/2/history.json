@@ -1,1 +1,8 @@
-[]
+[
+    {
+        "description": "After Viola had a coffee in the afternoon (16:00) her Insomnia symptoms worsen. The subsequent night she wasn't able to fall asleep.",
+        "activity_name": "Caffeine intake in the afternoon",
+        "event_type": "warning",
+        "date": "2026-01-22"
+    }
+]
