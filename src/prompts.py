@@ -84,7 +84,7 @@ Execute steps in order:
    If relevant past decisions are found, surface them to the caregiver before proposing options.
    This prevents repeating rejected activities or ignoring previously agreed rules.
 
-4. PREFERENCE CHECK (optional)
+4. PREFERENCE CHECK (proactive)
    Call get_patient_preferences() to personalise suggestions to the patient's habits.
 
 5. CONFIRMATION (mandatory)
