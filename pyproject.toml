@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=82", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,22 +7,22 @@ name = "KnowledgeManagerLLM"
 version = "0.1.0"
 description = "Description"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 
 dependencies = [
-    "requests>=2.32.5",
-    "python-dotenv>=1.2.1",
-    "psutil>=7.2.2",
-    "streamlit",
-    "sqlalchemy>=2.0.0",
-    "psycopg2-binary>=2.9.0",
-    "chromadb",
-    "openai>=1.0.0"
+    "requests==2.34.2",
+    "python-dotenv==1.2.2",
+    "psutil==7.2.2",
+    "streamlit==1.58.0",
+    "sqlalchemy==2.0.51",
+    "psycopg2-binary==2.9.12",
+    "chromadb==1.5.9",
+    "openai==2.42.0"
 ]
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]

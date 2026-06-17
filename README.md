@@ -104,12 +104,12 @@ Copy `.env.example` to `.env` and fill in every variable:
 # LLM backend – use one of the two options below
 
 # Option A: local Ollama
-MODEL=qwen2.5:14b
+MODEL=gpt-oss:20b
 OLLAMA_URL=http://localhost:11434
 
 # Option B: OpenAI cloud (set a valid key; the Ollama settings are ignored)
 # OPENAI_API_KEY=sk-...
-# MODEL=gpt-4o
+# MODEL=gpt-5.4-mini
 
 # LLM request timeout in seconds
 LLM_TIMEOUT=120
