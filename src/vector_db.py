@@ -30,20 +30,57 @@ COLLECTION_PATIENT_HISTORY = "patient_history"
 COLLECTION_CONFLICT_RESOLUTIONS = "conflict_resolutions"
 COLLECTION_PATIENT_PREFERENCES = "patient_preferences"
 
-# Cosine distance threshold below which two preferences are considered the same concept
+# Cosine distance threshold for de-duplicating patient preferences.
+# When a new preference is added, any existing entry closer than this value is replaced
+# rather than kept alongside the new one, preventing semantically equivalent preferences
+# from accumulating across sessions.
+# 0.25 is intentionally strict: only near-identical phrasings are merged; distinct but
+# related preferences (e.g. "prefers morning activities" vs "dislikes afternoon sessions")
+# are preserved as separate entries.
 # (distance range: 0 = identical, 2 = opposite; reasonable duplicate threshold ≈ 0.20–0.30)
 PREFERENCE_DEDUP_THRESHOLD = 0.25
 
-# Cosine distance threshold below which two conflict resolutions are considered duplicates
+# Cosine distance threshold for de-duplicating conflict resolutions.
+# Same rationale as PREFERENCE_DEDUP_THRESHOLD: replaces near-identical resolutions on
+# re-insert so repeated sessions about the same conflict do not bloat the collection.
+# 0.25 keeps de-dup conservative – two resolutions that address the same conflict from
+# slightly different angles are NOT merged.
 CONFLICT_DEDUP_THRESHOLD = 0.25
+
+# Maximum cosine distance accepted when querying past conflict resolution hints.
+# 0.65 is a moderate threshold: only resolutions with a meaningful semantic overlap with
+# the current conflict are surfaced. A looser value would return loosely related past
+# resolutions that could mislead the LLM; a tighter value would miss useful hints when
+# the conflict is described with different wording across sessions.
+CONFLICT_QUERY_THRESHOLD = 0.65
 
 # Maximum cosine distance accepted for a medicine lookup to be considered a valid match
 # when NO name-based match is found.
 # A name-based match (query normalised ⊇ or == medicine name) always wins regardless of
 # distance, so this threshold only acts as a guard against returning completely unrelated
 # medicine data when the requested drug is genuinely absent from the knowledge base.
-# (all-MiniLM-L6-v2 + cosine; short name vs full .md document → typical match ≈ 0.30–0.65)
+# 0.80 is permissive on purpose: the embedding model compares a short drug name against
+# a full .md document, which structurally inflates the cosine distance even for correct
+# matches. Empirically, valid matches for all-MiniLM-L6-v2 on this corpus sit in the
+# 0.30–0.65 range, so 0.80 leaves a safe margin while still blocking truly unrelated docs.
 MEDICINE_DISTANCE_THRESHOLD = 0.80
+
+# Cosine distance thresholds for patient history RAG queries.
+# Two separate values are used because the consequences of a missed match differ:
+#   - "danger" events (e.g. severe adverse reactions): better to surface a false positive
+#     than to silently miss a genuine risk, so the threshold is set higher (more permissive).
+#   - "warning" events (e.g. mild discomfort): a stricter threshold avoids flooding the LLM
+#     with low-relevance cautions that could reduce the signal-to-noise ratio.
+PATIENT_HISTORY_DANGER_THRESHOLD = 0.85
+PATIENT_HISTORY_WARNING_THRESHOLD = 0.70
+
+# Maximum cosine distance accepted when querying patient preferences.
+# 0.80 is intentionally permissive: preferences are heterogeneous (dietary, physical,
+# cognitive) and a broader retrieval net ensures the LLM receives relevant context even
+# when the query wording does not closely mirror how the preference was originally stored.
+# Unlike medicines or conflict hints, returning a slightly off-topic preference carries
+# little risk – the LLM can simply ignore it.
+PREFERENCE_QUERY_THRESHOLD = 0.80
 
 
 class VectorDBManager:
@@ -287,7 +324,7 @@ class VectorDBManager:
                 # Apply a tighter distance threshold for safety-critical "danger" events
                 # so they are surfaced even when the semantic match is imperfect.
                 event_type = meta.get("event_type", "warning")
-                threshold = 0.85 if event_type == "danger" else 0.70
+                threshold = PATIENT_HISTORY_DANGER_THRESHOLD if event_type == "danger" else PATIENT_HISTORY_WARNING_THRESHOLD
                 if dist < threshold:
                     events.append(
                         {
@@ -375,7 +412,7 @@ class VectorDBManager:
             distances = results.get("distances", [[]])[0]
 
             for doc, meta, dist in zip(docs, metas, distances):
-                if dist < 0.65:
+                if dist < CONFLICT_QUERY_THRESHOLD:
                     items.append(
                         {
                             "description": doc,
@@ -474,9 +511,10 @@ class VectorDBManager:
                         "description": doc,
                         "category": meta.get("category", ""),
                         "date": meta.get("date", ""),
+                        "relevance_score": round(1 - dist, 3),
                     }
                     for doc, meta, dist in zip(docs, metas, distances)
-                    if dist < 0.80
+                    if dist < PREFERENCE_QUERY_THRESHOLD
                 ]
             else:
                 # Return all preferences for this patient
