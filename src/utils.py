@@ -56,6 +56,14 @@ def minutes_to_hhmm(total_minutes):
     return f"{hours:02d}:{minutes:02d}"
 
 
+class StartWithFilter(logging.Filter):
+    def __init__(self, filter_string: str = ""):
+        self.filter_string = filter_string
+
+    def filter(self, record):
+        return record.getMessage().startswith(self.filter_string)
+
+
 def setup_logger():
     """Configura il logger per scrivere su file di sessione nella cartella logs e su terminale"""
 
@@ -63,7 +71,8 @@ def setup_logger():
     logs_dir.mkdir(exist_ok=True)
 
     session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = logs_dir / f"chat_session_{session_timestamp}.log"
+    session_dir = logs_dir / session_timestamp
+    session_dir.mkdir(exist_ok=True)
 
     logger = logging.getLogger("knowledge_manager")
     logger.setLevel(logging.DEBUG)
@@ -75,10 +84,19 @@ def setup_logger():
         "%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
-    # File Handler
-    file_handler = logging.FileHandler(log_filename, encoding="utf-8")
+    # File Handler General
+    file_handler = logging.FileHandler(f"{session_dir}/full.log", encoding="utf-8")
     file_handler.setLevel(FILE_LOG_LEVEL)
     file_handler.setFormatter(file_formatter)
+
+    # Chat-only log file
+    chat_handler = logging.FileHandler(f"{session_dir}/chat.log", encoding="utf-8")
+    chat_handler.setLevel(FILE_LOG_LEVEL)
+    chat_formatter = logging.Formatter(
+        "%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    chat_handler.setFormatter(chat_formatter)
+    chat_handler.addFilter(StartWithFilter(filter_string="[CHAT]"))
 
     # Terminal Handler
     console_handler = logging.StreamHandler(sys.stdout)
@@ -87,8 +105,25 @@ def setup_logger():
     console_handler.setFormatter(console_formatter)
 
     logger.addHandler(file_handler)
+    logger.addHandler(chat_handler)
     logger.addHandler(console_handler)
+
+    logger.session_dir = session_dir
 
     logger.info(f"[SESSION] New chat session started ID:{session_timestamp}")
 
     return logger
+
+
+def addAgentFilterLogger(agent_name):
+    logger = logging.getLogger("knowledge_manager")
+    agent_handler = logging.FileHandler(
+        f"{logger.session_dir}/agent_{agent_name}.log", encoding="utf-8"
+    )
+    agent_handler.setLevel(FILE_LOG_LEVEL)
+    agent_formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    agent_handler.setFormatter(agent_formatter)
+    agent_handler.addFilter(StartWithFilter(filter_string=f"[{agent_name.upper()}]"))
+    logger.addHandler(agent_handler)

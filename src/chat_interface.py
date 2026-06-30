@@ -1,9 +1,9 @@
 import json
+from datetime import datetime
 from time import time
 
 import streamlit as st
 
-import prompts
 from chat import OllamaChat
 from config_loader import DEFAULT_PATIENT_ID, MODEL, PATIENTS_DATA_FOLDER, THERAPY_FILE
 from sql_db import DatabaseManager
@@ -116,7 +116,7 @@ with st.sidebar:
             st.rerun()
     else:
         st.warning("No patient data folders found.")
-    st.divider()
+    # st.divider()
 
 # ── Vector DB (once per patient selection) ──────────────────────────────────
 if "vector_db" not in st.session_state:
@@ -141,11 +141,12 @@ if st.session_state.get("session_loaded_for") != st.session_state.selected_patie
 if "chat" not in st.session_state:
     st.session_state.chat = OllamaChat(
         model=MODEL,
-        system_prompt=prompts._THERAPY_MANAGER_PROMPT,
         database_manager=st.session_state.db if st.session_state.db_available else None,
         vector_db=st.session_state.vector_db,
     )
-    st.session_state.first_message = st.session_state.chat.conversation_history[-1]
+    st.session_state.first_message = (
+        st.session_state.chat.chat_agent.conversation_history[-1]
+    )
 
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
@@ -202,9 +203,6 @@ if st.session_state.processing and st.session_state.pending_message:
             {"role": "assistant", "message": response_gen}
         )
 
-        logger.debug(f"[TIMING] Total elapsed time: {elapsed:.2f}s")
-        logger.info(f"[CHAT] ASSISTANT: {response_gen}")
-
         with st.container():
             st.markdown(response_gen)
             st.badge(f"🕛{elapsed:.2f}s")
@@ -222,43 +220,22 @@ if st.session_state.processing and st.session_state.pending_message:
 
 # ── Sidebar – session, therapy, system info ──────────────────────────────────
 with st.sidebar:
-    st.subheader("💾 Session")
-    db_status = "✅ Connected" if st.session_state.db_available else "❌ Not available"
-    st.caption(f"Database: {db_status}")
-
-    if st.button(
-        "Save therapy",
-        use_container_width=True,
-        disabled=not st.session_state.db_available
-        or st.session_state.session_ended
-        or st.session_state.processing,
-    ):
-        logger.info("[UI] Save therapy button clicked – running end_session")
-        with st.spinner("Saving session and extracting knowledge..."):
-            result = st.session_state.chat.end_session()
-        if result.get("status") == "success":
-            v_id = result.get("version", {}).get("id")
-            logger.info(f"[SESSION] Therapy saved manually – version #{v_id}")
-            st.session_state.session_ended = True
-            st.success(f"Version #{v_id} saved!")
-            st.rerun()
-        elif result.get("status") == "skipped":
-            msg = result.get("message", "Session already ended")
-            logger.warning(f"[SESSION] Save skipped: {msg}")
-            st.info(msg)
-        else:
-            msg = result.get("message", "Unknown error")
-            logger.error(f"[SESSION] Save failed: {msg}")
-            st.error(msg)
-
-    st.divider()
-    st.subheader("📋 Therapy")
-
     therapy_path = THERAPY_FILE
     if therapy_path.exists():
         try:
             therapy_data = json.loads(therapy_path.read_text(encoding="utf-8"))
             patient_name = therapy_data.get("patient_full_name", "N/A")
+            birth_date = therapy_data.get("birth_date", None)
+            birth_date_desc = ""
+            if birth_date:
+                try:
+                    birth_date_desc = datetime.strptime(
+                        birth_date, "%Y-%m-%dT%H:%M:%S"
+                    ).strftime("%d/%m/%Y")
+                except Exception:
+                    birth_date_desc = ""
+            age = therapy_data.get("age", "0")
+
             conditions = therapy_data.get("medical_conditions", [])
             activities = therapy_data.get("activities", [])
             expired_activities = therapy_data.get("expired_activities", [])
@@ -272,13 +249,18 @@ with st.sidebar:
                 6: "Sat",
                 7: "Sun",
             }
-            st.markdown(f"**Patient:** {patient_name}")
+            # st.markdown(f"**Patient:** {patient_name}")
+
+            st.markdown(f"📅{birth_date_desc} - {age} yrs.")
 
             if conditions:
                 with st.expander(f"Medical conditions ({len(conditions)})"):
                     for c in conditions:
                         st.markdown(f"- {c}")
 
+            st.divider()
+
+            st.subheader("📋 Therapy")
             if activities:
                 with st.expander(f"Activities ({len(activities)})"):
                     for act in activities:
@@ -327,6 +309,36 @@ with st.sidebar:
         st.warning("therapy.json not found")
 
     st.divider()
+
+    st.subheader("💾 Session")
+    db_status = "✅ Connected" if st.session_state.db_available else "❌ Not available"
+    st.caption(f"Database: {db_status}")
+
+    if st.button(
+        "Save therapy",
+        use_container_width=True,
+        disabled=not st.session_state.db_available
+        or st.session_state.session_ended
+        or st.session_state.processing,
+    ):
+        logger.info("[UI] Save therapy button clicked – running end_session")
+        with st.spinner("Saving session and extracting knowledge..."):
+            result = st.session_state.chat.end_session()
+        if result.get("status") == "success":
+            v_id = result.get("version", {}).get("id")
+            logger.info(f"[SESSION] Therapy saved manually – version #{v_id}")
+            st.session_state.session_ended = True
+            st.success(f"Version #{v_id} saved!")
+            st.rerun()
+        elif result.get("status") == "skipped":
+            msg = result.get("message", "Session already ended")
+            logger.warning(f"[SESSION] Save skipped: {msg}")
+            st.info(msg)
+        else:
+            msg = result.get("message", "Unknown error")
+            logger.error(f"[SESSION] Save failed: {msg}")
+            st.error(msg)
+
     with st.expander("⚙️ System info"):
         cpu_info, ram_info, gpu_info = get_system_info()
         st.markdown(

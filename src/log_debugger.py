@@ -2,10 +2,13 @@
 Log Debugger - Interactive log viewer for KnowledgeManagerLLM sessions
 """
 
+import json
 import re
 from datetime import datetime
 
 import streamlit as st
+
+from config_loader import THERAPY_FILE
 
 # Must be first Streamlit command
 st.set_page_config(
@@ -179,6 +182,103 @@ if unparsed_lines:
         if len(unparsed_lines) > 50:
             st.caption(f"... and {len(unparsed_lines) - 50} more")
 
+with st.sidebar:
+    st.subheader("👤 Patient")
+    chosen = st.selectbox(
+        "Select patient",
+        options=["Mario Rossi"],
+        index=0,
+        label_visibility="collapsed",
+    )
+    therapy_path = THERAPY_FILE
+    if therapy_path.exists():
+        try:
+            therapy_data = json.loads(therapy_path.read_text(encoding="utf-8"))
+            patient_name = therapy_data.get("patient_full_name", "N/A")
+            birth_date = therapy_data.get("birth_date", None)
+            birth_date_desc = ""
+            if birth_date:
+                try:
+                    birth_date_desc = datetime.strptime(
+                        birth_date, "%Y-%m-%dT%H:%M:%S"
+                    ).strftime("%d/%m/%Y")
+                except Exception:
+                    birth_date_desc = ""
+            age = therapy_data.get("age", "0")
+
+            conditions = therapy_data.get("medical_conditions", [])
+            activities = therapy_data.get("activities", [])
+            expired_activities = therapy_data.get("expired_activities", [])
+
+            days_map = {
+                1: "Mon",
+                2: "Tue",
+                3: "Wed",
+                4: "Thu",
+                5: "Fri",
+                6: "Sat",
+                7: "Sun",
+            }
+            # st.markdown(f"**Patient:** {patient_name}")
+
+            st.markdown(f"📅{birth_date_desc} - {age} yrs.")
+
+            if conditions:
+                with st.expander(f"Medical conditions ({len(conditions)})"):
+                    for c in conditions:
+                        st.markdown(f"- {c}")
+
+            st.divider()
+
+            st.subheader("📋 Therapy")
+            if activities:
+                with st.expander(f"Activities ({len(activities)})"):
+                    for act in activities:
+                        days = ", ".join(
+                            days_map[d] for d in act.get("day_of_week", [])
+                        )
+
+                        st.markdown(
+                            f"**{act['name']}**  \n"
+                            f"🕐 {act['time']} · ⏱️ {act['duration_minutes']}min · 📅 {days}"
+                        )
+
+                        if act.get("dependencies"):
+                            dep_names = []
+                            for dep in act["dependencies"]:
+                                dep_names += [
+                                    x["name"]
+                                    for x in activities
+                                    if x["activity_id"] == dep
+                                ]
+                            st.caption(f"Depends on: {', '.join(dep_names)}")
+                        st.write("")
+
+            if expired_activities:
+                with st.expander(
+                    f"Activities that expired today ({len(expired_activities)})"
+                ):
+                    for act in expired_activities:
+                        days = ", ".join(
+                            days_map[d] for d in act.get("day_of_week", [])
+                        )
+
+                        st.markdown(
+                            f"**{act['name']}**  \nUntil: {act['valid_until']}  \n"
+                            f"🕐 {act['time']} · ⏱️ {act['duration_minutes']}min · 📅 {days}"
+                        )
+
+                        if act.get("dependencies"):
+                            st.caption(f"Depends on: {', '.join(act['dependencies'])}")
+                        st.write("")
+
+        except Exception as e:
+            st.error(f"Errore lettura terapia: {e}")
+    else:
+        st.warning("therapy.json not found")
+
+    st.divider()
+
 
 # ─── TABS ─────────────────────────────────────────────────────────────────────
 
@@ -190,7 +290,7 @@ tab_chat, tab_tools, tab_timeline, tab_stats, tab_raw = st.tabs(
 # ─── TAB: CHAT ────────────────────────────────────────────────────────────────
 
 with tab_chat:
-    st.subheader("Conversation Replay")
+    st.header("Your Therapy Assistant")
 
     conversation = extract_chat_conversation(parsed_entries)
 
@@ -200,7 +300,7 @@ with tab_chat:
         for msg in conversation:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["message"])
-                st.caption(f"🕐 {msg['timestamp'].strftime('%H:%M:%S')}")
+                # st.caption(f"🕐 {msg['timestamp'].strftime('%H:%M:%S')}")
 
 
 # ─── TAB: TOOLS ───────────────────────────────────────────────────────────────

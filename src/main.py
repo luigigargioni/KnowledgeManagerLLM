@@ -1,5 +1,3 @@
-from time import time
-
 import prompts as prompts
 import tools as tools
 from chat import OllamaChat
@@ -51,13 +49,12 @@ def main():
         )
 
     # Chat data
-    model_name = MODEL
-    system_prompt = prompts._THERAPY_MANAGER_PROMPT
+    # model_name = MODEL
+    # system_prompt = prompts._THERAPY_MANAGER_PROMPT
 
     # Chat initialization
     chat = OllamaChat(
-        model=model_name,
-        system_prompt=system_prompt,
+        model=MODEL,
         database_manager=db if db_available else None,
         vector_db=vector_db,
     )
@@ -65,27 +62,25 @@ def main():
     print("=" * 60)
     print("  KnowledgeManagerLLM - LLM Chat Interface")
     print("=" * 60)
-    print(f"Model: {model_name}")
+    print(f"Model: {MODEL}")
     print("Commands: 'exit' or 'quit' to end session")
     print("=" * 60)
-    print()
 
-    # print of first static message
-    logger.info(f"[CHAT] ASSISTANT: {chat.conversation_history[-1]['content']}")
-    print(f"\nAssistant: {chat.conversation_history[-1]['content']}\n")
+    # Il main chiede il primo messaggio senza sapere come è generato
+    first_message = chat.chat_agent.conversation_history[-1]
+    logger.info(f"[CHAT] ASSISTANT: {first_message}")
+    print(f"\nAssistant: {first_message}\n")
 
     while True:
         try:
             user_input = input("You: ").strip()
 
-            # Manual exit
             if user_input.lower() in ["exit", "quit", "esci"]:
                 result = chat.end_session()
                 if result.get("status") == "success":
                     v_id = result.get("version", {}).get("id")
                     if v_id:
                         print(f"\n[Terapia salvata nel database - versione #{v_id}]")
-
                 logger.info("[SESSION] Chat session ended by user")
                 print("\nGoodbye!")
                 break
@@ -93,10 +88,7 @@ def main():
             if not user_input:
                 continue
 
-            start = time()
             response = chat.send_message(user_input)
-            logger.debug(f"[TIMING] Total elapsed time: {time() - start:.2f}s")
-            logger.info(f"[CHAT] ASSISTANT: {response}")
 
             if response:
                 print(f"\nAssistant: {response}\n")
@@ -106,15 +98,13 @@ def main():
             if result.get("status") == "success":
                 v_id = result.get("version", {}).get("id")
                 if v_id:
-                    print(f"\n[Therapy saved to database – version #{v_id}]")
-
-            logger.info("[SESSION] Chat interrupted by user (Ctrl+C)")
+                    print(f"\n[Therapy saved – version #{v_id}]")
             print("\n\nSession interrupted. Goodbye!")
             break
+
         except Exception as e:
-            logger.exception(f"[ERROR] Unexpected error: {str(e)}")
-            print(f"\nUnexpected error: {str(e)}")
-            continue
+            logger.exception(f"[ERROR] {e}")
+            print(f"\nUnexpected error: {e}")
 
 
 if __name__ == "__main__":

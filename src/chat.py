@@ -1,11 +1,14 @@
 import json
 import logging
-from datetime import datetime
+from time import time
 
-from openai import APIConnectionError, APITimeoutError, OpenAI
+from openai import OpenAI
 
 import prompts as prompts
 import tools as tools
+from agents.agent import Agent
+from agents.check_agent import TherapyCheckAgent
+from agents.therapy_manager_agent import TherapyManagerAgent
 from config_loader import (
     LLM_PROVIDER,
     LLM_TIMEOUT,
@@ -18,6 +21,7 @@ from session_extractor import (
     extract_and_save_patient_preferences,
 )
 from sql_db import DatabaseManager
+from utils import addAgentFilterLogger
 
 logger = logging.getLogger("knowledge_manager")
 
@@ -83,7 +87,6 @@ class Chat:
     def __init__(
         self,
         model=MODEL,
-        system_prompt=None,
         database_manager: DatabaseManager = None,
         vector_db=None,
     ):
@@ -99,114 +102,128 @@ class Chat:
         """
         self.model = model
         self.client = _make_client()
-        self.conversation_history = []
         self.session_ended = False
-
         self.database_manager = database_manager
         self.vector_db = vector_db
+        self.conversation_history = []
 
         # Inject the vector DB into the tools module so all tool functions can use it
         if vector_db is not None:
             tools.set_vector_db(vector_db)
             logger.debug("[INIT] Vector DB injected into tools module")
 
+        # Agents creation
+        self.check_agent = TherapyCheckAgent(zero_shot=False)
+        addAgentFilterLogger(self.check_agent.name)
+
+        self.chat_agent = TherapyManagerAgent()
+        addAgentFilterLogger(self.chat_agent.name)
+
+        # Agents association to the supervisor, needed for delegation
+        self._agent_registry: dict[str, Agent] = {
+            f"delegate_to_{self.check_agent.name}": self.check_agent,
+        }
+
+        # By adding the check_agent to the tools of chat_agente the second can delegate requests
+        self.chat_agent.tools.append(
+            self.check_agent.as_tool_declaration(
+                description=(
+                    "Delegate the action to the checker_agent to check it against the patient therapy or get medication information "
+                )
+            )
+        )
+
+        self.tools = self.chat_agent.tools
+
         logger.info(f"[INIT] Provider={LLM_PROVIDER} Model={model}")
 
-        self.tools = tools.tools_decl
-        logger.info(f"[INIT] Loaded {len(self.tools)} tools")
-
-        if system_prompt:
-            self.conversation_history.append(
-                {"role": "system", "content": system_prompt}
-            )
-            logger.info(
-                f"[INIT] System prompt configured: {len(system_prompt)} characters"
-            )
-        else:
-            logger.info("[INIT] No system prompt provided")
-
-        # Initialization of useful data
-        self.conversation_history.append(
-            {
-                "role": "system",
-                "content": f"get_current_datetime:{datetime.now().strftime('%Y-%m-%d %H:%M:%S %A')}",
-            }
-        )
-        therapy_json = tools.get_all_activities()
-        self.conversation_history.append(
-            {
-                "role": "system",
-                "content": f"get_therapy_activities:{therapy_json}",
-            }
-        )
-
-        first_message = build_first_message(therapy_json)
-        self.conversation_history.append(
+        first_message = build_first_message("{}")
+        self.chat_agent.conversation_history.append(
             {"role": "assistant", "content": first_message}
         )
 
-    def execute_tool(self, tool_name, tool_arguments):
+    def execute_tool(self, agent: Agent, tool_name: str, tool_arguments: dict) -> str:
         """
-        Execute a tool by name.
-
-        Args:
-            tool_name: Name of the tool to execute
-            tool_arguments: Tool arguments (dict)
-
-        Returns:
-            str: Result of the tool execution
+        L'orchestratore gestisce solo:
+        1. Delegation ai worker agents
+        2. save_session (richiede db_manager e vector_db)
+        Tutto il resto è delegato al chat_agent.
         """
+        logger.debug(
+            f"[{agent.name.upper()}][TOOL] Executing: {tool_name}({tool_arguments})"
+        )
 
-        if tool_name == "get_current_datetime":
-            now = datetime.now()
-            result = now.strftime("%Y-%m-%d %H:%M:%S %A")
-            return result
+        # 1. Delegation
+        if tool_name in self._agent_registry:
+            agent_delegate = self._agent_registry[tool_name]
+            result = self._send_to_agent(agent_delegate, tool_arguments)
 
-        # THERAPY MANAGEMENT TOOLS
-        elif tool_name == "get_therapy_activities":
-            return tools.get_all_activities()
-
-        elif tool_name == "add_therapy_activity":
-            return tools.add_therapy_activity(tool_arguments)
-
-        elif tool_name == "update_therapy_activity":
-            activity_id = tool_arguments.get("activity_id")
-            # Support both flat args (OpenAI style) and nested {updates: {...}} (legacy)
-            updates = tool_arguments.get("updates") or {
-                k: v for k, v in tool_arguments.items() if k != "activity_id"
-            }
-            return tools.update_therapy_activity(activity_id, updates)
-
-        elif tool_name == "remove_therapy_activity":
-            activity_id = tool_arguments.get("activity_id")
-            return tools.remove_therapy_activity(activity_id)
-
-        elif tool_name == "get_medicine_data":
-            medicine_name = tool_arguments.get("medicine_name")
-            return tools.get_medicine_data(medicine_name)
-
-        elif tool_name == "get_patient_preferences":
-            query = tool_arguments.get("query", "")
-            return tools.get_patient_preferences(query)
-
-        elif tool_name == "get_patient_history_events":
-            query = tool_arguments.get("query", "")
-            return tools.get_patient_history_events(query)
-
-        elif tool_name == "get_conflict_resolution_hints":
-            query = tool_arguments.get("query", "")
-            return tools.get_conflict_resolution_hints(query)
-
+        # 2. save_session: richiede dipendenze dell'orchestratore
         elif tool_name == "save_session":
-            logger.info(
-                "[TOOL] save_session triggered by LLM – running full end_session flow"
-            )
-            result = self.end_session()
-            return json.dumps(result, ensure_ascii=False)
+            result = json.dumps(self.end_session(), ensure_ascii=False)
 
+        # 3. Tool del supervisor
         else:
-            logger.warning(f"[TOOL] Tool not found: {tool_name}")
-            return f"Tool '{tool_name}' not found"
+            result = agent.execute_tool(tool_name, json.loads(tool_arguments))
+
+        logger.debug(f"[{agent.name.upper()}][TOOL] Results of {tool_name}: {result}")
+        return result
+
+    def _run_agent_loop(self, agent: Agent, user_message: str) -> str:
+        """
+        Loop tool-calling generico per qualsiasi agente.
+        Usato sia dal supervisor (send_message) che per la delegation (_send_to_agent).
+        """
+
+        logger.debug(f"[{agent.name.upper()}][REQUEST] {user_message}")
+        agent.conversation_history.append({"role": "user", "content": user_message})
+
+        for _ in range(10):
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=agent.conversation_history,
+                tools=agent.tools,
+            )
+            msg = response.choices[0].message
+
+            if not msg.tool_calls:
+                reply = msg.content or ""
+                if agent.zero_shot:
+                    agent.reset_agent()
+                else:
+                    agent.conversation_history.append(
+                        {"role": "assistant", "content": reply}
+                    )
+                logger.debug(f"[{agent.name.upper()}][REPLY] {reply}")
+                return reply
+
+            for tc in msg.tool_calls:
+                # Here the chat supervisor decide which agent to call or to close the session
+                result = self.execute_tool(
+                    agent, tc.function.name, tc.function.arguments
+                )
+                agent.conversation_history.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": str(result),
+                    }
+                )
+
+        return "Max iterations reached."
+
+    def send_message(self, user_message: str) -> str:
+        """Function used to send a message to the supervisor."""
+        logger.info(f"[CHAT] USER: {user_message}")
+        start = time()
+        res = self._run_agent_loop(self.chat_agent, user_message)
+        logger.debug(f"[TIMING] {time() - start:.2f}s")
+        logger.info(f"[CHAT] ASSISTANT: {res}")
+        return res
+
+    def _send_to_agent(self, agent: Agent, tool_arguments: dict) -> str:
+        """Delegation to a worker agent"""
+        return self._run_agent_loop(agent, json.dumps(tool_arguments))
 
     def _normalize_messages(self) -> list[dict]:
         """
@@ -245,104 +262,6 @@ class Chat:
             else:
                 normalized.append(msg)
         return normalized
-
-    def send_message(self, user_message):
-        """
-        Send a message to the model, maintaining conversation context.
-        Automatically handles tool calls.
-
-        Args:
-            user_message: The user message to send
-
-        Returns:
-            str: The model response, or None on error
-        """
-        logger.info(f"[CHAT] USER: {user_message}")
-
-        self.conversation_history.append({"role": "user", "content": user_message})
-
-        # LLM can call at most n tools in a row
-        max_iterations = 10
-
-        for _ in range(max_iterations):
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=self._normalize_messages(),
-                    tools=self.tools,
-                )
-
-                message = response.choices[0].message
-                tool_calls = message.tool_calls
-
-                if tool_calls:
-                    logger.debug(f"[TOOL] {len(tool_calls)} tool call(s) requested")
-
-                    # Record the assistant turn with its tool_calls
-                    self.conversation_history.append(
-                        {
-                            "role": "assistant",
-                            "content": message.content or "",
-                            "tool_calls": [
-                                {
-                                    "id": tc.id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": tc.function.name,
-                                        "arguments": tc.function.arguments,
-                                    },
-                                }
-                                for tc in tool_calls
-                            ],
-                        }
-                    )
-
-                    for tool_call in tool_calls:
-                        tool_name = tool_call.function.name
-                        # OpenAI (and Ollama /v1) always returns arguments as a JSON string
-                        tool_arguments = json.loads(tool_call.function.arguments)
-
-                        logger.debug(f"[TOOL] Executing: {tool_name}({tool_arguments})")
-
-                        tool_result = self.execute_tool(tool_name, tool_arguments)
-                        result_preview = (
-                            str(tool_result)[:100] + "..."
-                            if len(str(tool_result)) > 100
-                            else str(tool_result)
-                        )
-                        logger.debug(f"[TOOL] Result: {result_preview}")
-
-                        self.conversation_history.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": tool_call.id,
-                                "content": str(tool_result),
-                            }
-                        )
-
-                else:
-                    assistant_message = message.content or "No response received"
-                    self.conversation_history.append(
-                        {"role": "assistant", "content": assistant_message}
-                    )
-                    return assistant_message
-
-            except APIConnectionError:
-                logger.error(
-                    f"[ERROR] Connection failed: Cannot connect to {LLM_PROVIDER} API"
-                )
-                return None
-            except APITimeoutError:
-                logger.error("[ERROR] Request timeout")
-                return None
-            except Exception as e:
-                logger.error(f"[ERROR] Request failed: {e}")
-                return None
-
-        logger.warning("[WARNING] Max iterations reached for tool calling")
-        error_msg = "I'm sorry, I could not complete the request because too many operations were needed. Please try rephrasing or breaking the request into smaller steps."
-        self.conversation_history.append({"role": "assistant", "content": error_msg})
-        return error_msg
 
     def get_history(self):
         return self.conversation_history

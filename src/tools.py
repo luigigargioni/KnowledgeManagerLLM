@@ -6,7 +6,19 @@ from datetime import datetime
 from config_loader import THERAPY_FILE
 from utils import hhmm_to_minutes, minutes_to_hhmm
 
+CATEGORIES = [
+    "medication",
+    "outside_activity",
+    "meal",
+    "health_checkup",
+    "therapy",
+    "relaxation",
+    "social_activity",
+]
+
+
 logger = logging.getLogger("knowledge_manager")
+
 
 # ─── Vector DB reference (injected at startup via set_vector_db) ──────────────
 _vector_db = None
@@ -400,6 +412,7 @@ def add_therapy_activity(activity_data):
             "day_of_week",
             "time",
             "duration_minutes",
+            "category",
         ]
         for field in required_fields:
             if field not in activity_data:
@@ -410,6 +423,17 @@ def add_therapy_activity(activity_data):
                     },
                     indent=2,
                 )
+
+        # Validate category
+        act_category = activity_data.get("category")
+        if act_category not in CATEGORIES:
+            return json.dumps(
+                {
+                    "status": "error",
+                    "message": f"Category {act_category} is not allowed. Admitted values {','.join(CATEGORIES)}",
+                },
+                indent=2,
+            )
 
         # Validate time format (must be HH:MM)
         time_err = _validate_time_field(activity_data.get("time"), "time")
@@ -482,6 +506,7 @@ def add_therapy_activity(activity_data):
             "dependencies": activity_data.get("dependencies", []),
             "valid_from": activity_data.get("valid_from"),
             "valid_until": activity_data.get("valid_until"),
+            "category": activity_data["category"],
         }
 
         patient_id = _get_patient_id()
@@ -615,6 +640,17 @@ def update_therapy_activity(activity_id, updates):
         ]
 
         patient_id = _get_patient_id()
+
+        # Validate category
+        if "category" in updates:
+            if updates["category"] not in CATEGORIES:
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": f"Category {updates['category']} is not allowed. Admitted values {','.join(CATEGORIES)}",
+                    },
+                    indent=2,
+                )
 
         # Validate time format if it is being updated (must be HH:MM)
         if "time" in updates:
@@ -973,6 +1009,7 @@ def get_conflict_resolution_hints(query: str) -> str:
 
 
 # region Tools declaration
+
 tools_decl = [
     {
         "type": "function",
@@ -1023,6 +1060,10 @@ tools_decl = [
                     "time": {
                         "type": "string",
                         "description": "Time the activity takes place (format HH:MM)",
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "Category of the activity. Value in ['medication','outside_activity','meal','health_checkup','therapy','relaxation','social_activity'] ",
                     },
                     "duration_minutes": {
                         "type": "integer",
@@ -1213,6 +1254,72 @@ tools_decl = [
             "name": "save_session",
             "description": "Saves the current therapy configuration session inside the database. Run this when the user tells you they finished.",
             "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_activity",
+            "description": """
+                Check the activity in respect with the current patient therapy, health conditions and medications.
+                Requires: 
+                - activity_id (unique)
+                - name
+                - day_of_week: list of integers representing days of the week with 1=Monday and 7=Sunday
+                - time (format HH:MM)
+                - duration_minutes. 
+                Optional: description, dependencies (list of activities names), valid_from, valid_until""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "activity_id": {
+                        "type": "string",
+                        "description": "Unique ID of the activity (e.g.: 'lb_001')",
+                    },
+                    "name": {"type": "string", "description": "Name of the activity"},
+                    "description": {
+                        "type": "string",
+                        "description": "Detailed desciption of the activity",
+                    },
+                    "day_of_week": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Days of the week the activity takes place (1=Monday, 7=Sunday)",
+                    },
+                    "time": {
+                        "type": "string",
+                        "description": "Time the activity takes place (format HH:MM)",
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "Category of the activity. Value in ['medication','outside_activity','meal','health_checkup','therapy','relaxation','social_activity'] ",
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "description": "Duration of the activity in minutes",
+                    },
+                    "dependencies": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of activity_ids that must be completed before the current activity (use activity_id values, not names)",
+                    },
+                    "valid_from": {
+                        "type": "string",
+                        "description": "Date the activity starts to be valid (YYYY-MM-DD)",
+                    },
+                    "valid_until": {
+                        "type": "string",
+                        "description": "Date in which the activity ends to be valid (YYYY-MM-DD)",
+                    },
+                },
+                "required": [
+                    "activity_id",
+                    "name",
+                    "day_of_week",
+                    "time",
+                    "duration_minutes",
+                ],
+            },
         },
     },
 ]
