@@ -1,6 +1,6 @@
-import logging
+from utils import get_current_logger
 
-logger = logging.getLogger("knowledge_manager")
+logger = get_current_logger()
 
 
 class Agent:
@@ -31,6 +31,7 @@ class Agent:
         self.conversation_history = (
             [self.conversation_history[0]] if self.prompt else []
         )
+        self.inject_context()
 
     def inject_context(self):
         """Function used to inject some initial context in the agent"""

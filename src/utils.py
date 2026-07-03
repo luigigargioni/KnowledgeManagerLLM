@@ -1,8 +1,15 @@
+import json
 import logging
+import os
 import platform
+
+# log_parser.py
+import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime
+from pathlib import Path
 
 import psutil
 
@@ -11,8 +18,11 @@ import tools as tools
 from config_loader import (
     CHECK_NVIDIA_GPU,
     FILE_LOG_LEVEL,
+    LLM_PROVIDER,
     LOGS_FOLDER,
+    MODEL,
     TERMINAL_LOG_LEVEL,
+    THERAPY_FILE,
 )
 
 
@@ -111,12 +121,27 @@ def setup_logger():
     logger.session_dir = session_dir
 
     logger.info(f"[SESSION] New chat session started ID:{session_timestamp}")
+    cpu_info, ram_info, gpu_info = get_system_info()
+    logger.info(
+        f"[SESSION] CPU: {cpu_info['model']} {cpu_info['cores']}/{cpu_info['threads']}\tRAM:{ram_info:.0f} GB"
+    )
+    if len(gpu_info) > 0:
+        for info in gpu_info:
+            logger.info(
+                f"[SESSION] GPU {info['gpu']}: {info['name']} ({info['memory']})"
+            )
+
+    logger.info(f"[SESSION] Provider={LLM_PROVIDER} Model={MODEL}")
 
     return logger
 
 
+def get_current_logger():
+    return logging.getLogger("knowledge_manager")
+
+
 def addAgentFilterLogger(agent_name):
-    logger = logging.getLogger("knowledge_manager")
+    logger = get_current_logger()
     agent_handler = logging.FileHandler(
         f"{logger.session_dir}/agent_{agent_name}.log", encoding="utf-8"
     )
@@ -127,3 +152,142 @@ def addAgentFilterLogger(agent_name):
     agent_handler.setFormatter(agent_formatter)
     agent_handler.addFilter(StartWithFilter(filter_string=f"[{agent_name.upper()}]"))
     logger.addHandler(agent_handler)
+
+
+_LOG_LINE_PATTERN = re.compile(
+    r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} - \[CHAT\] (USER|ASSISTANT): (.*)$"
+)
+
+# Mappa il marker del log al role OpenAI-style
+_ROLE_MAP = {
+    "USER": "user",
+    "ASSISTANT": "assistant",
+}
+
+
+def parse_chat_log(log_path: str | Path) -> list[dict]:
+    """
+    Parsa un file di log nel formato:
+        YYYY-MM-DD HH:MM:SS - [CHAT] USER: <messaggio>
+        YYYY-MM-DD HH:MM:SS - [CHAT] ASSISTANT: <messaggio multi-riga>
+
+    Ricostruisce la conversation_history con i ruoli corretti, gestendo
+    correttamente i messaggi che si estendono su più righe (es. risposte
+    formattate dell'assistant).
+
+    Args:
+        log_path: percorso al file .log
+
+    Returns:
+        Lista di dict {"role": "user"|"assistant", "content": "..."}
+        pronta per popolare agent.conversation_history.
+    """
+    log_path = Path(log_path)
+    lines = log_path.read_text(encoding="utf-8").splitlines()
+
+    history: list[dict] = []
+    current_role: str | None = None
+    current_content: list[str] = []
+
+    def _flush():
+        """Chiude il messaggio corrente e lo aggiunge alla history."""
+        if current_role is not None:
+            content = "\n".join(current_content).strip()
+            if content:
+                history.append({"role": current_role, "content": content})
+
+    for line in lines:
+        match = _LOG_LINE_PATTERN.match(line)
+
+        if match:
+            # Nuova riga di log riconosciuta: chiudi il messaggio precedente
+            _flush()
+            marker, first_line = match.groups()
+            current_role = _ROLE_MAP[marker]
+            current_content = [first_line]
+        else:
+            # Riga di continuazione (es. punto elenco di una risposta ASSISTANT)
+            # Ignora righe vuote prima del primo messaggio riconosciuto
+            if current_role is not None:
+                current_content.append(line)
+
+    # Flush dell'ultimo messaggio rimasto in buffer
+    _flush()
+
+    return history
+
+
+def populate_agent_history(
+    agent, log_path: str | Path, keep_system_prompt: bool = True
+) -> None:
+    """
+    Popola agent.conversation_history a partire da un file di log,
+    preservando il system prompt iniziale se presente.
+
+    Args:
+        agent: istanza di Agent (es. TherapyManagerAgent) la cui history va popolata
+        log_path: percorso al file .log
+        keep_system_prompt: se True, mantiene il messaggio system esistente
+                             in cima alla history prima di appendere i messaggi parsati
+    """
+    parsed_messages = parse_chat_log(log_path)
+
+    if keep_system_prompt and agent.conversation_history:
+        agent.conversation_history = agent.conversation_history + parsed_messages
+    else:
+        agent.conversation_history = parsed_messages
+
+
+def copy_session_therapy():
+    logger = get_current_logger()
+    session_log_dir = logger.session_dir
+
+    os.makedirs(session_log_dir, exist_ok=True)
+
+    shutil.copy2(THERAPY_FILE, os.path.join(session_log_dir, "therapy.json"))
+
+
+def load_past_session(
+    agent,
+    session_log_dir: str | Path,
+    keep_system_prompt: bool = True,
+) -> list[dict]:
+    """
+    Carica una sessione precedente nella history dell'agente e
+    restituisce gli snapshot della terapia trovati.
+
+    Args:
+        agent: istanza di Agent da popolare
+        session_log_dir: cartella della sessione precedente (es. logs/session_20260630)
+        keep_system_prompt: se True, mantiene il system prompt iniziale
+
+    Returns:
+        Lista di snapshot terapia [{"message_idx": int, "therapy": dict}, ...]
+        da assegnare a chat._therapy_snapshots.
+        Lista vuota se il file non esiste.
+    """
+    logger = get_current_logger()
+    session_log_dir = Path(session_log_dir)
+    chat_log = session_log_dir / "chat.log"
+    snapshots_path = session_log_dir / "therapy_snapshots.json"
+
+    if not chat_log.exists():
+        raise FileNotFoundError(f"chat.log not found in {session_log_dir}")
+
+    # Popola la history con i messaggi della sessione precedente
+    populate_agent_history(agent, chat_log, keep_system_prompt=keep_system_prompt)
+
+    # Carica gli snapshot se presenti
+    if snapshots_path.exists():
+        snapshots = json.loads(snapshots_path.read_text(encoding="utf-8"))
+        logger.info(
+            f"[LOAD] Loaded {len(snapshots)} therapy snapshots from {session_log_dir}"
+        )
+    else:
+        logger.warning(
+            f"[LOAD] No therapy_snapshots.json found in {session_log_dir} – "
+            "starting with empty snapshot list"
+        )
+        snapshots = []
+
+    return snapshots

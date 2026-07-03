@@ -10,15 +10,15 @@ When the caregiver saves a session this module:
 """
 
 import json
-import logging
 import re
 
 from openai import OpenAI
 
 from config_loader import LLM_PROVIDER, LLM_TIMEOUT, MODEL, OLLAMA_URL, OPENAI_API_KEY
 from prompts import _CONFLICT_EXTRACTION_PROMPT, _PREFERENCE_EXTRACTION_PROMPT
+from utils import get_current_logger
 
-logger = logging.getLogger("knowledge_manager")
+logger = get_current_logger()
 
 
 def _format_conversation(conversation_history: list[dict]) -> str:

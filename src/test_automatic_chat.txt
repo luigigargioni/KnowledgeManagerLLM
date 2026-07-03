@@ -1,0 +1,5 @@
+Is Aulin safe for the patient?
+What about Tachipirina?
+Are there instances of Tachipirina intake in the current therapy?
+Are they correctly spaced according to the hourly or daily intake?
+exit

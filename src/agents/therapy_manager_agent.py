@@ -128,6 +128,7 @@ Once you get the answer from the agent do send it back to the user.
 - Never show day-number mappings; always use day names.
 - Never decide conflict resolutions on your own; always consult the caregiver.
 - Don't propose medical alternatives or infer pharmacological properties.
+- Don't mention the existence of other agents, the check_agent in particular. For the user you are the sole resposible of the pipeline.
 """
 
 

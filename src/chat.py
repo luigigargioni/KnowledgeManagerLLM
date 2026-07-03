@@ -1,5 +1,5 @@
 import json
-import logging
+from pathlib import Path
 from time import time
 
 from openai import OpenAI
@@ -15,21 +15,26 @@ from config_loader import (
     MODEL,
     OLLAMA_URL,
     OPENAI_API_KEY,
+    THERAPY_FILE,
 )
 from session_extractor import (
     extract_and_save_conflict_resolutions,
     extract_and_save_patient_preferences,
 )
 from sql_db import DatabaseManager
-from utils import addAgentFilterLogger
+from utils import addAgentFilterLogger, get_current_logger
+from utils import load_past_session as _load
 
-logger = logging.getLogger("knowledge_manager")
+logger = get_current_logger()
 
 
 def _make_client() -> OpenAI:
     """Return an OpenAI-compatible client for the configured provider."""
     if LLM_PROVIDER == "openai":
-        return OpenAI(api_key=OPENAI_API_KEY, timeout=LLM_TIMEOUT)
+        return OpenAI(
+            api_key=OPENAI_API_KEY,
+            timeout=LLM_TIMEOUT,
+        )
     # Ollama exposes an OpenAI-compatible API at /v1
     return OpenAI(base_url=f"{OLLAMA_URL}/v1", api_key="ollama", timeout=LLM_TIMEOUT)
 
@@ -113,7 +118,7 @@ class Chat:
             logger.debug("[INIT] Vector DB injected into tools module")
 
         # Agents creation
-        self.check_agent = TherapyCheckAgent(zero_shot=False)
+        self.check_agent = TherapyCheckAgent(zero_shot=True)
         addAgentFilterLogger(self.check_agent.name)
 
         self.chat_agent = TherapyManagerAgent()
@@ -135,11 +140,112 @@ class Chat:
 
         self.tools = self.chat_agent.tools
 
-        logger.info(f"[INIT] Provider={LLM_PROVIDER} Model={model}")
-
         first_message = build_first_message("{}")
         self.chat_agent.conversation_history.append(
             {"role": "assistant", "content": first_message}
+        )
+
+        self._therapy_snapshots: list[dict] = []
+        self._save_therapy_snapshot()
+
+    def _save_therapy_snapshot(self):
+        """
+        Saves a snapshot of the therapy associated with the chat index.
+        Used later for rewind feature.
+        """
+
+        current_idx = (
+            len(
+                [
+                    m
+                    for m in self.chat_agent.conversation_history
+                    if m["role"] in ["assistant", "user"]
+                ]
+            )
+            - 1
+        )
+        therapy = json.loads(THERAPY_FILE.read_text(encoding="utf-8"))
+
+        self._therapy_snapshots.append(
+            {
+                "message_idx": current_idx,
+                "therapy": therapy,
+            }
+        )
+
+        # Saving of snapshot on memory
+        if logger.session_dir:
+            snapshots_path = logger.session_dir / "therapy_snapshots.json"
+            snapshots_path.write_text(
+                json.dumps(self._therapy_snapshots, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        logger.debug(
+            f"[SNAPSHOT] Saved therapy snapshot at message_idx={current_idx} "
+            f"(total snapshots: {len(self._therapy_snapshots)})"
+        )
+
+    def restore_therapy_snapshot(self, message_idx: int):
+        """
+        Restored the first snapshot with message_idx<= given_message_idx.
+        Overwrites therapy.json with the new snapshot.
+        """
+
+        # Cerca l'ultimo snapshot con idx <= message_idx
+        candidates = [
+            s for s in self._therapy_snapshots if s["message_idx"] <= message_idx
+        ]
+        if not candidates:
+            logger.warning(
+                f"[SNAPSHOT] No snapshot found for message_idx<={message_idx}, keeping current therapy"
+            )
+            return
+
+        snapshot = candidates[-1]  # l'ultimo (più recente) tra i candidati
+
+        # Tronca anche la lista degli snapshot: quelli successivi non sono più validi
+        self._therapy_snapshots = candidates
+
+        THERAPY_FILE.write_text(
+            json.dumps(snapshot["therapy"], indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        logger.info(
+            f"[SNAPSHOT] Restored therapy snapshot from message_idx={snapshot['message_idx']}"
+        )
+
+    # chat.py
+
+    def load_past_session(self, session_log_dir: Path) -> None:
+        """
+        Carica il contesto di una sessione precedente:
+        - Popola la history del chat_agent dal chat.log
+        - Ripristina gli snapshot della terapia
+        - Ripristina therapy.json all'ultimo snapshot trovato
+        - Logga il caricamento nella sessione corrente
+        """
+
+        logger.info(f"[LOAD] Loading past session from {session_log_dir}")
+
+        snapshots = _load(
+            self.chat_agent,
+            session_log_dir,
+            keep_system_prompt=True,
+        )
+
+        if snapshots:
+            self._therapy_snapshots = snapshots
+            # Ripristina therapy.json all'ultimo snapshot della sessione caricata
+            self.restore_therapy_snapshot(snapshots[-1]["message_idx"])
+        else:
+            # Nessuno snapshot: salva almeno lo stato attuale di therapy.json
+            self._therapy_snapshots = []
+            self._save_therapy_snapshot()
+
+        logger.info(
+            f"[LOAD] Past session loaded from: {session_log_dir} – "
+            f"{len(self.chat_agent.conversation_history)} messages, "
+            f"{len(self._therapy_snapshots)} snapshots"
         )
 
     def execute_tool(self, agent: Agent, tool_name: str, tool_arguments: dict) -> str:
@@ -165,6 +271,14 @@ class Chat:
         # 3. Tool del supervisor
         else:
             result = agent.execute_tool(tool_name, json.loads(tool_arguments))
+
+        # If is an action that changes the therapy i save a new snapshot of it
+        if tool_name in (
+            "add_therapy_activity",
+            "update_therapy_activity",
+            "remove_therapy_activity",
+        ):
+            self._save_therapy_snapshot()
 
         logger.debug(f"[{agent.name.upper()}][TOOL] Results of {tool_name}: {result}")
         return result
@@ -196,6 +310,10 @@ class Chat:
                     )
                 logger.debug(f"[{agent.name.upper()}][REPLY] {reply}")
                 return reply
+
+            logger.debug(
+                f"[{agent.name.upper()}][TOOL] Requested {len(msg.tool_calls)} tools"
+            )
 
             for tc in msg.tool_calls:
                 # Here the chat supervisor decide which agent to call or to close the session

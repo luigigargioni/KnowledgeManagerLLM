@@ -1,11 +1,18 @@
 import json
 from datetime import datetime
+from pathlib import Path
 from time import time
 
 import streamlit as st
 
 from chat import OllamaChat
-from config_loader import DEFAULT_PATIENT_ID, MODEL, PATIENTS_DATA_FOLDER, THERAPY_FILE
+from config_loader import (
+    DEFAULT_PATIENT_ID,
+    LOGS_FOLDER,
+    MODEL,
+    PATIENTS_DATA_FOLDER,
+    THERAPY_FILE,
+)
 from sql_db import DatabaseManager
 from utils import get_system_info, setup_logger
 from vector_db import VectorDBManager
@@ -167,12 +174,55 @@ if st.session_state.session_ended:
     )
 
 
-with st.chat_message(st.session_state.first_message["role"]):
-    st.markdown(st.session_state.first_message["content"])
+# with st.chat_message(st.session_state.first_message["role"]):
+#    st.markdown(st.session_state.first_message["content"])
 
-for message in st.session_state.conversation:
+
+for idx, message in enumerate(
+    [
+        m
+        for m in st.session_state.chat.chat_agent.conversation_history
+        if m["role"] in ["assistant", "user"]
+    ]
+):
+    if message["role"] not in ["assistant", "user"]:
+        continue
+
     with st.chat_message(message["role"]):
-        st.markdown(message["message"])
+        st.markdown(message["content"])
+
+        if st.button(
+            "go back here", key=f"rewind_{idx}", icon="🔄", icon_position="right"
+        ):
+            logger.info(
+                f"[REWIND] Conversation was reloaded from message {idx} - {message['role'].upper()}: {f'{message["content"][:80]}...' if len(message['content']) > 80 else message['content']}"
+            )
+            full_idx = st.session_state.chat.chat_agent.conversation_history.index(
+                message
+            )
+            st.session_state.chat.chat_agent.conversation_history = (
+                st.session_state.chat.chat_agent.conversation_history[: full_idx + 1]
+            )
+
+            # Recovering of new therapy from snapshot
+            st.session_state.chat.restore_therapy_snapshot(idx)
+
+            if message["role"] == "user":
+                st.session_state.chat.chat_agent.conversation_history = (
+                    st.session_state.chat.chat_agent.conversation_history[:-1]
+                )
+                st.session_state.pending_message = message["content"]
+                st.session_state.processing = True
+            else:
+                st.session_state.pending_message = None
+                st.session_state.processing = False
+
+            # Resetta anche lo stato di fine sessione, nel caso il rewind
+            # avvenga prima di un eventuale save_session successivo
+            st.session_state.session_ended = False
+
+            st.rerun()
+
 
 user_message = st.chat_input(
     "Write a message...",
@@ -182,7 +232,11 @@ user_message = st.chat_input(
 # Phase 1: new input from the user → save it and rerun with processing=True
 # so the sidebar renders with disabled widgets before the blocking call.
 if user_message and not st.session_state.processing:
-    st.session_state.pending_message = user_message
+    st.session_state.pending_message = (
+        user_message
+        if user_message
+        else st.session_state.chat.chat_agent.conversation_history[-1]["content"]
+    )
     st.session_state.processing = True
     st.rerun()
 
@@ -338,6 +392,58 @@ with st.sidebar:
             msg = result.get("message", "Unknown error")
             logger.error(f"[SESSION] Save failed: {msg}")
             st.error(msg)
+
+    st.divider()
+    st.subheader("📂 Past Sessions")
+
+    def get_available_sessions(patient_id: str) -> list[Path]:
+        """Restituisce le cartelle di sessione disponibili per il paziente, ordinate per data desc."""
+        logs_root = LOGS_FOLDER / patient_id
+        if not logs_root.exists():
+            return []
+        return sorted(
+            [
+                d
+                for d in logs_root.iterdir()
+                if d.is_dir() and (d / "chat.log").exists()
+            ],
+            reverse=True,  # più recente prima
+        )
+
+    available_sessions = get_available_sessions(st.session_state.selected_patient_id)
+
+    if not available_sessions:
+        st.caption("No past sessions found.")
+    else:
+        session_labels = [d.name for d in available_sessions]
+        selected_session_label = st.selectbox(
+            "Select a past session",
+            options=session_labels,
+            label_visibility="collapsed",
+            disabled=st.session_state.processing or st.session_state.session_ended,
+        )
+        selected_session_dir = next(
+            d for d in available_sessions if d.name == selected_session_label
+        )
+
+        if st.button(
+            "Load session",
+            use_container_width=True,
+            disabled=st.session_state.processing or st.session_state.session_ended,
+        ):
+            with st.spinner("Loading past session..."):
+                try:
+                    st.session_state.chat.load_past_session(selected_session_dir)
+                    logger.info(f"[UI] Past session loaded from {selected_session_dir}")
+                    st.success(f"Session '{selected_session_label}' loaded.")
+                    st.rerun()
+                except FileNotFoundError as e:
+                    st.error(str(e))
+                except Exception as e:
+                    logger.error(f"[UI] Failed to load past session: {e}")
+                    st.error(f"Error loading session: {e}")
+
+    st.divider()
 
     with st.expander("⚙️ System info"):
         cpu_info, ram_info, gpu_info = get_system_info()

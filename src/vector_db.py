@@ -12,7 +12,6 @@ Manages 4 collections:
   - patient_preferences:   Patient preferences per patient (personalise therapy suggestions)
 """
 
-import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -21,8 +20,9 @@ from chromadb.utils import embedding_functions
 
 import chromadb
 from config_loader import CHROMA_DB_PATH, MEDICINES_FOLDER, PATIENTS_DATA_FOLDER
+from utils import get_current_logger
 
-logger = logging.getLogger("knowledge_manager")
+logger = get_current_logger()
 
 # ─── Collection names ────────────────────────────────────────────────────────
 COLLECTION_MEDICINES = "medicines"
@@ -324,7 +324,11 @@ class VectorDBManager:
                 # Apply a tighter distance threshold for safety-critical "danger" events
                 # so they are surfaced even when the semantic match is imperfect.
                 event_type = meta.get("event_type", "warning")
-                threshold = PATIENT_HISTORY_DANGER_THRESHOLD if event_type == "danger" else PATIENT_HISTORY_WARNING_THRESHOLD
+                threshold = (
+                    PATIENT_HISTORY_DANGER_THRESHOLD
+                    if event_type == "danger"
+                    else PATIENT_HISTORY_WARNING_THRESHOLD
+                )
                 if dist < threshold:
                     events.append(
                         {

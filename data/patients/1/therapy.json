@@ -23,7 +23,8 @@
             "description": "Fasting blood glucose check",
             "valid_until": null,
             "dependencies": [],
-            "duration_minutes": 10
+            "duration_minutes": 10,
+            "category": "health_checkup"
         },
         {
             "name": "Breakfast",
@@ -40,7 +41,8 @@
             "dependencies": [
                 "lb_001"
             ],
-            "duration_minutes": 20
+            "duration_minutes": 20,
+            "category": "meal"
         },
         {
             "name": "Physiotherapy Session",
@@ -55,7 +57,8 @@
             "description": "A physiotherapy session to maintain joint flexibility and muscle strength.",
             "valid_until": null,
             "dependencies": [],
-            "duration_minutes": 30
+            "duration_minutes": 30,
+            "category": "therapy"
         },
         {
             "name": "Lunch",
@@ -74,7 +77,8 @@
             "description": "",
             "valid_until": null,
             "dependencies": [],
-            "duration_minutes": 60
+            "duration_minutes": 60,
+            "category": "meal"
         },
         {
             "name": "Dinner",
@@ -93,7 +97,8 @@
             "description": "A gluten-free and low-carb dinner suitable for a patient with celiac disease and type 1 diabetes.",
             "valid_until": null,
             "dependencies": [],
-            "duration_minutes": 60
+            "duration_minutes": 60,
+            "category": "meal"
         }
     ],
     "expired_activities": []

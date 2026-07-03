@@ -4,7 +4,6 @@ Usa SQLAlchemy come ORM con psycopg2 come driver
 """
 
 import json
-import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -23,8 +22,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
 from config_loader import DB_CONNECTION_STRING, PATIENTS_DATA_FOLDER, THERAPY_FILE
+from utils import get_current_logger
 
-logger = logging.getLogger("knowledge_manager")
+logger = get_current_logger()
 
 
 # region BASE & MODELS

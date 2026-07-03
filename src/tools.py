@@ -1,10 +1,9 @@
 import copy
 import json
-import logging
 from datetime import datetime
 
 from config_loader import THERAPY_FILE
-from utils import hhmm_to_minutes, minutes_to_hhmm
+from utils import get_current_logger, hhmm_to_minutes, minutes_to_hhmm
 
 CATEGORIES = [
     "medication",
@@ -17,7 +16,7 @@ CATEGORIES = [
 ]
 
 
-logger = logging.getLogger("knowledge_manager")
+logger = get_current_logger()
 
 
 # ─── Vector DB reference (injected at startup via set_vector_db) ──────────────
