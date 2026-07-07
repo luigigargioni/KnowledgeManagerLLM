@@ -296,6 +296,239 @@ _MANAGER_TOOLS = [
 ]
 
 
+_PROMPT = """
+You are an assistant who must help a caregiver manage a patient's therapy.
+
+# THERAPY
+The current therapy is provided separately as JSON containing patient information and activities.
+
+## Notes
+Activity rules:
+- Days: Mon=1 ... Sun=7. If omitted, assume every day.
+- Dependencies contain activity_ids only.
+- Generate a description if missing.
+- valid_from/valid_until null = always valid.
+- Category is required and must be one of:
+  medication, outside_activity, meal, health_checkup,
+  therapy, relaxation, social_activity.
+
+# HOW TO ADD, DELETE OR MODIFY AN ACTIVITY
+Execute steps in order:
+
+1. ACTIVITY CHECK
+  Call delegate_to_checker_agent to verify if the activity is safe for the patient before adding it or after an update.
+  Call the function each time the current activity changes. DO NOT proceed before verifing that
+  the current activity is safe. If the checker returns warnings or conflicts, report them clearly to the caregiver.
+  If you already checked the current activity, you can proceede with next steps.
+
+2. PAST CONFLICT RESOLUTIONS CHECK (proactive)
+   Call get_conflict_resolution_hints(query) with a description of the activity or concern.
+   If relevant past decisions are found, surface them to the caregiver before proposing options.
+   This prevents repeating rejected activities or ignoring previously agreed rules.
+
+3. PREFERENCE CHECK (proactive)
+   Call get_patient_preferences() to personalise suggestions to the patient's habits.
+
+4. CONFIRMATION (mandatory)
+   Ask for user confirmation asbout the action you are going to perform. 
+
+5. ACTION EXECUTION (mandatory)
+   Procede to call add_therapy_activity, remove_therapy_activity or update_therapy_activity depending on the request.
+   The functions add_therapy_activity and update_therapy_activity already include checks on possible temporal overlappings between activities and/or broken depencencies
+   sequences so YOU DON'T NEED to do those check yourself.
+   If no conflicts emerge DO present the result to the user. Adding, updating or removing an activity must be the last steps of the flow before passing the baton back to the
+   user.
+
+6. CONFLICT RESOLUTION
+   If a scheduling conflict occurs, present the conflict, suggested alternative times,
+   and any past_resolution_hints from the tool result.
+   DO NOT resolve conflicts on your own; always consult the caregiver.
+
+
+# Getting additional information
+If the user request information about some medication, counterindication or interaction between medication and activities do call delegate_to_checker_agent with an adequate message.
+The checker_agent will handle the retrieval of information and the evaluation of the request.
+Once you get the answer from the agent do send it back to the user.
+
+
+# CHECKS TO PERFORM
+- When a scheduling conflict occurs ALWAYS ask the user how to resolve it.
+- Notify the caregiver of any temporal conflicts with existing activities that emerge from running add_therapy_activity and update_therapy_activity.
+  Always, rely on those funcions for temporal overlappings as a consequence of additions or updates.
+
+# Rules
+- Use only the necessary tools.
+- Reply in English unless requested otherwise.
+- Use 24-hour time.
+- Never expose JSON or internal implementation.
+- Never mention other agents.
+- Never resolve scheduling conflicts yourself.
+- Do not invent medical advice.
+"""
+
+
+_MANAGER_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_datetime",
+            "description": "Get the current date and time in a human readable format",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_therapy_activities",
+            "description": "Get the entire therapy of the patient",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_therapy_activity",
+            "description": """Adds a new activity to the therapy of the current patient.
+                Requires: activity_id, name, day_of_week, time, duration_minutes.
+                Optional: description, dependencies, valid_from, valid_until""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "activity_id": {
+                        "type": "string",
+                        "description": "Unique ID (e.g.: 'lb_001')",
+                    },
+                    "name": {"type": "string", "description": "Name of the activity"},
+                    "description": {
+                        "type": "string",
+                        "description": "Detailed description",
+                    },
+                    "day_of_week": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Days of the week (1=Monday, 7=Sunday)",
+                    },
+                    "time": {"type": "string", "description": "Time (HH:MM)"},
+                    "category": {
+                        "type": "string",
+                        "description": "Category: medication, outside_activity, meal, health_checkup, therapy, relaxation, social_activity",
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "description": "Duration in minutes",
+                    },
+                    "dependencies": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of dependency activity_ids",
+                    },
+                    "valid_from": {"type": "string", "description": "YYYY-MM-DD"},
+                    "valid_until": {"type": "string", "description": "YYYY-MM-DD"},
+                },
+                "required": [
+                    "activity_id",
+                    "name",
+                    "day_of_week",
+                    "time",
+                    "duration_minutes",
+                ],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_therapy_activity",
+            "description": "Updates an existing activity. Specify activity_id and only fields that need to change.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "activity_id": {
+                        "type": "string",
+                        "description": "ID of the activity to update",
+                    },
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "day_of_week": {"type": "array", "items": {"type": "integer"}},
+                    "time": {"type": "string", "description": "HH:MM"},
+                    "duration_minutes": {"type": "integer"},
+                    "dependencies": {"type": "array", "items": {"type": "string"}},
+                    "valid_from": {"type": "string", "description": "YYYY-MM-DD"},
+                    "valid_until": {"type": "string", "description": "YYYY-MM-DD"},
+                },
+                "required": ["activity_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "remove_therapy_activity",
+            "description": "Remove an activity from the therapy of the current patient",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "activity_id": {
+                        "type": "string",
+                        "description": "ID of the activity to remove",
+                    }
+                },
+                "required": ["activity_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_patient_preferences",
+            "description": (
+                "Retrieve known preferences and habits of the current patient. "
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Optional topic (e.g. 'food', 'morning routine', 'medication timing').",
+                    }
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_conflict_resolution_hints",
+            "description": (
+                "Retrieve past conflict resolutions, rejected activities, and prior "
+                "caregiver decisions that are semantically related to a given activity or topic. "
+                "Call this BEFORE proposing options to the caregiver so that previous decisions "
+                "are taken into account and surfaced."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Description of the activity or conflict to look up in past resolution records (e.g. 'potassium snack renal failure', 'NSAID analgesic', 'evening aerobic exercise diabetes').",
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_session",
+            "description": "Saves the current therapy session. Call when the user says they are done.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+]
+
+
 class TherapyManagerAgent(Agent):
     def __init__(self, agent_name="therapy_manager"):
         super().__init__(
@@ -307,16 +540,16 @@ class TherapyManagerAgent(Agent):
     def inject_context(self):
         self.conversation_history.append(
             {
-                "role": "tool",
-                "content": f"get_current_datetime:{datetime.now().strftime('%Y-%m-%d %H:%M:%S %A')}",
+                "role": "system",
+                "content": f"Current datetime:{datetime.now().strftime('%Y-%m-%d %H:%M:%S %A')}",
             }
         )
 
         therapy_json = tools.get_all_activities()
         self.conversation_history.append(
             {
-                "role": "tool",
-                "content": f"get_therapy_activities:{therapy_json}",
+                "role": "system",
+                "content": f"Current patient activities:{therapy_json}",
             }
         )
 

@@ -297,8 +297,11 @@ class Chat:
                 model=self.model,
                 messages=agent.conversation_history,
                 tools=agent.tools,
+                reasoning_effort="low",
             )
             msg = response.choices[0].message
+
+            agent.conversation_history.append(msg.model_dump(exclude_none=True))
 
             if not msg.tool_calls:
                 reply = msg.content or ""

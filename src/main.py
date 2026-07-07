@@ -1,8 +1,11 @@
+# main.py
 import argparse
+import sys
 from pathlib import Path
 from time import time
 
 import tools as tools
+from agents.caregiver_agent import CaregiverAgent
 from chat import OllamaChat
 from config_loader import DEFAULT_PATIENT_ID, MODEL
 from sql_db import DatabaseManager
@@ -21,63 +24,128 @@ def parse_args() -> argparse.Namespace:
         "-i",
         type=Path,
         default=None,
-        help="Path to a text file containing one user message per line. "
-        "If omitted, runs in interactive mode.",
+        help=(
+            "Path to a script file (.md, .txt, or any text format) describing "
+            "the caregiver's objectives. If omitted, runs in interactive mode."
+        ),
     )
     parser.add_argument(
         "--delay",
         "-d",
         type=float,
         default=0.0,
-        help="Seconds to wait between messages in file mode (default: 0).",
+        help="Seconds to wait between turns in agent mode (default: 0).",
     )
     return parser.parse_args()
 
 
-def read_messages_from_file(path: Path) -> list[str]:
+def read_script(path: Path) -> str:
     """
-    Legge i messaggi utente da un file di testo.
-    - Una riga = un messaggio
-    - Righe vuote e righe che iniziano con # vengono ignorate
+    Legge lo script da passare al CaregiverAgent.
+    Il contenuto viene passato all'agente senza alcuna modifica —
+    la formattazione e la struttura sono responsabilità di chi scrive lo script.
     """
     if not path.exists():
-        raise FileNotFoundError(f"Input file not found: {path}")
+        raise FileNotFoundError(f"Script file not found: {path}")
 
-    messages = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if stripped and not stripped.startswith("#"):
-            messages.append(stripped)
+    script = path.read_text(encoding="utf-8").strip()
 
-    if not messages:
-        raise ValueError(f"No messages found in {path}")
+    if not script:
+        raise ValueError(f"Script file is empty: {path}")
 
-    return messages
+    return script
 
 
-def message_generator(args: argparse.Namespace):
+def run_agent_mode(chat: OllamaChat, script: str, delay: float) -> None:
     """
-    Restituisce un iteratore di messaggi utente.
-    In modalità file: legge dal file e termina automaticamente.
-    In modalità interattiva: legge da stdin finché l'utente non esce.
+    Modalità agente: un CaregiverAgent genera i messaggi autonomamente
+    seguendo lo script, finché non produce 'exit'.
     """
-    if args.input:
-        messages = read_messages_from_file(args.input)
-        logger.info(f"[MODE] File mode – {len(messages)} messages from {args.input}")
-        for msg in messages:
-            yield msg
+    import time as time_mod
+
+    caregiver = CaregiverAgent(script=script)
+    client = chat.client  # stesso client LLM usato da Chat
+
+    print(f"[Agent mode] Script loaded ({len(script)} chars)\n")
+
+    # Il primo messaggio del caregiver viene generato a partire dal
+    # contesto iniziale (terapia attuale) senza input esterno
+    chatbot_response = chat.chat_agent.conversation_history[-1]["content"]
+    print(f"Assistant: {chatbot_response}\n")
+
+    max_turns = 30  # safety cap per evitare loop infiniti
+
+    for turn in range(max_turns):
+        # Il caregiver riceve la risposta del chatbot come messaggio in arrivo
+        caregiver.conversation_history.append(
+            {
+                "role": "user",
+                "content": chatbot_response,
+            }
+        )
+
+        # Il caregiver genera la sua prossima mossa
+        response = client.chat.completions.create(
+            model=chat.model,
+            messages=caregiver.conversation_history,
+            tools=caregiver.tools or None,
+        )
+        caregiver_message = response.choices[0].message.content or ""
+        caregiver.conversation_history.append(
+            {
+                "role": "assistant",
+                "content": caregiver_message,
+            }
+        )
+
+        print(f"You (agent): {caregiver_message}\n")
+
+        # Condizione di uscita
+        if caregiver_message.strip().lower() in ["exit", "quit", "esci"]:
+            logger.info(f"[AGENT] Caregiver agent sent exit after {turn + 1} turn(s)")
+            break
+
+        if delay > 0:
+            time_mod.sleep(delay)
+
+        # Il chatbot risponde al messaggio del caregiver
+        start = time()
+        chatbot_response = chat.send_message(caregiver_message)
+        elapsed = time() - start
+
+        print(f"Assistant: {chatbot_response}")
+        print(f"[{elapsed:.2f}s]\n")
+
+        if delay > 0:
+            time_mod.sleep(delay)
+
     else:
-        logger.info("[MODE] Interactive mode")
-        while True:
-            try:
-                user_input = input("You: ").strip()
-            except EOFError:
-                # stdin chiuso (es. pipe), termina silenziosamente
-                return
-            if user_input:
-                yield user_input
-            elif user_input.lower() in ["exit", "quit", "esci"]:
-                return
+        logger.warning("[AGENT] Max turns reached without exit signal")
+        print("[Max turns reached – ending session]")
+
+
+def run_interactive_mode(chat: OllamaChat) -> None:
+    """Modalità interattiva: l'utente digita i messaggi da tastiera."""
+    while True:
+        try:
+            user_input = input("You: ").strip()
+
+            if user_input.lower() in ["exit", "quit", "esci"]:
+                break
+
+            if not user_input:
+                continue
+
+            start = time()
+            response = chat.send_message(user_input)
+            elapsed = time() - start
+
+            if response:
+                print(f"\nAssistant: {response}")
+                print(f"[{elapsed:.2f}s]\n")
+
+        except EOFError:
+            break
 
 
 def main():
@@ -128,44 +196,25 @@ def main():
     print("=" * 60)
     print(f"Model: {MODEL}")
     if args.input:
-        print(f"Mode:  file ({args.input})")
+        print(f"Mode:  agent  |  script: {args.input}")
     else:
         print("Mode:  interactive  |  'exit' or 'quit' to end")
     print("=" * 60)
 
-    # first_message = chat.get_first_message()
-    # logger.info(f"[CHAT] ASSISTANT: {first_message}")
-    # print(f"\nAssistant: {first_message}\n")
-
     # ── Main loop ─────────────────────────────────────────────────────────
     try:
-        for user_input in message_generator(args):
-            # Gestione uscita in modalità interattiva
-            if not args.input and user_input.lower() in ["exit", "quit", "esci"]:
-                break
-
-            # In modalità file stampa il messaggio come se l'utente lo avesse scritto
-            if args.input:
-                print(f"You: {user_input}")
-
-            start = time()
-            response = chat.send_message(user_input)
-            elapsed = time() - start
-
-            if response:
-                print(f"\nAssistant: {response}")
-                if args.input:
-                    print(f"[{elapsed:.2f}s]")
-                print()
-
-            # Pausa opzionale tra messaggi in modalità file
-            if args.input and args.delay > 0:
-                import time as time_mod
-
-                time_mod.sleep(args.delay)
+        if args.input:
+            script = read_script(args.input)
+            run_agent_mode(chat, script, args.delay)
+        else:
+            run_interactive_mode(chat)
 
     except KeyboardInterrupt:
         print("\n\nInterrupted.")
+    except (FileNotFoundError, ValueError) as e:
+        logger.error(f"[ERROR] {e}")
+        print(f"Error: {e}")
+        sys.exit(1)
 
     # ── Fine sessione ─────────────────────────────────────────────────────
     result = chat.end_session()

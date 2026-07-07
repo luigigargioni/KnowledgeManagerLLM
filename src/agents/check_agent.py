@@ -238,8 +238,8 @@ class TherapyCheckAgent(Agent):
         therapy_json = tools.get_all_activities()
         self.conversation_history.append(
             {
-                "role": "tool",
-                "content": f"get_therapy_activities:{therapy_json}",
+                "role": "system",
+                "content": f"Current patient activities:{therapy_json}",
             }
         )
 
@@ -252,8 +252,8 @@ class TherapyCheckAgent(Agent):
 
         self.conversation_history.append(
             {
-                "role": "tool",
-                "content": f"current_medicine_data:{json.dumps(medications)}",
+                "role": "system",
+                "content": f"Current patient medications:{json.dumps(medications)}",
             }
         )
 

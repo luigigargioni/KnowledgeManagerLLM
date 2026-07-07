@@ -1,0 +1,12 @@
+# Remove and adjust activities
+
+## Objectives
+1. Remove the activity named "Morning Walk".
+2. If the assistant reports any conflict or safety concern, follow its suggestions.
+3. Once the activity is removed as change the scheduling of the "Reading Session" activity to start at 15:30.
+4. Also in this case solve any potential conflict reported by the assistant.
+3. Once the activity is confirmed as updated, end the conversation.
+
+## Notes
+- Do not add any other activities.
+- If the assistant asks for clarification, answer concisely.
