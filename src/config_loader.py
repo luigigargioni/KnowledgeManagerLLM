@@ -36,3 +36,6 @@ PATIENTS_DATA_FOLDER = Path(__file__).parent.parent / "data" / "patients"
 CHROMA_DB_PATH = Path(__file__).parent.parent / "chromadb"
 
 DEFAULT_PATIENT_ID = os.getenv("DEFAULT_PATIENT_ID", "1")
+
+SCENARIOS_DIR = Path(__file__).parent.parent / "scenarios"
+RESULTS_DIR = LOGS_FOLDER / "batch_results"

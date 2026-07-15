@@ -17,7 +17,8 @@ dependencies = [
     "sqlalchemy==2.0.51",
     "psycopg2-binary==2.9.12",
     "chromadb==1.5.9",
-    "openai==2.42.0"
+    "openai==2.42.0",
+    "langgraph==1.2.8"
 ]
 
 [tool.ruff]

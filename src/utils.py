@@ -2,8 +2,6 @@ import json
 import logging
 import os
 import platform
-
-# log_parser.py
 import re
 import shutil
 import subprocess
@@ -14,7 +12,6 @@ from pathlib import Path
 import psutil
 
 import prompts as prompts
-import tools as tools
 from config_loader import (
     CHECK_NVIDIA_GPU,
     FILE_LOG_LEVEL,
@@ -74,21 +71,26 @@ class StartWithFilter(logging.Filter):
         return record.getMessage().startswith(self.filter_string)
 
 
-def setup_logger():
+def setup_logger(
+    logs_dir: Path = LOGS_FOLDER,
+    session_folder_name=None,
+    logger_name: str = "knowledge_manager",
+):
     """Configura il logger per scrivere su file di sessione nella cartella logs e su terminale"""
 
-    logs_dir = LOGS_FOLDER
     logs_dir.mkdir(exist_ok=True)
+    if not session_folder_name:
+        session_folder_name = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    session_dir = logs_dir / session_timestamp
+    session_dir = logs_dir / session_folder_name
     session_dir.mkdir(exist_ok=True)
 
-    logger = logging.getLogger("knowledge_manager")
+    logger = logging.getLogger(logger_name)
     logger.setLevel(logging.DEBUG)
+    logger.session_dir = session_dir
 
-    if logger.handlers:
-        return logger
+    for hand in logger.handlers:
+        logger.removeHandler(hand)
 
     file_formatter = logging.Formatter(
         "%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
@@ -118,9 +120,7 @@ def setup_logger():
     logger.addHandler(chat_handler)
     logger.addHandler(console_handler)
 
-    logger.session_dir = session_dir
-
-    logger.info(f"[SESSION] New chat session started ID:{session_timestamp}")
+    logger.info(f"[SESSION] New chat session started ID:{session_folder_name}")
     cpu_info, ram_info, gpu_info = get_system_info()
     logger.info(
         f"[SESSION] CPU: {cpu_info['model']} {cpu_info['cores']}/{cpu_info['threads']}\tRAM:{ram_info:.0f} GB"
@@ -291,3 +291,19 @@ def load_past_session(
         snapshots = []
 
     return snapshots
+
+
+def build_transcript(conversation_history: list[dict]) -> str:
+    """
+    Costruisce una trascrizione leggibile dal JudgeAgent
+    a partire dalla conversation history del chat_agent.
+    Filtra solo i messaggi user/assistant.
+    """
+    lines = []
+    for msg in conversation_history:
+        role = msg.get("role")
+        if role == "user":
+            lines.append(f"CAREGIVER: {msg['content']}")
+        elif role == "assistant":
+            lines.append(f"CHATBOT: {msg['content']}")
+    return "\n\n".join(lines)

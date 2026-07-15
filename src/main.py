@@ -1,15 +1,20 @@
 # main.py
 import argparse
+import json
 import sys
 from pathlib import Path
 from time import time
 
+from langchain_core.messages import AIMessage
+
 import tools as tools
+from agent_graph import build_therapy_graph
 from agents.caregiver_agent import CaregiverAgent
+from agents.judge_agent import JudgeAgent
 from chat import OllamaChat
 from config_loader import DEFAULT_PATIENT_ID, MODEL
 from sql_db import DatabaseManager
-from utils import get_system_info, setup_logger
+from utils import build_transcript, get_system_info, setup_logger
 from vector_db import VectorDBManager
 
 logger = setup_logger()
@@ -56,7 +61,62 @@ def read_script(path: Path) -> str:
     return script
 
 
-def run_agent_mode(chat: OllamaChat, script: str, delay: float) -> None:
+def run_agent_mode(chat, script: str, delay: float) -> None:
+
+    caregiver = CaregiverAgent(script=script)
+    graph = build_therapy_graph(chat, caregiver)
+
+    first_message = chat.chat_agent.conversation_history[-1]["content"]
+    print(f"Assistant: {first_message}\n")
+
+    for event in graph.stream(
+        {
+            "messages": [AIMessage(content=first_message)],
+            "session_ended": False,
+        },
+        {"recursion_limit": 30},
+    ):
+        for node_name, state in event.items():
+            last = state["messages"][-1].content
+            if node_name == "caregiver":
+                print(f"You (agent): {last}\n")
+            elif node_name == "therapy_manager":
+                print(f"Assistant: {last}\n")
+
+        if delay > 0:
+            time.sleep(delay)
+
+    # ── Evaluation ───────────────────────────────────────────────────────
+    print("\n" + "=" * 60)
+    print("  Evaluation")
+    print("=" * 60)
+
+    transcript = build_transcript(chat.chat_agent.conversation_history)
+    judge = JudgeAgent()
+    evaluation = judge.evaluate(
+        client=chat.client, model=chat.model, script=script, transcript=transcript
+    )
+
+    evaluation["script"] = script
+
+    if evaluation.get("status") == "error":
+        print(f"[Judge] Evaluation failed: {evaluation.get('message')}")
+        return None
+
+    print(f"\nOverall: {evaluation['overall_status'].upper()}")
+
+    # Saving of the evalutaion json
+    output_path = logger.session_dir / "evaluation.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(evaluation, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    print(f"[Judge] Evaluation saved to {output_path}")
+
+    return evaluation
+
+
+def run_agent_mode_old(chat: OllamaChat, script: str, delay: float) -> None:
     """
     Modalità agente: un CaregiverAgent genera i messaggi autonomamente
     seguendo lo script, finché non produce 'exit'.

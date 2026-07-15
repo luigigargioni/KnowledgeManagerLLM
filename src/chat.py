@@ -130,14 +130,14 @@ class Chat:
         }
 
         # By adding the check_agent to the tools of chat_agente the second can delegate requests
-        self.chat_agent.tools.append(
+        self.chat_agent.tools = self.chat_agent.tools + [
             self.check_agent.as_tool_declaration(
                 description=(
-                    "Delegate the action to the checker_agent to check it against the patient therapy or get medication information "
+                    "Delegate the action to the checker_agent to check it against "
+                    "the patient therapy or get medication information"
                 )
             )
-        )
-
+        ]
         self.tools = self.chat_agent.tools
 
         first_message = build_first_message("{}")
@@ -301,7 +301,7 @@ class Chat:
             )
             msg = response.choices[0].message
 
-            agent.conversation_history.append(msg.model_dump(exclude_none=True))
+            # agent.conversation_history.append(msg.model_dump(exclude_none=True))
 
             if not msg.tool_calls:
                 reply = msg.content or ""

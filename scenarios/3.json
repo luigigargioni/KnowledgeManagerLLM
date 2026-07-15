@@ -1,0 +1,93 @@
+{
+    "patient_id": 3,
+    "patient_full_name": "Giuseppe Conti",
+    "gender": "Male",
+    "birth_date": "1940-04-17T00:00:00",
+    "age": 85,
+    "medical_conditions": [
+        "Osteoarthritis",
+        "Chronic back pain"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "wl_001",
+            "name": "Outdoor walk",
+            "description": "Daily outdoor walk, now causing excessive joint pain.",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5
+            ],
+            "time": "10:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "outside_activity"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "time": "13:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 3 — Remove and replace an activity\n\n## Context\nThe patient has been experiencing worsening joint pain during the outdoor walk. The doctor has decided to replace it with a gentler indoor stretching session.\n\n## Objectives\n1. Remove the outdoor walk activity (wl_001).\n2. Add a new indoor stretching session: 30 minutes, every Monday, Wednesday and Friday at 10:00.\n3. Confirm both changes with the assistant before ending the conversation.\n\n## Notes\n- Perform the removal first, then add the new activity.\n- Do not modify any meal activities.\n- If the assistant warns about the patient's conditions and the new activity, reassure it that the doctor has approved the stretching."
+}

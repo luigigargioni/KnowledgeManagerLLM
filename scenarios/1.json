@@ -1,0 +1,74 @@
+{
+    "patient_id": 1,
+    "patient_full_name": "Mario Rossi",
+    "gender": "Male",
+    "birth_date": "1945-06-10T00:00:00",
+    "age": 80,
+    "medical_conditions": [
+        "Hypertension"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "time": "08:30",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "time": "13:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "time": "19:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 1 — Add a simple activity\n\n## Context\nThe patient's doctor has recommended a short evening walk to help manage his blood pressure.\n\n## Objectives\n1. Add an evening walk activity, 20 minutes long, every Tuesday and Thursday at 17:00.\n2. Once the activity is confirmed as added by the assistant, end the conversation.\n\n## Notes\n- Do not add any other activities.\n- If the assistant asks for clarification, keep your answers short and consistent with the objectives above."
+}

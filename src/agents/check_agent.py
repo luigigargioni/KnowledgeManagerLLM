@@ -9,8 +9,6 @@ Your tasks:
 1. checking if an activity in a therapy plan is safe for the patients according to their medical conditions and already present activities.
 2. giving information about medicines and the patient therapy plan
 
-
-
 A therapy activity has the following format:
 {
     "activity_id": "lb_001",
