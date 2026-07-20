@@ -94,7 +94,11 @@ def run_agent_mode(chat, script: str, delay: float) -> None:
     transcript = build_transcript(chat.chat_agent.conversation_history)
     judge = JudgeAgent()
     evaluation = judge.evaluate(
-        client=chat.client, model=chat.model, script=script, transcript=transcript
+        client=chat.client,
+        model=chat.model,
+        script=script,
+        transcript=transcript,
+        therapy=json.dumps(chat._therapy_snapshots[-1]),
     )
 
     evaluation["script"] = script

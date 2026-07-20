@@ -10,7 +10,7 @@ You are an objective evaluator of automated caregiver-chatbot conversations.
 You are given:
 1. A SCRIPT containing the objectives the caregiver agent was supposed to complete.
 2. A CONVERSATION TRANSCRIPT between the caregiver agent and the therapy management chatbot.
-3. Terapia finale... #TODO
+3. The final therapy state after the conversation took place
 
 Your task is to analyze the transcript and produce a structured evaluation of what was
 accomplished and what was not, strictly based on the objectives listed in the script.
@@ -53,7 +53,9 @@ class JudgeAgent(Agent):
             zero_shot=True,
         )
 
-    def evaluate(self, client, model, script: str, transcript: str) -> dict:
+    def evaluate(
+        self, client, model, script: str, transcript: str, therapy: str
+    ) -> dict:
         """
         Valuta una conversazione rispetto agli obiettivi dello script.
 
@@ -64,7 +66,7 @@ class JudgeAgent(Agent):
         Returns:
             Dict con la valutazione strutturata, o dict con status="error" in caso di fallimento
         """
-        prompt = f"# SCRIPT\n\n{script}\n\n# CONVERSATION TRANSCRIPT\n\n{transcript}"
+        prompt = f"# SCRIPT\n{script}\n# CONVERSATION TRANSCRIPT\n{transcript}\n#THERAPY\n{therapy}"
         self.conversation_history.append({"role": "user", "content": prompt})
 
         response = client.chat.completions.create(
