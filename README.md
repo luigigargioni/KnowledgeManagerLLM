@@ -28,10 +28,12 @@ A conversational AI assistant that helps caregivers manage a patient's therapy s
 | `session_extractor.py` | End-of-session LLM extraction: saves conflict resolutions and patient preferences to ChromaDB |
 | `session_manager.py` | `SessionManager` – handles runtime therapy snapshots (save/restore) and past session loading from disk |
 | `log_parser.py` | Parses `chat.log` files and reconstructs conversation history for session resume |
+| `scenario_loader.py` | Loads scenario files, installs therapy state, and converts therapy data to natural language for the `CaregiverAgent` |
 | `prompts.py` | System prompt for the main assistant and extraction prompts for `session_extractor` |
 | `config_loader.py` | Loads all settings from the `.env` file |
-| `main.py` | Terminal entry point – supports both interactive and file-driven modes |
+| `main.py` | Terminal entry point – supports both interactive and agent-driven modes |
 | `chat_interface.py` | Streamlit web UI entry point |
+| `test.py` | Batch test runner – executes multiple scenarios automatically and produces structured evaluation reports |
 
 ### Agent architecture
 
@@ -39,6 +41,8 @@ The system uses a **supervisor/worker** multi-agent pattern:
 
 - **`TherapyManagerAgent`** (supervisor) – manages the conversation with the caregiver, handles therapy CRUD operations, and delegates to worker agents when needed.
 - **`TherapyCheckAgent`** (worker) – invoked automatically before any activity is added or updated; checks compatibility with the patient's current medications, history, and preferences.
+- **`CaregiverAgent`** – simulates a caregiver interacting with the system, driven by a natural language script describing objectives. Used in agent-driven mode and batch testing.
+- **`JudgeAgent`** – evaluates completed conversations against the scenario objectives and produces a structured JSON report (checklist of completed, partial, failed, and not-attempted objectives).
 
 Each agent is self-contained: it owns its system prompt, tool declarations, context injection (`inject_context`), and tool execution (`execute_tool`). `Chat` acts as the orchestrator and is the only component that knows all agents exist; agents do not know about each other.
 
@@ -203,28 +207,29 @@ Type `exit`, `quit`, or `esci` to end the session. The therapy state is saved to
 
 | Flag | Short | Default | Description |
 |---|---|---|---|
-| `--input <file>` | `-i` | *(none)* | Path to a text file containing one user message per line. If omitted, runs in interactive mode. |
-| `--delay <seconds>` | `-d` | `0` | Pause between messages when running in file mode. Useful for readability. |
+| `--input <file>` | `-i` | *(none)* | Path to a scenario script (`.md` or any text format) describing the caregiver's objectives. If omitted, runs in interactive mode. |
+| `--delay <seconds>` | `-d` | `0` | Pause between turns in agent mode. Useful for readability. |
 
-**File mode** – run a pre-written conversation script non-interactively:
+**Agent mode** – a `CaregiverAgent` reads the script and drives the conversation autonomously:
 
 ```bash
-python main.py --input tests/test_add_activity.txt
-python main.py --input tests/test_add_activity.txt --delay 1
+python main.py --input scenarios/1/scenario_script.md
+python main.py --input scenarios/1/scenario_script.md --delay 2
 ```
 
-The input file format is plain text, one message per line. Empty lines and lines starting with `#` are ignored:
+The script is a free-form markdown file describing the caregiver's objectives. Its full content is passed verbatim to the `CaregiverAgent` — formatting and structure are the author's responsibility:
 
-```text
-# test_add_activity.txt
-What can you do?
+```markdown
+# Add a morning walk
 
-Add a morning walk, 30 minutes, every Monday Wednesday Friday at 8:00
-Yes, confirm the activity
-exit
+## Context
+The patient tolerates light exercise well.
+
+## Objectives
+1. Add a 30-minute morning walk every Monday, Wednesday and Friday at 08:00.
+2. If the assistant reports a conflict, follow its suggestion.
+3. Once the activity is confirmed, end the conversation.
 ```
-
-This mode is designed for automated testing: the assistant processes each line as a user message and prints the responses to stdout. The session is saved to PostgreSQL at the end exactly as in interactive mode.
 
 ### Streamlit web interface
 
@@ -232,6 +237,100 @@ This mode is designed for automated testing: the assistant processes each line a
 cd src
 streamlit run chat_interface.py
 ```
+
+---
+
+### Batch testing
+
+`test.py` runs multiple scenarios automatically, without human interaction, and produces structured evaluation reports. Each scenario is a self-contained folder under `scenarios/` containing a `scenario.json` file that defines the patient, the initial therapy state, and the objectives for the `CaregiverAgent`.
+
+Each scenario runs in **stateless mode**: no database is used and `therapy.json` is overwritten at the start of each scenario from the scenario file itself, ensuring full isolation between runs.
+
+At the end of each scenario the `JudgeAgent` evaluates the conversation against the objectives and produces a structured JSON result. All scenario logs and results are saved under `logs/batch_results/<batch_id>/`.
+
+#### CLI options
+
+| Flag | Default | Description |
+|---|---|---|
+| `--from <id>` | `1` | First scenario ID to run (inclusive). |
+| `--to <id>` | same as `--from` | Last scenario ID to run (inclusive). Omit to run a single scenario. |
+| `--delay <seconds>` | `0` | Pause between conversation turns. |
+| `--max-turns <n>` | `30` | Maximum number of turns per scenario before forcing termination. |
+
+#### Examples
+
+```bash
+
+# Run all the scenarios
+python test.py
+
+# Run a single scenario
+python test.py --from 1 --to 1
+
+# Run a range of scenarios
+python test.py --from 1 --to 20
+```
+
+#### Scenario file format
+
+Each scenario lives in `scenarios/<id>/scenario.json` and follows the same structure as `therapy.json`, with an additional `objectives` field containing the script passed to the `CaregiverAgent`:
+
+```json
+{
+  "patient_id": 1,
+  "patient_full_name": "Mario Rossi",
+  "gender": "Male",
+  "birth_date": "1945-06-10T00:00:00",
+  "age": 80,
+  "medical_conditions": ["Hypertension"],
+  "activities": [ "..." ],
+  "expired_activities": [],
+  "objectives": "# Scenario 1\n\n## Objectives\n1. Add a 30-minute evening walk..."
+}
+```
+
+#### Output structure
+
+```
+logs/batch_results/<batch_id>/
+├── batch.log               # global batch log (errors, skips, summary)
+├── results.json            # all evaluation results aggregated
+└── <scenario_id>/
+    ├── scenario_<id>.log   # per-scenario log
+    ├── chat.log            # USER/ASSISTANT transcript
+    └── full.log            # full log including tool calls
+    └── evaluation.json     # result of the judge evaluation
+```
+
+`results.json` contains one entry per scenario with the `JudgeAgent` evaluation:
+
+```json
+{
+  "batch_id": "20260630_143000",
+  "results": [
+    {
+      "scenario_id": 1,
+      "overall_status": "completed",
+      "turns": 6,
+      "patient": "Mario Rossi",
+      "elapsed_seconds": 42.3,
+      "objectives": [
+        {
+          "id": 1,
+          "description": "Add a 30-minute evening walk on Tuesday and Thursday at 17:00",
+          "status": "completed",
+          "evidence": "Assistant confirmed: activity added for Tue, Thu at 17:00",
+          "notes": null
+        }
+      ],
+      "summary": "All objectives were completed successfully within 6 turns."
+    }
+  ],
+  "failed": []
+}
+```
+
+If a scenario raises an unhandled exception it is logged in `batch.log` under `failed`, and the batch continues with the next scenario.
 
 ---
 
@@ -244,8 +343,10 @@ streamlit run chat_interface.py
 | `data/patients/<id>/history.json` | Seed safety-event history for a patient |
 | `data/patients/<id>/preferences.json` | Seed preferences for a patient |
 | `data/patients/<id>/conflict_resolutions.json` | Seed past conflict resolutions for a patient |
+| `scenarios/<id>/scenario.json` | Self-contained test scenario: patient data, initial therapy, and caregiver objectives |
 | `chromadb/` | Persistent ChromaDB store (auto-created) |
 | `logs/<patient_id>/<session_id>/chat.log` | Chat-only log (USER/ASSISTANT messages); used for session resume |
 | `logs/<patient_id>/<session_id>/full.log` | Full log including tool calls, errors, and system events |
 | `logs/<patient_id>/<session_id>/agent_<name>.log` | Per-agent log for each active agent |
 | `logs/<patient_id>/<session_id>/therapy_snapshots.json` | Runtime therapy snapshots with logical message indices; used for conversation rewind |
+| `logs/batch_results/<batch_id>/results.json` | Aggregated evaluation results for a batch test run |
