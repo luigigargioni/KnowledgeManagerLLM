@@ -140,7 +140,7 @@ class Chat:
         ]
         self.tools = self.chat_agent.tools
 
-        first_message = build_first_message("{}")
+        first_message = build_first_message(THERAPY_FILE.read_text(encoding="utf-8"))
         self.chat_agent.conversation_history.append(
             {"role": "assistant", "content": first_message}
         )

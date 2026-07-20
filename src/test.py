@@ -7,7 +7,7 @@ import os
 import traceback
 from datetime import datetime
 from pathlib import Path
-from time import time
+from time import sleep, time
 
 from agents.caregiver_agent import CaregiverAgent
 from agents.judge_agent import JudgeAgent
@@ -126,7 +126,7 @@ def run_scenario(
             break
 
         if delay > 0:
-            time.sleep(delay)
+            sleep(delay)
 
         chatbot_response = chat.send_message(caregiver_message)
         logger.info(
@@ -134,7 +134,7 @@ def run_scenario(
         )
 
         if delay > 0:
-            time.sleep(delay)
+            sleep(delay)
     else:
         turns = max_turns
         logger.warning(
@@ -149,7 +149,7 @@ def run_scenario(
         model=chat.model,
         script=script,
         transcript=transcript,
-        therapy=json.dumps(chat._therapy_snapshots[-1]),
+        therapy=json.dumps(chat._therapy_snapshots[-1]["therapy"]),
     )
 
     if evaluation.get("status") == "error":
@@ -215,6 +215,7 @@ def main():
     file_handler = logging.FileHandler(f"{batch_log_dir}/batch.log", encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
 
     # Logger globale del batch
     logger.info(
@@ -257,6 +258,7 @@ def main():
                 "scenario_id": scenario_id,
                 "turns": evaluation["turns"],
                 "patient": evaluation["patient"],
+                "objectives": evaluation.get("objectives", []),
             }
             results.append(to_append)
             print_scenario_summary(scenario_id, evaluation)
