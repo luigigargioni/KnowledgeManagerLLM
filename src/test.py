@@ -13,6 +13,7 @@ from agents.caregiver_agent import CaregiverAgent
 from agents.judge_agent import JudgeAgent
 from chat import OllamaChat
 from config_loader import MODEL, RESULTS_DIR, SCENARIOS_DIR
+from results_extractor import append_batch_results
 from scenario_loader import (
     install_scenario_therapy,
     load_scenario,
@@ -81,6 +82,7 @@ def run_scenario(
         f"[SCENARIO {scenario_id}] Therapy installed – patient: {scenario.get('patient_full_name')}"
     )
 
+    vector_db.seed_patient_data(str(scenario.get("patient_id")))
     # ── Inizializza Chat in modalità stateless (no DB) ────────────────────
     chat = OllamaChat(
         model=MODEL,
@@ -143,13 +145,15 @@ def run_scenario(
 
     # ── Valutazione ───────────────────────────────────────────────────────
     transcript = build_transcript(chat.chat_agent.conversation_history)
+    final_therapy = chat._therapy_snapshots[-1]["therapy"]
+    final_therapy.pop("objectives")
     judge = JudgeAgent()
     evaluation = judge.evaluate(
         client=chat.client,
         model=chat.model,
         script=script,
         transcript=transcript,
-        therapy=json.dumps(chat._therapy_snapshots[-1]["therapy"]),
+        therapy=json.dumps(final_therapy),
     )
 
     if evaluation.get("status") == "error":
@@ -160,7 +164,9 @@ def run_scenario(
 
     evaluation["scenario_id"] = scenario_id
     evaluation["turns"] = turns
-    evaluation["patient"] = scenario.get("patient_full_name", "Unknown")
+    evaluation["patient"] = (
+        f"{scenario.get('patient_full_name', 'Unknown')}({scenario.get('patient_id', '-1')})"
+    )
     evaluation["elapsed_seconds"] = round(time() - start, 2)
 
     output_path = logger.session_dir / "evaluation.json"
@@ -173,7 +179,7 @@ def run_scenario(
         f"[SCENARIO {scenario_id}] Evaluation complete – "
         f"overall: {evaluation['overall_status']}"
     )
-    return evaluation
+    return evaluation, script, transcript, final_therapy
 
 
 def print_scenario_summary(scenario_id: int, evaluation: dict) -> None:
@@ -244,7 +250,7 @@ def main():
         print(f"\n[{scenario_id}/{to_id}] Running scenario {scenario_id}...")
 
         try:
-            evaluation = run_scenario(
+            evaluation, scenario, transcript, final_therapy = run_scenario(
                 scenario_id=scenario_id,
                 vector_db=vector_db,
                 delay=args.delay,
@@ -261,6 +267,13 @@ def main():
                 "objectives": evaluation.get("objectives", []),
             }
             results.append(to_append)
+            append_batch_results(
+                evaluation,
+                batch_id,
+                scenario,
+                transcript,
+                final_therapy,
+            )
             print_scenario_summary(scenario_id, evaluation)
 
         except FileNotFoundError as e:
