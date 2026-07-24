@@ -1,0 +1,20 @@
+[
+    {
+        "description": "After Rose's regular routine was disrupted by an overnight stay away from home, she showed increased disorientation and had difficulty recognizing familiar surroundings the next morning.",
+        "activity_name": "Overnight stay away from home",
+        "event_type": "warning",
+        "date": "2026-02-14"
+    },
+    {
+        "description": "Rose skipped an evening meal after forgetting to eat, leading to mild dizziness and increased confusion.",
+        "activity_name": "Missed evening meal",
+        "event_type": "warning",
+        "date": "2026-03-27"
+    },
+    {
+        "description": "Rose engaged in a structured memory exercise session with a caregiver, and reported feeling more alert and oriented afterward.",
+        "activity_name": "Memory exercise session",
+        "event_type": "info",
+        "date": "2026-05-09"
+    }
+]

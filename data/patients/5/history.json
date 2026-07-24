@@ -1,0 +1,26 @@
+[
+    {
+        "description": "Samuel slipped while getting out of bed unassisted, resulting in a fractured right femur. He was immediately placed on prescribed bed rest.",
+        "activity_name": "Fall while unassisted",
+        "event_type": "warning",
+        "date": "2026-01-05"
+    },
+    {
+        "description": "After several days of prescribed bed rest, Samuel showed early signs of mild confusion, consistent with his Senile Dementia being aggravated by reduced mobility and routine disruption.",
+        "activity_name": "Prolonged bed rest",
+        "event_type": "warning",
+        "date": "2026-01-12"
+    },
+    {
+        "description": "Samuel's physiotherapy session went well, with slight improvement in leg mobility since the femur fracture.",
+        "activity_name": "Physiotherapy session",
+        "event_type": "info",
+        "date": "2026-03-03"
+    },
+    {
+        "description": "Samuel attempted to stand up unsupervised to reach for a glass of water, putting strain on his healing femur and requiring staff intervention to prevent a fall.",
+        "activity_name": "Unsupervised attempt to stand",
+        "event_type": "warning",
+        "date": "2026-04-18"
+    }
+]

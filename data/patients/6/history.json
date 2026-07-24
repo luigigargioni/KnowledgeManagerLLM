@@ -1,0 +1,20 @@
+[
+    {
+        "description": "After Laura had a stressful day at work followed by a glass of wine in the evening, she experienced hot flashes and disrupted sleep.",
+        "activity_name": "Alcohol intake after stressful day",
+        "event_type": "warning",
+        "date": "2026-03-11"
+    },
+    {
+        "description": "Laura's blood pressure reading at a routine check was slightly elevated after a salty restaurant meal the night before.",
+        "activity_name": "High-sodium restaurant meal",
+        "event_type": "warning",
+        "date": "2026-04-25"
+    },
+    {
+        "description": "Laura started a regular yoga routine, and her subsequent blood pressure readings showed improvement.",
+        "activity_name": "Started yoga routine",
+        "event_type": "info",
+        "date": "2026-05-30"
+    }
+]

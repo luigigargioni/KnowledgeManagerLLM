@@ -1,0 +1,14 @@
+[
+    {
+        "description": "After Frank ate a meal high in processed and salty foods, his follow-up blood test showed elevated creatinine levels, indicating further strain on his Chronic Kidney Disease.",
+        "activity_name": "High-sodium meal intake",
+        "event_type": "warning",
+        "date": "2026-02-19"
+    },
+    {
+        "description": "Frank became dehydrated after a hot afternoon with insufficient fluid intake, leading to a temporary decline in kidney function markers.",
+        "activity_name": "Inadequate fluid intake",
+        "event_type": "warning",
+        "date": "2026-04-07"
+    }
+]

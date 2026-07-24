@@ -1,8 +1,20 @@
 [
     {
-        "description": "After Viola had a coffee in the afternoon (16:00) her Insomnia symptoms worsen. The subsequent night she wasn't able to fall asleep.",
-        "activity_name": "Caffeine intake in the afternoon",
+        "description": "After Robert ate a slice of  cake in the evening, his blood glucose spiked significantly above his target range overnight.",
+        "activity_name": "High-sugar dessert intake",
         "event_type": "warning",
-        "date": "2026-01-22"
+        "date": "2026-02-08"
+    },
+    {
+        "description": "Robert skipped his usual walk for several days due to bad weather. His weight increased slightly and his mood worsen significantly.",
+        "activity_name": "Missed daily walk routine",
+        "event_type": "warning",
+        "date": "2026-03-15"
+    },
+    {
+        "description": "Robert attended a nutrition counseling session and adjusted his meal plan. His fasting glucose readings improved over the following week.",
+        "activity_name": "Nutrition counseling session",
+        "event_type": "info",
+        "date": "2026-04-01"
     }
 ]

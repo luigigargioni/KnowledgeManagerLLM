@@ -1,32 +1,20 @@
 [
     {
-        "description": "Mario Rossi experienced an acute hypoglycemic crisis after a brisk walking session in the late afternoon. The event was caused by the combination of intense physical exercise and insulin therapy for type 1 diabetes. Aerobic exercise without prior blood glucose monitoring is not recommended.",
-        "activity_name": "Brisk walking",
-        "event_type": "danger",
-        "date": "2025-11-10"
-    },
-    {
-        "description": "The administration of Aspirin (acetylsalicylic acid) caused a worsening of renal function with a significant increase in serum creatinine in a patient with severe renal failure. The physician confirmed the incompatibility of Aspirin with severe renal impairment.",
-        "activity_name": "Aspirin intake",
-        "event_type": "danger",
-        "date": "2025-09-03"
-    },
-    {
-        "description": "The patient experienced acute stomach pain and nausea after the administration of Aulin (Nimesulide). Subsequently, the physician discontinued Aulin therapy due to incompatibility with severe renal failure, which represents an absolute contraindication for NSAIDs.",
-        "activity_name": "Aulin intake",
-        "event_type": "danger",
-        "date": "2025-07-18"
-    },
-    {
-        "description": "After a meal containing gluten (regular bread), the celiac patient developed severe gastrointestinal symptoms: abdominal pain, diarrhea, and persistent bloating for 48 hours. Severe gluten intolerance confirmed; a strictly gluten-free diet is mandatory.",
-        "activity_name": "Meal with gluten",
-        "event_type": "danger",
-        "date": "2025-06-05"
-    },
-    {
-        "description": "Intense cognitive activity in the early afternoon (1:00 PM–3:00 PM) repeatedly coincided with episodes of postprandial drowsiness, making the patient unable to concentrate. It is recommended to postpone cognitive activities to the late afternoon (after 4:00 PM).",
-        "activity_name": "Afternoon cognitive activity",
+        "description": "After David spent the afternoon gardening, his Seasonal Allergies symptoms worsened. He experienced sneezing and watery eyes into the evening.",
+        "activity_name": "Outdoor gardening exposure",
         "event_type": "warning",
-        "date": "2025-10-22"
+        "date": "2026-04-14"
+    },
+    {
+        "description": "David went for a light jog in cold morning air and reported mild wheezing afterward.",
+        "activity_name": "Morning jog in cold weather",
+        "event_type": "warning",
+        "date": "2026-05-02"
+    },
+    {
+        "description": "David completed his annual check-up with no new symptoms reported. His asthma remains well controlled with occasional inhaler use.",
+        "activity_name": "Annual medical check-up",
+        "event_type": "info",
+        "date": "2026-06-10"
     }
 ]

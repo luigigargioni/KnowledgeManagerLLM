@@ -1,0 +1,111 @@
+[
+    {
+        "patient_id": 1,
+        "patient_full_name": "David Mitchell",
+        "gender": "Male",
+        "birth_date": "1984-03-10T00:00:00",
+        "age": 42,
+        "medical_conditions": [
+            "Seasonal Allergies",
+            "Mild Asthma"
+        ]
+    },
+    {
+        "patient_id": 2,
+        "patient_full_name": "Robert Turner",
+        "gender": "Male",
+        "birth_date": "1960-09-01T00:00:00",
+        "age": 66,
+        "medical_conditions": [
+            "Type 2 Diabetes Mellitus",
+            "Obesity"
+        ]
+    },
+    {
+        "patient_id": 3,
+        "patient_full_name": "Anthony Parker",
+        "gender": "Male",
+        "birth_date": "1952-02-16T00:00:00",
+        "age": 74,
+        "medical_conditions": [
+            "Ischemic Heart Disease",
+            "Gluten Intolerance"
+        ]
+    },
+    {
+        "patient_id": 4,
+        "patient_full_name": "Frank Collins",
+        "gender": "Male",
+        "birth_date": "1943-04-22T00:00:00",
+        "age": 83,
+        "medical_conditions": [
+            "Chronic Kidney Disease"
+        ]
+    },
+    {
+        "patient_id": 5,
+        "patient_full_name": "Samuel Wright",
+        "gender": "Male",
+        "birth_date": "1936-06-16T00:00:00",
+        "age": 90,
+        "medical_conditions": [
+            "Senile Dementia",
+            "Fractured Femur (Right Leg)",
+            "Prescribed Bed Rest"
+        ]
+    },
+    {
+        "patient_id": 6,
+        "patient_full_name": "Laura Bennett",
+        "gender": "Female",
+        "birth_date": "1971-05-18T00:00:00",
+        "age": 55,
+        "medical_conditions": [
+            "Perimenopause",
+            "Mild Hypertension"
+        ]
+    },
+    {
+        "patient_id": 7,
+        "patient_full_name": "Anne Morris",
+        "gender": "Female",
+        "birth_date": "1952-03-19T00:00:00",
+        "age": 70,
+        "medical_conditions": [
+            "Hypertension",
+            "Type 2 Diabetes Mellitus"
+        ]
+    },
+    {
+        "patient_id": 8,
+        "patient_full_name": "Joan Edwards",
+        "gender": "Female",
+        "birth_date": "1947-04-17T00:00:00",
+        "age": 79,
+        "medical_conditions": [
+            "Rheumatoid Arthritis",
+            "Iron-Deficiency Anemia"
+        ]
+    },
+    {
+        "patient_id": 9,
+        "patient_full_name": "Rose Baker",
+        "gender": "Female",
+        "birth_date": "1943-09-01T00:00:00",
+        "age": 83,
+        "medical_conditions": [
+            "Mild Alzheimer's Dementia"
+        ]
+    },
+    {
+        "patient_id": 10,
+        "patient_full_name": "Carol Phillips",
+        "gender": "Female",
+        "birth_date": "1935-01-01T00:00:00",
+        "age": 91,
+        "medical_conditions": [
+            "Heart Failure",
+            "Cognitive Decline"
+        ]
+    }
+]
