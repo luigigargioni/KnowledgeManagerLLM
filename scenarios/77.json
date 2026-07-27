@@ -1,0 +1,63 @@
+{
+    "patient_id": 8,
+    "patient_full_name": "Joan Edwards",
+    "gender": "Female",
+    "birth_date": "1947-04-17T00:00:00",
+    "age": 79,
+    "medical_conditions": [
+        "Rheumatoid Arthritis",
+        "Iron-Deficiency Anemia"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "ph_001",
+            "name": "Physiotherapy",
+            "description": "Joint mobility physiotherapy.",
+            "day_of_week": [2, 4],
+            "time": "10:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "therapy"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 77 — Scheduling Conflict - Reject Alternative\n\n## Context\nJoan's caregiver wants to add a social activity at the same time as her physiotherapy but prefers to choose a different time rather than accept the system's suggestion.\n\n## Objectives\n1. Add a social activity 'Art therapy group', 60 minutes, every Tuesday and Thursday at 10:00.\n2. If the assistant detects a conflict with physiotherapy and suggests an alternative time, reject the suggestion and propose 14:00 instead.\n3. Confirm the activity at 14:00 and end the conversation."
+}

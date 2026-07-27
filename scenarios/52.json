@@ -1,0 +1,51 @@
+{
+    "patient_id": 6,
+    "patient_full_name": "Laura Bennett",
+    "gender": "Female",
+    "birth_date": "1971-05-18T00:00:00",
+    "age": 55,
+    "medical_conditions": [
+        "Perimenopause",
+        "Mild Hypertension"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 52 — Add Evening Wine with History Warning\n\n## Context\nLaura enjoys a glass of wine in the evening and wants to add it as a regular activity. However, she has a history of hot flashes and disrupted sleep after alcohol intake on stressful days.\n\n## Objectives\n1. Add an evening wine activity, 30 minutes, every day at 20:30 after dinner, with a dependency on 'di_001'.\n2. If the assistant warns about Laura's past hot flashes from alcohol intake, acknowledge the concern and ask if a non-alcoholic alternative would be better.\n3. Follow the assistant's recommendation and confirm the final activity.\n4. End the conversation."
+}

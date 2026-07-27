@@ -1,0 +1,51 @@
+{
+    "patient_id": 6,
+    "patient_full_name": "Laura Bennett",
+    "gender": "Female",
+    "birth_date": "1971-05-18T00:00:00",
+    "age": 55,
+    "medical_conditions": [
+        "Perimenopause",
+        "Mild Hypertension"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 57 — Add Activity with Non-Existent Dependency\n\n## Context\nLaura's caregiver wants to add a social activity that depends on a meditation session that doesn't exist in the schedule yet.\n\n## Objectives\n1. Add a social activity 'Book club meeting', 60 minutes, every Wednesday at 18:00, with a dependency on 'rlx_999'.\n2. If the assistant reports that the dependency 'rlx_999' does not exist, acknowledge the error and ask to add the activity without the dependency.\n3. Confirm the corrected activity and end the conversation."
+}

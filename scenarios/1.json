@@ -1,0 +1,51 @@
+{
+    "patient_id": 1,
+    "patient_full_name": "David Mitchell",
+    "gender": "Male",
+    "birth_date": "1984-03-10T00:00:00",
+    "age": 42,
+    "medical_conditions": [
+        "Seasonal Allergies",
+        "Mild Asthma"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 1 — Add Evening Walk and Safe Ibuprofen\n\n## Context\nDavid's doctor has recommended a short evening walk to help maintain general fitness and support respiratory health. David also has mild joint pain and the doctor suggested Ibuprofen, which is safe given his conditions.\n\n## Objectives\n1. Add an evening walk activity, 20 minutes long, every Tuesday and Thursday at 17:00.\n2. Add Ibuprofen as a medication, 400mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n3. Once both the activity and medication are confirmed as added by the assistant, end the conversation."
+}

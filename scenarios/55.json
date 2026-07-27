@@ -1,0 +1,63 @@
+{
+    "patient_id": 6,
+    "patient_full_name": "Laura Bennett",
+    "gender": "Female",
+    "birth_date": "1971-05-18T00:00:00",
+    "age": 55,
+    "medical_conditions": [
+        "Perimenopause",
+        "Mild Hypertension"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "wl_001",
+            "name": "Morning walk",
+            "description": "Morning walk on weekdays.",
+            "day_of_week": [1, 2, 3, 4, 5],
+            "time": "10:00",
+            "duration_minutes": 30,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "outside_activity"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 55 — Add Activity Same Time Different Days - No Conflict\n\n## Context\nLaura's caregiver wants to add a weekend activity at the same time as her weekday morning walk. Since the days don't overlap, there should be no conflict.\n\n## Objectives\n1. Add a weekend gardening activity, 60 minutes, every Saturday and Sunday at 10:00.\n2. If the assistant confirms there is no scheduling conflict because the days don't overlap, confirm the addition.\n3. End the conversation."
+}

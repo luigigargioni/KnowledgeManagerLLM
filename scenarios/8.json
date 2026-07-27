@@ -1,0 +1,63 @@
+{
+    "patient_id": 1,
+    "patient_full_name": "David Mitchell",
+    "gender": "Male",
+    "birth_date": "1984-03-10T00:00:00",
+    "age": 42,
+    "medical_conditions": [
+        "Seasonal Allergies",
+        "Mild Asthma"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "med_001",
+            "name": "Antihistamine",
+            "description": "Allergy medication taken after breakfast.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:15",
+            "duration_minutes": 5,
+            "dependencies": ["br_001"],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "medication"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 8 — Add Activity with Temporal Ordering Violation\n\n## Context\nDavid's caregiver wants to add a new breathing exercise that depends on the antihistamine medication, but the new activity is scheduled before the medication ends.\n\n## Objectives\n1. Add a breathing exercise activity, 15 minutes, every day at 08:10, with a dependency on 'med_001'.\n2. If the assistant detects a temporal ordering violation (the dependency ends after the activity starts), acknowledge the error and adjust the activity time to 08:30.\n3. Confirm the corrected activity and end the conversation."
+}

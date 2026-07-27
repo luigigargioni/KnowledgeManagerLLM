@@ -1,0 +1,63 @@
+{
+    "patient_id": 3,
+    "patient_full_name": "Anthony Parker",
+    "gender": "Male",
+    "birth_date": "1952-02-16T00:00:00",
+    "age": 74,
+    "medical_conditions": [
+        "Ischemic Heart Disease",
+        "Gluten Intolerance"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "wl_001",
+            "name": "Morning walk",
+            "description": "Light morning walk for cardiovascular health.",
+            "day_of_week": [1, 3, 5],
+            "time": "10:00",
+            "duration_minutes": 30,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "outside_activity"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 23 — Add Gluten-Free Snack Activity\n\n## Context\nAnthony has gluten intolerance and his caregiver wants to add a scheduled gluten-free afternoon snack to ensure he eats regularly between meals.\n\n## Objectives\n1. Add a gluten-free snack activity, 15 minutes, every day at 16:00.\n2. Once the assistant confirms the activity is added with no history warnings, end the conversation."
+}

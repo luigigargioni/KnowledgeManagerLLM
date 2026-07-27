@@ -1,0 +1,63 @@
+{
+    "patient_id": 1,
+    "patient_full_name": "David Mitchell",
+    "gender": "Male",
+    "birth_date": "1984-03-10T00:00:00",
+    "age": 42,
+    "medical_conditions": [
+        "Seasonal Allergies",
+        "Mild Asthma"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "med_001",
+            "name": "Salbutamol",
+            "description": "Inhaler for asthma, taken after breakfast.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:15",
+            "duration_minutes": 5,
+            "dependencies": ["br_001"],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "medication"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 2 — Update Breakfast Time with Medication Conflict\n\n## Context\nDavid's caregiver wants to move breakfast 15 minutes earlier to better accommodate his morning routine, but this may conflict with his Salbutamol medication schedule which depends on breakfast.\n\n## Objectives\n1. Update the breakfast activity (br_001) to start at 07:45 instead of 08:00.\n2. If the assistant detects a conflict with the Salbutamol medication dependency, accept its suggested alternative time for the medication.\n3. Once the update is confirmed, end the conversation."
+}

@@ -1,0 +1,63 @@
+{
+    "patient_id": 8,
+    "patient_full_name": "Joan Edwards",
+    "gender": "Female",
+    "birth_date": "1947-04-17T00:00:00",
+    "age": 79,
+    "medical_conditions": [
+        "Rheumatoid Arthritis",
+        "Iron-Deficiency Anemia"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "ph_001",
+            "name": "Physiotherapy",
+            "description": "Joint mobility physiotherapy.",
+            "day_of_week": [2, 4],
+            "time": "10:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "therapy"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 80 — Complex Unknown Medicine Then Safe Add\n\n## Context\nJoan's caregiver wants to add a medication called 'Celecoxib' for arthritis pain, and also add Ferrous Sulfate for her anemia.\n\n## Objectives\n1. Request adding Celecoxib as a medication, 200mg, every day at 09:00 after breakfast.\n2. If the assistant reports that Celecoxib is not found in the medicine database, acknowledge and do not proceed with it.\n3. Then request adding Ferrous Sulfate as a medication, 325mg, every day at 08:15 after breakfast, with a dependency on 'br_001'.\n4. Confirm the Ferrous Sulfate addition and end the conversation."
+}

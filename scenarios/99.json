@@ -1,0 +1,64 @@
+{
+    "patient_id": 10,
+    "patient_full_name": "Carol Phillips",
+    "gender": "Female",
+    "birth_date": "1935-01-01T00:00:00",
+    "age": 91,
+    "medical_conditions": [
+        "Heart Failure",
+        "Cognitive Decline"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [
+        {
+            "activity_id": "ph_001",
+            "name": "Old cardiac rehab",
+            "description": "Previous cardiac rehabilitation program.",
+            "day_of_week": [2, 4],
+            "time": "14:00",
+            "duration_minutes": 60,
+            "dependencies": [],
+            "valid_from": "2026-01-01",
+            "valid_until": "2026-05-31",
+            "category": "therapy"
+        }
+    ],
+    "objectives": "# Scenario 99 — Expired Activity Replacement with Validity Period\n\n## Context\nCarol had a cardiac rehabilitation program that expired in May. Her doctor wants to start a new gentle therapy program for the second half of the year.\n\n## Objectives\n1. Add a new gentle exercise therapy activity, 30 minutes, every Tuesday and Thursday at 14:00, valid from 2026-07-01 to 2026-12-31.\n2. Once the assistant confirms the new activity is added and notes the expired previous therapy, end the conversation."
+}

@@ -1,0 +1,51 @@
+{
+    "patient_id": 10,
+    "patient_full_name": "Carol Phillips",
+    "gender": "Female",
+    "birth_date": "1935-01-01T00:00:00",
+    "age": 91,
+    "medical_conditions": [
+        "Heart Failure",
+        "Cognitive Decline"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 92 — Add Safe Lisinopril Medication\n\n## Context\nCarol's cardiologist has prescribed Lisinopril as part of her heart failure management plan.\n\n## Objectives\n1. Add Lisinopril as a medication, 5mg, every day at 08:15 after breakfast, with a dependency on 'br_001'.\n2. Once the assistant confirms the medication is safe and added, end the conversation."
+}

@@ -1,0 +1,75 @@
+{
+    "patient_id": 3,
+    "patient_full_name": "Anthony Parker",
+    "gender": "Male",
+    "birth_date": "1952-02-16T00:00:00",
+    "age": 74,
+    "medical_conditions": [
+        "Ischemic Heart Disease",
+        "Gluten Intolerance"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "med_001",
+            "name": "Aspirin",
+            "description": "Preventive aspirin after breakfast.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:10",
+            "duration_minutes": 5,
+            "dependencies": ["br_001"],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "medication"
+        },
+        {
+            "activity_id": "hc_001",
+            "name": "Blood pressure check",
+            "description": "BP check after aspirin.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:20",
+            "duration_minutes": 10,
+            "dependencies": ["med_001"],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "health_checkup"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 28 — Remove Activity Blocked by Dependent\n\n## Context\nAnthony's caregiver wants to remove the aspirin medication, but it is a dependency for the blood pressure check activity.\n\n## Objectives\n1. Remove the aspirin medication activity (med_001).\n2. If the assistant reports that the activity cannot be removed because it is a dependency for hc_001, acknowledge the error.\n3. Ask to remove the blood pressure check first, then remove the aspirin.\n4. Confirm both removals and end the conversation."
+}

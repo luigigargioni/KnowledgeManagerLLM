@@ -1,0 +1,51 @@
+{
+    "patient_id": 2,
+    "patient_full_name": "Robert Turner",
+    "gender": "Male",
+    "birth_date": "1960-09-01T00:00:00",
+    "age": 66,
+    "medical_conditions": [
+        "Type 2 Diabetes Mellitus",
+        "Obesity"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 13 — Add Sweet Dessert with History Warning\n\n## Context\nRobert's family wants to add a regular evening dessert to his meal plan. However, Robert has a history of blood glucose spikes after eating high-sugar desserts.\n\n## Objectives\n1. Add a dessert activity, 'Evening sweet dessert', 15 minutes, every day at 20:00 after dinner, with a dependency on 'di_001'.\n2. If the assistant warns about Robert's past glucose spike from high-sugar desserts, acknowledge the concern and ask for a sugar-free alternative.\n3. Follow the assistant's recommendation and confirm the final activity.\n4. End the conversation."
+}

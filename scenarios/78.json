@@ -1,0 +1,75 @@
+{
+    "patient_id": 8,
+    "patient_full_name": "Joan Edwards",
+    "gender": "Female",
+    "birth_date": "1947-04-17T00:00:00",
+    "age": 79,
+    "medical_conditions": [
+        "Rheumatoid Arthritis",
+        "Iron-Deficiency Anemia"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "med_001",
+            "name": "Ferrous Sulfate",
+            "description": "Iron supplement after breakfast.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:15",
+            "duration_minutes": 5,
+            "dependencies": ["br_001"],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "medication"
+        },
+        {
+            "activity_id": "hc_001",
+            "name": "Blood count check",
+            "description": "Blood count monitoring after medication.",
+            "day_of_week": [1, 3, 5],
+            "time": "08:25",
+            "duration_minutes": 15,
+            "dependencies": ["med_001"],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "health_checkup"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 78 — Add Therapy with Valid Dependency Chain and No History Warning\n\n## Context\nJoan's caregiver wants to add an occupational therapy session that depends on completing the blood count check first. Since Joan has no history file, the system should not trigger any history warnings.\n\n## Objectives\n1. Add an occupational therapy activity, 45 minutes, every Monday, Wednesday, and Friday at 08:45, with a dependency on 'hc_001'.\n2. Verify that the assistant does not trigger any history warnings (Joan has no history file).\n3. Once the assistant confirms the dependency chain is valid and the activity is added with no history warnings, end the conversation."
+}

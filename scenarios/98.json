@@ -1,0 +1,75 @@
+{
+    "patient_id": 10,
+    "patient_full_name": "Carol Phillips",
+    "gender": "Female",
+    "birth_date": "1935-01-01T00:00:00",
+    "age": 91,
+    "medical_conditions": [
+        "Heart Failure",
+        "Cognitive Decline"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "med_001",
+            "name": "Furosemide",
+            "description": "Heart failure medication after breakfast.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:10",
+            "duration_minutes": 5,
+            "dependencies": ["br_001"],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "medication"
+        },
+        {
+            "activity_id": "hc_001",
+            "name": "Weight check",
+            "description": "Daily weight check after medication.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:20",
+            "duration_minutes": 10,
+            "dependencies": ["med_001"],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "health_checkup"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 98 — Remove Activity Blocked by Dependent\n\n## Context\nCarol's caregiver wants to remove the Furosemide medication, but it is a dependency for the daily weight check.\n\n## Objectives\n1. Remove the Furosemide medication activity (med_001).\n2. If the assistant reports that the activity cannot be removed because it is a dependency for hc_001, acknowledge the error.\n3. Ask to remove the weight check first, then remove the Furosemide.\n4. Confirm both removals and end the conversation."
+}

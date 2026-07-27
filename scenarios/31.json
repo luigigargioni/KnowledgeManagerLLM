@@ -1,0 +1,50 @@
+{
+    "patient_id": 4,
+    "patient_full_name": "Frank Collins",
+    "gender": "Male",
+    "birth_date": "1943-04-22T00:00:00",
+    "age": 83,
+    "medical_conditions": [
+        "Chronic Kidney Disease"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 31 — Add Safe Paracetamol Medication\n\n## Context\nFrank is experiencing mild headaches. His doctor recommends Paracetamol as the preferred pain reliever for patients with Chronic Kidney Disease.\n\n## Objectives\n1. Add Paracetamol as a medication, 500mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n2. Once the assistant confirms the medication is safe and added, end the conversation."
+}

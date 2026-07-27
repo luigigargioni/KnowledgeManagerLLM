@@ -1,0 +1,51 @@
+{
+    "patient_id": 8,
+    "patient_full_name": "Joan Edwards",
+    "gender": "Female",
+    "birth_date": "1947-04-17T00:00:00",
+    "age": 79,
+    "medical_conditions": [
+        "Rheumatoid Arthritis",
+        "Iron-Deficiency Anemia"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 79 — Add Time-Limited Social Activity\n\n## Context\nJoan's family has arranged a 3-week summer program of social activities at a community center to help with her mood and social engagement.\n\n## Objectives\n1. Add a social activity 'Community center program', 120 minutes, every Tuesday and Thursday at 13:00, valid from 2026-07-01 to 2026-07-22.\n2. Once the assistant confirms the time-limited activity is added, end the conversation."
+}

@@ -1,0 +1,52 @@
+{
+    "patient_id": 5,
+    "patient_full_name": "Samuel Wright",
+    "gender": "Male",
+    "birth_date": "1936-06-16T00:00:00",
+    "age": 90,
+    "medical_conditions": [
+        "Senile Dementia",
+        "Fractured Femur (Right Leg)",
+        "Prescribed Bed Rest"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 46 — Add Caution Rivaroxaban Medication\n\n## Context\nSamuel's doctor wants to add Rivaroxaban as a safer alternative to Warfarin for blood clot prevention. However, fall risk remains a concern.\n\n## Objectives\n1. Add Rivaroxaban as a medication, 10mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n2. If the assistant issues a caution warning about fall risk remaining with Rivaroxaban, acknowledge the warning but proceed with the addition as prescribed.\n3. Confirm the medication addition and end the conversation."
+}

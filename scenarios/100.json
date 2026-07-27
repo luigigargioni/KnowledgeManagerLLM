@@ -1,0 +1,63 @@
+{
+    "patient_id": 10,
+    "patient_full_name": "Carol Phillips",
+    "gender": "Female",
+    "birth_date": "1935-01-01T00:00:00",
+    "age": 91,
+    "medical_conditions": [
+        "Heart Failure",
+        "Cognitive Decline"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "wl_001",
+            "name": "Supervised walk",
+            "description": "Supervised walk for mobility.",
+            "day_of_week": [1, 3, 5],
+            "time": "10:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "outside_activity"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 100 — Complex Add, Update, Add with Dependency, and Caution Medicine\n\n## Context\nCarol's caregiver wants to add Lisinopril, update the supervised walk, add a social activity, and also add Rivaroxaban as a safer alternative to Warfarin for clot prevention.\n\n## Objectives\n1. Add Lisinopril as a medication, 5mg, every day at 08:15 after breakfast, with a dependency on 'br_001'.\n2. Update the supervised walk (wl_001) to last 30 minutes instead of 20 and add Sunday to its days.\n3. Add Rivaroxaban as a medication, 10mg, every day at 08:20 after breakfast, with a dependency on 'br_001'.\n4. If the assistant issues a caution warning about fall risk remaining with Rivaroxaban and cognitive decline, acknowledge the warning but explain that the doctor has assessed the risk and will monitor closely.\n5. Add a social activity 'Family video call', 30 minutes, every Sunday at 16:00.\n6. Confirm all changes and end the conversation."
+}

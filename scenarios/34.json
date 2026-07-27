@@ -1,0 +1,62 @@
+{
+    "patient_id": 4,
+    "patient_full_name": "Frank Collins",
+    "gender": "Male",
+    "birth_date": "1943-04-22T00:00:00",
+    "age": 83,
+    "medical_conditions": [
+        "Chronic Kidney Disease"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "rlx_001",
+            "name": "Reading time",
+            "description": "Afternoon reading for relaxation.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "15:00",
+            "duration_minutes": 30,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "relaxation"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 34 — Add Outdoor Activity in Hot Weather with History Warning\n\n## Context\nFrank's caregiver wants to add an outdoor gardening activity in the afternoon. However, Frank has a history of dehydration and kidney function decline after hot weather exposure.\n\n## Objectives\n1. Add an outdoor gardening activity, 60 minutes, every Tuesday and Thursday at 14:00.\n2. If the assistant warns about Frank's past dehydration from hot weather activities, acknowledge the concern and ask if an early morning time would be safer.\n3. Follow the assistant's recommendation and confirm the final activity.\n4. End the conversation."
+}

@@ -1,0 +1,63 @@
+{
+    "patient_id": 1,
+    "patient_full_name": "David Mitchell",
+    "gender": "Male",
+    "birth_date": "1984-03-10T00:00:00",
+    "age": 42,
+    "medical_conditions": [
+        "Seasonal Allergies",
+        "Mild Asthma"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "wl_001",
+            "name": "Afternoon walk",
+            "description": "Light afternoon walk.",
+            "day_of_week": [2, 4],
+            "time": "16:00",
+            "duration_minutes": 30,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "outside_activity"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 6 — Add Cold Morning Jog with History Warning\n\n## Context\nDavid wants to start jogging in the early morning. His caregiver is concerned because David has a history of wheezing after jogging in cold morning air.\n\n## Objectives\n1. Add a morning jog activity, 30 minutes, every Monday, Wednesday, and Friday at 06:30.\n2. If the assistant warns about David's past wheezing episode from cold morning jogs, acknowledge the warning and ask if a later time or indoor alternative would be better.\n3. Follow the assistant's recommendation and confirm the final activity.\n4. End the conversation."
+}

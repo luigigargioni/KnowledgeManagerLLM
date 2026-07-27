@@ -1,0 +1,63 @@
+{
+    "patient_id": 2,
+    "patient_full_name": "Robert Turner",
+    "gender": "Male",
+    "birth_date": "1960-09-01T00:00:00",
+    "age": 66,
+    "medical_conditions": [
+        "Type 2 Diabetes Mellitus",
+        "Obesity"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "wl_001",
+            "name": "Morning walk",
+            "description": "Daily morning walk for glycemic control and weight management.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "10:00",
+            "duration_minutes": 30,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "outside_activity"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 15 — Remove Daily Walk with History Warning\n\n## Context\nRobert's caregiver wants to remove the daily morning walk due to upcoming bad weather. However, Robert has a history of weight gain and mood decline when he missed his daily walk routine.\n\n## Objectives\n1. Remove the morning walk activity (wl_001).\n2. If the assistant warns about Robert's past decline when he missed his daily walks, acknowledge the concern and ask if an indoor alternative would be better.\n3. Follow the assistant's recommendation — either remove the walk and add an indoor alternative, or keep the walk.\n4. Confirm the final decision and end the conversation."
+}

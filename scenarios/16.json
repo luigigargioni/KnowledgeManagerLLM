@@ -1,0 +1,63 @@
+{
+    "patient_id": 2,
+    "patient_full_name": "Robert Turner",
+    "gender": "Male",
+    "birth_date": "1960-09-01T00:00:00",
+    "age": 66,
+    "medical_conditions": [
+        "Type 2 Diabetes Mellitus",
+        "Obesity"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "med_001",
+            "name": "Metformin",
+            "description": "Diabetes medication taken with breakfast.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:05",
+            "duration_minutes": 5,
+            "dependencies": ["br_001"],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "medication"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 16 — Add Insulin with Valid Dependency\n\n## Context\nRobert's doctor has added Insulin to his diabetes management plan. It should be administered after breakfast.\n\n## Objectives\n1. Add Insulin as a medication, 10 units, every day at 08:30, with a dependency on 'br_001'.\n2. Once the assistant confirms the medication is safe and the dependency is valid, end the conversation."
+}

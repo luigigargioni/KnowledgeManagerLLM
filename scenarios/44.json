@@ -1,0 +1,52 @@
+{
+    "patient_id": 5,
+    "patient_full_name": "Samuel Wright",
+    "gender": "Male",
+    "birth_date": "1936-06-16T00:00:00",
+    "age": 90,
+    "medical_conditions": [
+        "Senile Dementia",
+        "Fractured Femur (Right Leg)",
+        "Prescribed Bed Rest"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 44 — Add Extended Bed Rest with History Warning\n\n## Context\nSamuel's caregiver wants to add a prolonged bed rest period in the afternoon. However, Samuel has a history of confusion after prolonged bed rest.\n\n## Objectives\n1. Add an extended bed rest activity, 120 minutes, every day at 14:00.\n2. If the assistant warns about Samuel's past confusion from prolonged bed rest, acknowledge the concern and ask if shorter periods with regular repositioning would be better.\n3. Follow the assistant's recommendation and confirm the final activity.\n4. End the conversation."
+}

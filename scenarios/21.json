@@ -1,0 +1,51 @@
+{
+    "patient_id": 3,
+    "patient_full_name": "Anthony Parker",
+    "gender": "Male",
+    "birth_date": "1952-02-16T00:00:00",
+    "age": 74,
+    "medical_conditions": [
+        "Ischemic Heart Disease",
+        "Gluten Intolerance"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 21 — Add Safe Aspirin Medication\n\n## Context\nAnthony's cardiologist has recommended low-dose Aspirin as preventive therapy for his Ischemic Heart Disease.\n\n## Objectives\n1. Add Aspirin as a medication, 100mg, every day at 08:05 after breakfast, with a dependency on 'br_001'.\n2. Once the assistant confirms the medication is safe and added, end the conversation."
+}

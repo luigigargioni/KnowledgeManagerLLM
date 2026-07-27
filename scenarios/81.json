@@ -1,0 +1,62 @@
+{
+    "patient_id": 9,
+    "patient_full_name": "Rose Baker",
+    "gender": "Female",
+    "birth_date": "1943-09-01T00:00:00",
+    "age": 83,
+    "medical_conditions": [
+        "Mild Alzheimer's Dementia"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "rlx_001",
+            "name": "Memory exercises",
+            "description": "Daily memory exercises.",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "10:00",
+            "duration_minutes": 30,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "relaxation"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 81 — Add Safe Donepezil Medication\n\n## Context\nRose's neurologist has prescribed Donepezil to help manage her mild Alzheimer's dementia.\n\n## Objectives\n1. Add Donepezil as a medication, 5mg, every day at 20:00 after dinner, with a dependency on 'di_001'.\n2. Once the assistant confirms the medication is safe and added, end the conversation."
+}

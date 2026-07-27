@@ -1,0 +1,51 @@
+{
+    "patient_id": 8,
+    "patient_full_name": "Joan Edwards",
+    "gender": "Female",
+    "birth_date": "1947-04-17T00:00:00",
+    "age": 79,
+    "medical_conditions": [
+        "Rheumatoid Arthritis",
+        "Iron-Deficiency Anemia"
+    ],
+    "activities": [
+        {
+            "activity_id": "br_001",
+            "name": "Breakfast",
+            "description": "Breakfast",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "08:00",
+            "duration_minutes": 20,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "lu_001",
+            "name": "Lunch",
+            "description": "Lunch",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "12:30",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        },
+        {
+            "activity_id": "di_001",
+            "name": "Dinner",
+            "description": "Dinner",
+            "day_of_week": [1, 2, 3, 4, 5, 6, 7],
+            "time": "19:00",
+            "duration_minutes": 45,
+            "dependencies": [],
+            "valid_from": null,
+            "valid_until": null,
+            "category": "meal"
+        }
+    ],
+    "expired_activities": [],
+    "objectives": "# Scenario 76 — Add Caution Prednisone Medication\n\n## Context\nJoan's doctor wants to add Prednisone for acute arthritis flare-ups. However, long-term Prednisone use carries osteoporosis risk.\n\n## Objectives\n1. Add Prednisone as a medication, 5mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n2. If the assistant issues a caution warning about osteoporosis risk with long-term use, acknowledge the warning but explain that this is a short-term course prescribed by the doctor.\n3. Confirm the medication addition and end the conversation."
+}
