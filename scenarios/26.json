@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 26 — Update Breaking Dependency Ordering\n\n## Context\nAnthony's caregiver wants to move the blood pressure check earlier, but this would break the dependency ordering since it would start before the aspirin ends.\n\n## Objectives\n1. Update the blood pressure check (hc_001) to start at 08:08 instead of 08:20.\n2. If the assistant detects a temporal ordering violation with the dependency on med_001, acknowledge the error.\n3. Ask to update the dependency instead — remove the dependency on med_001 and set it to depend on br_001 directly.\n4. Confirm the corrected update and end the conversation."
+    "objectives": "# Scenario 26 — Update Breaking Dependency Ordering\n\n## Context\nAnthony's caregiver wants to move the blood pressure check earlier, but this would break the dependency ordering since it would start before the aspirin ends.\n\n## Objectives\n1. Update the blood pressure check (hc_001) to start at 08:08 instead of 08:20.\n2. If the assistant detects a temporal ordering violation with the dependency on med_001, acknowledge the error.\n3. Ask to update the dependency instead — remove the dependency on med_001 and set it to depend on br_001 directly.\n4. Confirm the corrected update."
 }

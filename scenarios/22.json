@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 22 — Add Safe Atorvastatin Medication\n\n## Context\nAnthony's cardiologist has prescribed Atorvastatin as standard therapy for Ischemic Heart Disease to manage cholesterol levels.\n\n## Objectives\n1. Add Atorvastatin as a medication, 40mg, every day at 20:30 after dinner, with a dependency on 'di_001'.\n2. Once the assistant confirms the medication is safe and added, end the conversation."
+    "objectives": "# Scenario 22 — Add Safe Atorvastatin Medication\n\n## Context\nAnthony's cardiologist has prescribed Atorvastatin as standard therapy for Ischemic Heart Disease to manage cholesterol levels.\n\n## Objectives\n1. Add Atorvastatin as a medication, 40mg, every day at 20:30 after dinner, with a dependency on 'di_001'.\n2. Once the assistant confirms the medication is safe and added."
 }

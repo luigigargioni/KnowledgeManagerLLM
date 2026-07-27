@@ -70,5 +70,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 1 — Add a simple activity\n\n## Context\nThe patient's doctor has recommended a short evening walk to help manage his blood pressure.\n\n## Objectives\n1. Add an evening walk activity, 20 minutes long, every Tuesday and Thursday at 17:00.\n2. Once the activity is confirmed as added by the assistant, end the conversation.\n\n## Notes\n- Do not add any other activities.\n- If the assistant asks for clarification, keep your answers short and consistent with the objectives above."
+    "objectives": "# Scenario 1 — Add a simple activity\n\n## Context\nThe patient's doctor has recommended a short evening walk to help manage his blood pressure.\n\n## Objectives\n1. Add an evening walk activity, 20 minutes long, every Tuesday and Thursday at 17:00.\n2. Once the activity is confirmed as added by the assistant.\n\n## Notes\n- Do not add any other activities.\n- If the assistant asks for clarification, keep your answers short and consistent with the objectives above."
 }

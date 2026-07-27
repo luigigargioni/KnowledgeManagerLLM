@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 7 — Add Activity with Non-Existent Dependency\n\n## Context\nDavid's caregiver wants to add a new relaxation activity that depends on a medication that is not currently in David's schedule.\n\n## Objectives\n1. Add a meditation activity, 20 minutes, every day at 20:30, with a dependency on activity ID 'med_999'.\n2. If the assistant reports that the dependency does not exist, acknowledge the error and ask to add the activity without the dependency.\n3. Confirm the corrected activity and end the conversation."
+    "objectives": "# Scenario 7 — Add Activity with Non-Existent Dependency\n\n## Context\nDavid's caregiver wants to add a new relaxation activity that depends on a medication that is not currently in David's schedule.\n\n## Objectives\n1. Add a meditation activity, 20 minutes, every day at 20:30, with a dependency on activity ID 'med_999'.\n2. If the assistant reports that the dependency does not exist, acknowledge the error and ask to add the activity without the dependency.\n3. Confirm the corrected activity."
 }

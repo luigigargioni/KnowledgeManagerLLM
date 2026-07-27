@@ -60,5 +60,5 @@
             "category": "therapy"
         }
     ],
-    "objectives": "# Scenario 99 — Expired Activity Replacement with Validity Period\n\n## Context\nCarol had a cardiac rehabilitation program that expired in May. Her doctor wants to start a new gentle therapy program for the second half of the year.\n\n## Objectives\n1. Add a new gentle exercise therapy activity, 30 minutes, every Tuesday and Thursday at 14:00, valid from 2026-07-01 to 2026-12-31.\n2. Once the assistant confirms the new activity is added and notes the expired previous therapy, end the conversation."
+    "objectives": "# Scenario 99 — Expired Activity Replacement with Validity Period\n\n## Context\nCarol had a cardiac rehabilitation program that expired in May. Her doctor wants to start a new gentle therapy program for the second half of the year.\n\n## Objectives\n1. Add a new gentle exercise therapy activity, 30 minutes, every Tuesday and Thursday at 14:00, valid from 2026-07-01 to 2026-12-31.\n2. Once the assistant confirms the new activity is added and notes the expired previous therapy."
 }

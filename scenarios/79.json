@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 79 — Add Time-Limited Social Activity\n\n## Context\nJoan's family has arranged a 3-week summer program of social activities at a community center to help with her mood and social engagement.\n\n## Objectives\n1. Add a social activity 'Community center program', 120 minutes, every Tuesday and Thursday at 13:00, valid from 2026-07-01 to 2026-07-22.\n2. Once the assistant confirms the time-limited activity is added, end the conversation."
+    "objectives": "# Scenario 79 — Add Time-Limited Social Activity\n\n## Context\nJoan's family has arranged a 3-week summer program of social activities at a community center to help with her mood and social engagement.\n\n## Objectives\n1. Add a social activity 'Community center program', 120 minutes, every Tuesday and Thursday at 13:00, valid from 2026-07-01 to 2026-07-22.\n2. Once the assistant confirms the time-limited activity is added."
 }

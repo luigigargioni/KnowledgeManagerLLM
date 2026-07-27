@@ -58,5 +58,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 87 — Scheduling Conflict - Accept Alternative\n\n## Context\nRose's caregiver wants to add a social activity at the same time as her memory exercises.\n\n## Objectives\n1. Add a social activity 'Music therapy group', 45 minutes, every day at 10:00.\n2. If the assistant detects a scheduling conflict with the memory exercises, accept its suggested alternative time.\n3. Confirm the activity at the suggested time and end the conversation."
+    "objectives": "# Scenario 87 — Scheduling Conflict - Accept Alternative\n\n## Context\nRose's caregiver wants to add a social activity at the same time as her memory exercises.\n\n## Objectives\n1. Add a social activity 'Music therapy group', 45 minutes, every day at 10:00.\n2. If the assistant detects a scheduling conflict with the memory exercises, accept its suggested alternative time.\n3. Confirm the activity at the suggested time."
 }

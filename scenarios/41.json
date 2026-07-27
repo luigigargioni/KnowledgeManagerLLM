@@ -60,5 +60,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 41 — Add Safe Paracetamol Medication\n\n## Context\nSamuel is experiencing pain from his fractured femur. His doctor recommends Paracetamol as the preferred pain reliever, avoiding NSAIDs.\n\n## Objectives\n1. Add Paracetamol as a medication, 500mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n2. Once the assistant confirms the medication is safe and added, end the conversation."
+    "objectives": "# Scenario 41 — Add Safe Paracetamol Medication\n\n## Context\nSamuel is experiencing pain from his fractured femur. His doctor recommends Paracetamol as the preferred pain reliever, avoiding NSAIDs.\n\n## Objectives\n1. Add Paracetamol as a medication, 500mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n2. Once the assistant confirms the medication is safe and added."
 }

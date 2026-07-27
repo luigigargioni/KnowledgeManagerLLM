@@ -59,5 +59,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 6 — Add Cold Morning Jog with History Warning\n\n## Context\nDavid wants to start jogging in the early morning. His caregiver is concerned because David has a history of wheezing after jogging in cold morning air.\n\n## Objectives\n1. Add a morning jog activity, 30 minutes, every Monday, Wednesday, and Friday at 06:30.\n2. If the assistant warns about David's past wheezing episode from cold morning jogs, acknowledge the warning and ask if a later time or indoor alternative would be better.\n3. Follow the assistant's recommendation and confirm the final activity.\n4. End the conversation."
+    "objectives": "# Scenario 6 — Add Cold Morning Jog with History Warning\n\n## Context\nDavid wants to start jogging in the early morning. His caregiver is concerned because David has a history of wheezing after jogging in cold morning air.\n\n## Objectives\n1. Add a morning jog activity, 30 minutes, every Monday, Wednesday, and Friday at 06:30.\n2. If the assistant warns about David's past wheezing episode from cold morning jogs, acknowledge the warning and ask if a later time or indoor alternative would be better.\n3. Follow the assistant's recommendation and confirm the final activity."
 }

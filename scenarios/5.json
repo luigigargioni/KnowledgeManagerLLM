@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 5 — Add Safe Salbutamol Medication\n\n## Context\nDavid's allergist has prescribed Salbutamol as a rescue inhaler for his mild asthma, to be used before outdoor activities.\n\n## Objectives\n1. Add Salbutamol as a medication activity, 5 minutes, every Monday, Wednesday, and Friday at 09:45 before the morning walk.\n2. Once the assistant confirms the medication is safe and added, end the conversation."
+    "objectives": "# Scenario 5 — Add Safe Salbutamol Medication\n\n## Context\nDavid's allergist has prescribed Salbutamol as a rescue inhaler for his mild asthma, to be used before outdoor activities.\n\n## Objectives\n1. Add Salbutamol as a medication activity, 5 minutes, every Monday, Wednesday, and Friday at 09:45 before the morning walk.\n2. Once the assistant confirms the medication is safe and added."
 }

@@ -48,5 +48,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 49 — Add Time-Limited Intensive Physiotherapy\n\n## Context\nSamuel's doctor has prescribed a 4-week intensive physiotherapy program to accelerate femur recovery.\n\n## Objectives\n1. Add an intensive physiotherapy activity, 45 minutes, every Monday, Wednesday, and Friday at 10:00, valid from 2026-07-01 to 2026-07-31.\n2. Once the assistant confirms the time-limited activity is added, end the conversation."
+    "objectives": "# Scenario 49 — Add Time-Limited Intensive Physiotherapy\n\n## Context\nSamuel's doctor has prescribed a 4-week intensive physiotherapy program to accelerate femur recovery.\n\n## Objectives\n1. Add an intensive physiotherapy activity, 45 minutes, every Monday, Wednesday, and Friday at 10:00, valid from 2026-07-01 to 2026-07-31.\n2. Once the assistant confirms the time-limited activity is added."
 }

@@ -46,5 +46,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 89 — Add Activity with Non-Existent Dependency\n\n## Context\nRose's caregiver wants to add a social activity that depends on a therapy session that doesn't exist in the schedule.\n\n## Objectives\n1. Add a social activity 'Reminiscence group', 45 minutes, every Wednesday at 15:00, with a dependency on 'th_999'.\n2. If the assistant reports that the dependency 'th_999' does not exist, acknowledge the error and ask to add the activity without the dependency.\n3. Confirm the corrected activity and end the conversation."
+    "objectives": "# Scenario 89 — Add Activity with Non-Existent Dependency\n\n## Context\nRose's caregiver wants to add a social activity that depends on a therapy session that doesn't exist in the schedule.\n\n## Objectives\n1. Add a social activity 'Reminiscence group', 45 minutes, every Wednesday at 15:00, with a dependency on 'th_999'.\n2. If the assistant reports that the dependency 'th_999' does not exist, acknowledge the error and ask to add the activity without the dependency.\n3. Confirm the corrected activity."
 }

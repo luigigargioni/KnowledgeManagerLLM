@@ -48,5 +48,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 46 — Add Caution Rivaroxaban Medication\n\n## Context\nSamuel's doctor wants to add Rivaroxaban as a safer alternative to Warfarin for blood clot prevention. However, fall risk remains a concern.\n\n## Objectives\n1. Add Rivaroxaban as a medication, 10mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n2. If the assistant issues a caution warning about fall risk remaining with Rivaroxaban, acknowledge the warning but proceed with the addition as prescribed.\n3. Confirm the medication addition and end the conversation."
+    "objectives": "# Scenario 46 — Add Caution Rivaroxaban Medication\n\n## Context\nSamuel's doctor wants to add Rivaroxaban as a safer alternative to Warfarin for blood clot prevention. However, fall risk remains a concern.\n\n## Objectives\n1. Add Rivaroxaban as a medication, 10mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n2. If the assistant issues a caution warning about fall risk remaining with Rivaroxaban, acknowledge the warning but proceed with the addition as prescribed.\n3. Confirm the medication addition."
 }

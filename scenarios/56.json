@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 56 — Update Time Causing Conflict - Accept Alternative\n\n## Context\nLaura wants to extend her morning walk, which will overlap with her meditation session that depends on it.\n\n## Objectives\n1. Update the morning walk (wl_001) to last 45 minutes instead of 30.\n2. If the assistant detects a conflict with the meditation session (rlx_001) that starts at 10:35, accept its suggested alternative time for meditation.\n3. Confirm both the walk update and the meditation time change, then end the conversation."
+    "objectives": "# Scenario 56 — Update Time Causing Conflict - Accept Alternative\n\n## Context\nLaura wants to extend her morning walk, which will overlap with her meditation session that depends on it.\n\n## Objectives\n1. Update the morning walk (wl_001) to last 45 minutes instead of 30.\n2. If the assistant detects a conflict with the meditation session (rlx_001) that starts at 10:35, accept its suggested alternative time for meditation.\n3. Confirm both the walk update and the meditation time change."
 }

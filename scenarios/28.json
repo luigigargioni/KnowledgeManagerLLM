@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 28 — Remove Activity Blocked by Dependent\n\n## Context\nAnthony's caregiver wants to remove the aspirin medication, but it is a dependency for the blood pressure check activity.\n\n## Objectives\n1. Remove the aspirin medication activity (med_001).\n2. If the assistant reports that the activity cannot be removed because it is a dependency for hc_001, acknowledge the error.\n3. Ask to remove the blood pressure check first, then remove the aspirin.\n4. Confirm both removals and end the conversation."
+    "objectives": "# Scenario 28 — Remove Activity Blocked by Dependent\n\n## Context\nAnthony's caregiver wants to remove the aspirin medication, but it is a dependency for the blood pressure check activity.\n\n## Objectives\n1. Remove the aspirin medication activity (med_001).\n2. If the assistant reports that the activity cannot be removed because it is a dependency for hc_001, acknowledge the error.\n3. Ask to remove the blood pressure check first, then remove the aspirin.\n4. Confirm both removals."
 }

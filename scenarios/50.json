@@ -60,5 +60,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 50 — Complex Add Medication and Social Activity\n\n## Context\nSamuel's caregiver wants to add Furosemide for fluid management and also add a social activity that conflicts with his afternoon rest.\n\n## Objectives\n1. Add Furosemide as a medication, 20mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n2. Add a social activity 'Family visit', 60 minutes, every Sunday at 14:00.\n3. If the assistant detects a scheduling conflict with the afternoon rest, accept its suggested alternative time.\n4. Confirm all changes and end the conversation."
+    "objectives": "# Scenario 50 — Complex Add Medication and Social Activity\n\n## Context\nSamuel's caregiver wants to add Furosemide for fluid management and also add a social activity that conflicts with his afternoon rest.\n\n## Objectives\n1. Add Furosemide as a medication, 20mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n2. Add a social activity 'Family visit', 60 minutes, every Sunday at 14:00.\n3. If the assistant detects a scheduling conflict with the afternoon rest, accept its suggested alternative time.\n4. Confirm all changes."
 }

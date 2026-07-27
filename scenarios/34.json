@@ -58,5 +58,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 34 — Add Outdoor Activity in Hot Weather with History Warning\n\n## Context\nFrank's caregiver wants to add an outdoor gardening activity in the afternoon. However, Frank has a history of dehydration and kidney function decline after hot weather exposure.\n\n## Objectives\n1. Add an outdoor gardening activity, 60 minutes, every Tuesday and Thursday at 14:00.\n2. If the assistant warns about Frank's past dehydration from hot weather activities, acknowledge the concern and ask if an early morning time would be safer.\n3. Follow the assistant's recommendation and confirm the final activity.\n4. End the conversation."
+    "objectives": "# Scenario 34 — Add Outdoor Activity in Hot Weather with History Warning\n\n## Context\nFrank's caregiver wants to add an outdoor gardening activity in the afternoon. However, Frank has a history of dehydration and kidney function decline after hot weather exposure.\n\n## Objectives\n1. Add an outdoor gardening activity, 60 minutes, every Tuesday and Thursday at 14:00.\n2. If the assistant warns about Frank's past dehydration from hot weather activities, acknowledge the concern and ask if an early morning time would be safer.\n3. Follow the assistant's recommendation and confirm the final activity."
 }

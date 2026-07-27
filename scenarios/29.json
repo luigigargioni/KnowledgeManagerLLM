@@ -60,5 +60,5 @@
             "category": "therapy"
         }
     ],
-    "objectives": "# Scenario 29 — Expired Activity Replacement\n\n## Context\nAnthony had a physiotherapy program that expired at the end of May. His doctor wants to start a new therapy program for the second half of the year.\n\n## Objectives\n1. Add a new cardiac rehabilitation therapy activity, 45 minutes, every Tuesday and Thursday at 14:00, valid from 2026-07-01 to 2026-12-31.\n2. Once the assistant confirms the new activity is added and notes the expired previous therapy, end the conversation."
+    "objectives": "# Scenario 29 — Expired Activity Replacement\n\n## Context\nAnthony had a physiotherapy program that expired at the end of May. His doctor wants to start a new therapy program for the second half of the year.\n\n## Objectives\n1. Add a new cardiac rehabilitation therapy activity, 45 minutes, every Tuesday and Thursday at 14:00, valid from 2026-07-01 to 2026-12-31.\n2. Once the assistant confirms the new activity is added and notes the expired previous therapy."
 }

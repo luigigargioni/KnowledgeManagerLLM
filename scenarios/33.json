@@ -46,5 +46,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 33 — Add High-Sodium Meal with History Warning\n\n## Context\nFrank's family wants to add a weekly restaurant meal to his schedule. However, Frank has a history of creatinine elevation after eating high-sodium meals.\n\n## Objectives\n1. Add a restaurant lunch activity, 'Restaurant meal with processed foods', 60 minutes, every Saturday at 13:00.\n2. If the assistant warns about Frank's past creatinine elevation from high-sodium meals, acknowledge the concern and ask for a low-sodium alternative.\n3. Follow the assistant's recommendation and confirm the final activity.\n4. End the conversation."
+    "objectives": "# Scenario 33 — Add High-Sodium Meal with History Warning\n\n## Context\nFrank's family wants to add a weekly restaurant meal to his schedule. However, Frank has a history of creatinine elevation after eating high-sodium meals.\n\n## Objectives\n1. Add a restaurant lunch activity, 'Restaurant meal with processed foods', 60 minutes, every Saturday at 13:00.\n2. If the assistant warns about Frank's past creatinine elevation from high-sodium meals, acknowledge the concern and ask for a low-sodium alternative.\n3. Follow the assistant's recommendation and confirm the final activity."
 }
