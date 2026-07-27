@@ -6,7 +6,7 @@ The therapy is saved in JSON format and contains brief patient data and the list
 The structure of patient data and an activities is as follows:
 {{
     "patient_id": 1,
-  "patient_full_name": "Mario Rossi",
+  "patient_full_name": "John Doe",
   "gender": "Male",
   "birth_date": "1957-05-15T00:00:00",
   "age": 68,
@@ -139,7 +139,7 @@ The therapy is saved in JSON format and contains brief patient data and the list
 The structure of patient data and an activities is as follows:
 {{
     "patient_id": 1,
-  "patient_full_name": "Mario Rossi",
+  "patient_full_name": "John Doe",
   "gender": "Male",
   "birth_date": "1957-05-15T00:00:00",
   "age": 68,

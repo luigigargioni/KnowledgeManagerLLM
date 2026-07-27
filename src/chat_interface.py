@@ -217,8 +217,8 @@ for idx, message in enumerate(
                 st.session_state.pending_message = None
                 st.session_state.processing = False
 
-            # Resetta anche lo stato di fine sessione, nel caso il rewind
-            # avvenga prima di un eventuale save_session successivo
+            # Also reset the session-ended state, in case the rewind
+            # happens before a subsequent save_session
             st.session_state.session_ended = False
 
             st.rerun()
@@ -358,7 +358,7 @@ with st.sidebar:
 
         except Exception as e:
             logger.error(f"[UI] Error reading therapy.json: {e}")
-            st.error(f"Errore lettura terapia: {e}")
+            st.error(f"Error reading therapy: {e}")
     else:
         st.warning("therapy.json not found")
 
@@ -397,7 +397,7 @@ with st.sidebar:
     st.subheader("📂 Past Sessions")
 
     def get_available_sessions(patient_id: str) -> list[Path]:
-        """Restituisce le cartelle di sessione disponibili per il paziente, ordinate per data desc."""
+        """Return available session folders for the patient, sorted by date desc."""
         logs_root = LOGS_FOLDER / patient_id
         if not logs_root.exists():
             return []
@@ -407,7 +407,7 @@ with st.sidebar:
                 for d in logs_root.iterdir()
                 if d.is_dir() and (d / "chat.log").exists()
             ],
-            reverse=True,  # più recente prima
+            reverse=True,  # most recent first
         )
 
     available_sessions = get_available_sessions(st.session_state.selected_patient_id)

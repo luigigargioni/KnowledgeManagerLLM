@@ -14,7 +14,7 @@ class TherapyState(TypedDict):
 
 def build_therapy_graph(chat, caregiver):
     """
-    Costruisce il grafo LangGraph che coordina CaregiverAgent e Chat.
+    Build the LangGraph that coordinates CaregiverAgent and Chat.
     """
 
     def caregiver_node(state: TherapyState) -> dict:

@@ -76,7 +76,7 @@ def setup_logger(
     session_folder_name=None,
     logger_name: str = "knowledge_manager",
 ):
-    """Configura il logger per scrivere su file di sessione nella cartella logs e su terminale"""
+    """Configure the logger to write to a session file in the logs folder and to the terminal"""
 
     logs_dir.mkdir(exist_ok=True)
     if not session_folder_name:
@@ -158,7 +158,7 @@ _LOG_LINE_PATTERN = re.compile(
     r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} - \[CHAT\] (USER|ASSISTANT): (.*)$"
 )
 
-# Mappa il marker del log al role OpenAI-style
+# Map the log marker to the OpenAI-style role
 _ROLE_MAP = {
     "USER": "user",
     "ASSISTANT": "assistant",
@@ -167,20 +167,19 @@ _ROLE_MAP = {
 
 def parse_chat_log(log_path: str | Path) -> list[dict]:
     """
-    Parsa un file di log nel formato:
-        YYYY-MM-DD HH:MM:SS - [CHAT] USER: <messaggio>
-        YYYY-MM-DD HH:MM:SS - [CHAT] ASSISTANT: <messaggio multi-riga>
+    Parse a log file in the format:
+        YYYY-MM-DD HH:MM:SS - [CHAT] USER: <message>
+        YYYY-MM-DD HH:MM:SS - [CHAT] ASSISTANT: <multi-line message>
 
-    Ricostruisce la conversation_history con i ruoli corretti, gestendo
-    correttamente i messaggi che si estendono su più righe (es. risposte
-    formattate dell'assistant).
+    Reconstruct the conversation_history with correct roles, handling
+    messages that span multiple lines (e.g. formatted assistant replies).
 
     Args:
-        log_path: percorso al file .log
+        log_path: path to the .log file
 
     Returns:
-        Lista di dict {"role": "user"|"assistant", "content": "..."}
-        pronta per popolare agent.conversation_history.
+        List of dicts {"role": "user"|"assistant", "content": "..."}
+        ready to populate agent.conversation_history.
     """
     log_path = Path(log_path)
     lines = log_path.read_text(encoding="utf-8").splitlines()
@@ -190,7 +189,7 @@ def parse_chat_log(log_path: str | Path) -> list[dict]:
     current_content: list[str] = []
 
     def _flush():
-        """Chiude il messaggio corrente e lo aggiunge alla history."""
+        """Close the current message and add it to the history."""
         if current_role is not None:
             content = "\n".join(current_content).strip()
             if content:
@@ -200,18 +199,18 @@ def parse_chat_log(log_path: str | Path) -> list[dict]:
         match = _LOG_LINE_PATTERN.match(line)
 
         if match:
-            # Nuova riga di log riconosciuta: chiudi il messaggio precedente
+            # New log line recognized: close the previous message
             _flush()
             marker, first_line = match.groups()
             current_role = _ROLE_MAP[marker]
             current_content = [first_line]
         else:
-            # Riga di continuazione (es. punto elenco di una risposta ASSISTANT)
-            # Ignora righe vuote prima del primo messaggio riconosciuto
+            # Continuation line (e.g. bullet point of an ASSISTANT reply)
+            # Skip empty lines before the first recognized message
             if current_role is not None:
                 current_content.append(line)
 
-    # Flush dell'ultimo messaggio rimasto in buffer
+    # Flush the last message remaining in the buffer
     _flush()
 
     return history
@@ -221,14 +220,14 @@ def populate_agent_history(
     agent, log_path: str | Path, keep_system_prompt: bool = True
 ) -> None:
     """
-    Popola agent.conversation_history a partire da un file di log,
-    preservando il system prompt iniziale se presente.
+    Populate agent.conversation_history from a log file,
+    preserving the initial system prompt if present.
 
     Args:
-        agent: istanza di Agent (es. TherapyManagerAgent) la cui history va popolata
-        log_path: percorso al file .log
-        keep_system_prompt: se True, mantiene il messaggio system esistente
-                             in cima alla history prima di appendere i messaggi parsati
+        agent: Agent instance (e.g. TherapyManagerAgent) whose history should be populated
+        log_path: path to the .log file
+        keep_system_prompt: if True, keeps the existing system message
+                            at the top of the history before appending the parsed messages
     """
     parsed_messages = parse_chat_log(log_path)
 
@@ -253,18 +252,18 @@ def load_past_session(
     keep_system_prompt: bool = True,
 ) -> list[dict]:
     """
-    Carica una sessione precedente nella history dell'agente e
-    restituisce gli snapshot della terapia trovati.
+    Load a previous session into the agent's history and
+    return the therapy snapshots found.
 
     Args:
-        agent: istanza di Agent da popolare
-        session_log_dir: cartella della sessione precedente (es. logs/session_20260630)
-        keep_system_prompt: se True, mantiene il system prompt iniziale
+        agent: Agent instance to populate
+        session_log_dir: previous session folder (e.g. logs/session_20260630)
+        keep_system_prompt: if True, keeps the initial system prompt
 
     Returns:
-        Lista di snapshot terapia [{"message_idx": int, "therapy": dict}, ...]
-        da assegnare a chat._therapy_snapshots.
-        Lista vuota se il file non esiste.
+        List of therapy snapshots [{"message_idx": int, "therapy": dict}, ...]
+        to assign to chat._therapy_snapshots.
+        Empty list if the file does not exist.
     """
     logger = get_current_logger()
     session_log_dir = Path(session_log_dir)
@@ -274,10 +273,10 @@ def load_past_session(
     if not chat_log.exists():
         raise FileNotFoundError(f"chat.log not found in {session_log_dir}")
 
-    # Popola la history con i messaggi della sessione precedente
+    # Populate the history with messages from the previous session
     populate_agent_history(agent, chat_log, keep_system_prompt=keep_system_prompt)
 
-    # Carica gli snapshot se presenti
+    # Load snapshots if present
     if snapshots_path.exists():
         snapshots = json.loads(snapshots_path.read_text(encoding="utf-8"))
         logger.info(
@@ -295,9 +294,9 @@ def load_past_session(
 
 def build_transcript(conversation_history: list[dict]) -> str:
     """
-    Costruisce una trascrizione leggibile dal JudgeAgent
-    a partire dalla conversation history del chat_agent.
-    Filtra solo i messaggi user/assistant.
+    Build a readable transcript for the JudgeAgent
+    from the chat_agent's conversation history.
+    Filter only user/assistant messages.
     """
     lines = []
     for msg in conversation_history:

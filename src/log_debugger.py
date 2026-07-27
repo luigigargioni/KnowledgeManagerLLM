@@ -186,7 +186,7 @@ with st.sidebar:
     st.subheader("👤 Patient")
     chosen = st.selectbox(
         "Select patient",
-        options=["Mario Rossi"],
+        options=["John Doe"],
         index=0,
         label_visibility="collapsed",
     )
@@ -273,7 +273,7 @@ with st.sidebar:
                         st.write("")
 
         except Exception as e:
-            st.error(f"Errore lettura terapia: {e}")
+            st.error(f"Error reading therapy: {e}")
     else:
         st.warning("therapy.json not found")
 

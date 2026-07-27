@@ -57,14 +57,14 @@ class JudgeAgent(Agent):
         self, client, model, script: str, transcript: str, therapy: str
     ) -> dict:
         """
-        Valuta una conversazione rispetto agli obiettivi dello script.
+        Evaluate a conversation against the script's objectives.
 
         Args:
-            script: contenuto dello script passato al CaregiverAgent
-            transcript: trascrizione della conversazione (USER/ASSISTANT)
+            script: content of the script passed to the CaregiverAgent
+            transcript: conversation transcript (USER/ASSISTANT)
 
         Returns:
-            Dict con la valutazione strutturata, o dict con status="error" in caso di fallimento
+            Dict with the structured evaluation, or dict with status="error" on failure
         """
         prompt = f"# SCRIPT\n{script}\n# CONVERSATION TRANSCRIPT\n{transcript}\n#THERAPY\n{therapy}"
         self.conversation_history.append({"role": "user", "content": prompt})
@@ -80,7 +80,7 @@ class JudgeAgent(Agent):
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
-            # Fallback: prova a estrarre il JSON se il modello ha aggiunto testo attorno
+            # Fallback: try to extract the JSON if the model added surrounding text
 
             match = re.search(r"\{.*\}", raw, re.DOTALL)
             if match:

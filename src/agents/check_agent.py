@@ -224,7 +224,7 @@ _CHECK_ACTIVITY_PARAMETERS = {
 
 class TherapyCheckAgent(Agent):
     def __init__(self, agent_name="checker_agent", zero_shot=False):
-        # I tool sono fissi per questo agente, non passati dall'esterno
+        # Tools are fixed for this agent, not passed from outside
         super().__init__(
             agent_name=agent_name,
             agent_prompt=_PROMPT,

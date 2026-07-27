@@ -245,7 +245,7 @@ class TherapyManagerAgent(Agent):
         super().__init__(
             agent_name=agent_name,
             agent_prompt=_PROMPT,
-            agent_tools=_MANAGER_TOOLS,  # check_activity aggiunto dall'orchestratore
+            agent_tools=_MANAGER_TOOLS,  # check_activity added by the orchestrator
         )
 
     def inject_context(self):

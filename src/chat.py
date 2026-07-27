@@ -129,7 +129,7 @@ class Chat:
             f"delegate_to_{self.check_agent.name}": self.check_agent,
         }
 
-        # By adding the check_agent to the tools of chat_agente the second can delegate requests
+        # By adding the check_agent to the tools of chat_agent the latter can delegate requests
         self.chat_agent.tools = self.chat_agent.tools + [
             self.check_agent.as_tool_declaration(
                 description=(
@@ -191,7 +191,7 @@ class Chat:
         Overwrites therapy.json with the new snapshot.
         """
 
-        # Cerca l'ultimo snapshot con idx <= message_idx
+        # Find the last snapshot with idx <= message_idx
         candidates = [
             s for s in self._therapy_snapshots if s["message_idx"] <= message_idx
         ]
@@ -201,9 +201,9 @@ class Chat:
             )
             return
 
-        snapshot = candidates[-1]  # l'ultimo (più recente) tra i candidati
+        snapshot = candidates[-1]  # the last (most recent) among the candidates
 
-        # Tronca anche la lista degli snapshot: quelli successivi non sono più validi
+        # Also truncate the snapshot list: subsequent ones are no longer valid
         self._therapy_snapshots = candidates
 
         THERAPY_FILE.write_text(
@@ -218,11 +218,11 @@ class Chat:
 
     def load_past_session(self, session_log_dir: Path) -> None:
         """
-        Carica il contesto di una sessione precedente:
-        - Popola la history del chat_agent dal chat.log
-        - Ripristina gli snapshot della terapia
-        - Ripristina therapy.json all'ultimo snapshot trovato
-        - Logga il caricamento nella sessione corrente
+        Load the context of a previous session:
+        - Populate the chat_agent history from chat.log
+        - Restore the therapy snapshots
+        - Restore therapy.json to the last snapshot found
+        - Log the loading in the current session
         """
 
         logger.info(f"[LOAD] Loading past session from {session_log_dir}")
@@ -235,10 +235,10 @@ class Chat:
 
         if snapshots:
             self._therapy_snapshots = snapshots
-            # Ripristina therapy.json all'ultimo snapshot della sessione caricata
+            # Restore therapy.json to the last snapshot of the loaded session
             self.restore_therapy_snapshot(snapshots[-1]["message_idx"])
         else:
-            # Nessuno snapshot: salva almeno lo stato attuale di therapy.json
+            # No snapshot: at least save the current state of therapy.json
             self._therapy_snapshots = []
             self._save_therapy_snapshot()
 
@@ -250,10 +250,10 @@ class Chat:
 
     def execute_tool(self, agent: Agent, tool_name: str, tool_arguments: dict) -> str:
         """
-        L'orchestratore gestisce solo:
-        1. Delegation ai worker agents
-        2. save_session (richiede db_manager e vector_db)
-        Tutto il resto è delegato al chat_agent.
+        The orchestrator only handles:
+        1. Delegation to worker agents
+        2. save_session (requires db_manager and vector_db)
+        Everything else is delegated to the chat_agent.
         """
         logger.debug(
             f"[{agent.name.upper()}][TOOL] Executing: {tool_name}({tool_arguments})"
@@ -264,11 +264,11 @@ class Chat:
             agent_delegate = self._agent_registry[tool_name]
             result = self._send_to_agent(agent_delegate, tool_arguments)
 
-        # 2. save_session: richiede dipendenze dell'orchestratore
+        # 2. save_session: requires orchestrator dependencies
         elif tool_name == "save_session":
             result = json.dumps(self.end_session(), ensure_ascii=False)
 
-        # 3. Tool del supervisor
+        # 3. Supervisor tools
         else:
             result = agent.execute_tool(tool_name, json.loads(tool_arguments))
 
@@ -285,8 +285,8 @@ class Chat:
 
     def _run_agent_loop(self, agent: Agent, user_message: str) -> str:
         """
-        Loop tool-calling generico per qualsiasi agente.
-        Usato sia dal supervisor (send_message) che per la delegation (_send_to_agent).
+        Generic tool-calling loop for any agent.
+        Used by both the supervisor (send_message) and for delegation (_send_to_agent).
         """
 
         logger.debug(f"[{agent.name.upper()}][REQUEST] {user_message}")

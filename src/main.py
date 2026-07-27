@@ -46,9 +46,9 @@ def parse_args() -> argparse.Namespace:
 
 def read_script(path: Path) -> str:
     """
-    Legge lo script da passare al CaregiverAgent.
-    Il contenuto viene passato all'agente senza alcuna modifica —
-    la formattazione e la struttura sono responsabilità di chi scrive lo script.
+    Read the script to pass to the CaregiverAgent.
+    The content is passed to the agent without any modification —
+    formatting and structure are the responsibility of the script author.
     """
     if not path.exists():
         raise FileNotFoundError(f"Script file not found: {path}")
@@ -122,25 +122,25 @@ def run_agent_mode(chat, script: str, delay: float) -> None:
 
 def run_agent_mode_old(chat: OllamaChat, script: str, delay: float) -> None:
     """
-    Modalità agente: un CaregiverAgent genera i messaggi autonomamente
-    seguendo lo script, finché non produce 'exit'.
+    Agent mode: a CaregiverAgent generates messages autonomously
+    following the script, until it produces 'exit'.
     """
     import time as time_mod
 
     caregiver = CaregiverAgent(script=script)
-    client = chat.client  # stesso client LLM usato da Chat
+    client = chat.client  # same LLM client used by Chat
 
     print(f"[Agent mode] Script loaded ({len(script)} chars)\n")
 
-    # Il primo messaggio del caregiver viene generato a partire dal
-    # contesto iniziale (terapia attuale) senza input esterno
+    # The first caregiver message is generated from the
+    # initial context (current therapy) without external input
     chatbot_response = chat.chat_agent.conversation_history[-1]["content"]
     print(f"Assistant: {chatbot_response}\n")
 
-    max_turns = 30  # safety cap per evitare loop infiniti
+    max_turns = 30  # safety cap to avoid infinite loops
 
     for turn in range(max_turns):
-        # Il caregiver riceve la risposta del chatbot come messaggio in arrivo
+        # The caregiver receives the chatbot response as an incoming message
         caregiver.conversation_history.append(
             {
                 "role": "user",
@@ -148,7 +148,7 @@ def run_agent_mode_old(chat: OllamaChat, script: str, delay: float) -> None:
             }
         )
 
-        # Il caregiver genera la sua prossima mossa
+        # The caregiver generates its next move
         response = client.chat.completions.create(
             model=chat.model,
             messages=caregiver.conversation_history,
@@ -164,7 +164,7 @@ def run_agent_mode_old(chat: OllamaChat, script: str, delay: float) -> None:
 
         print(f"You (agent): {caregiver_message}\n")
 
-        # Condizione di uscita
+        # Exit condition
         if caregiver_message.strip().lower() in ["exit", "quit", "esci"]:
             logger.info(f"[AGENT] Caregiver agent sent exit after {turn + 1} turn(s)")
             break
@@ -172,7 +172,7 @@ def run_agent_mode_old(chat: OllamaChat, script: str, delay: float) -> None:
         if delay > 0:
             time_mod.sleep(delay)
 
-        # Il chatbot risponde al messaggio del caregiver
+        # The chatbot responds to the caregiver's message
         start = time()
         chatbot_response = chat.send_message(caregiver_message)
         elapsed = time() - start
@@ -189,7 +189,7 @@ def run_agent_mode_old(chat: OllamaChat, script: str, delay: float) -> None:
 
 
 def run_interactive_mode(chat: OllamaChat) -> None:
-    """Modalità interattiva: l'utente digita i messaggi da tastiera."""
+    """Interactive mode: the user types messages from the keyboard."""
     while True:
         try:
             user_input = input("You: ").strip()
@@ -280,7 +280,7 @@ def main():
         print(f"Error: {e}")
         sys.exit(1)
 
-    # ── Fine sessione ─────────────────────────────────────────────────────
+    # ── End of session ─────────────────────────────────────────────────────
     result = chat.end_session()
     if result.get("status") == "success":
         v_id = result.get("version", {}).get("id")

@@ -16,7 +16,7 @@ DAYS_MAP = {
 
 
 def load_scenario(scenario_id: int) -> dict:
-    """Legge il file scenario.json dalla cartella dello scenario."""
+    """Read the scenario.json file from the scenario folder."""
     path = SCENARIOS_DIR / f"{str(scenario_id)}.json"
     if not path.exists():
         raise FileNotFoundError(f"Scenario {scenario_id} not found: {path}")
@@ -25,7 +25,7 @@ def load_scenario(scenario_id: int) -> dict:
 
 def install_scenario_therapy(scenario: dict) -> None:
     """
-    Sovrascrive therapy.json con la terapia dello scenario.
+    Overwrite therapy.json with the scenario's therapy.
     """
     THERAPY_FILE.write_text(
         json.dumps(scenario, indent=2, ensure_ascii=False),
@@ -35,11 +35,11 @@ def install_scenario_therapy(scenario: dict) -> None:
 
 def therapy_to_natural_language(scenario: dict) -> str:
     """
-    Converte la terapia dello scenario in un testo descrittivo da iniettare nel contesto del CaregiverAgent.
+    Convert the scenario's therapy into descriptive text to inject into the CaregiverAgent's context.
     """
     lines = []
 
-    # Dati paziente
+    # Patient data
     name = scenario.get("patient_full_name", "Unknown")
     age = scenario.get("age", "N/A")
     birth = scenario.get("birth_date", "")
@@ -61,7 +61,7 @@ def therapy_to_natural_language(scenario: dict) -> str:
     else:
         lines.append("- Medical conditions: none reported")
 
-    # Attività correnti
+    # Current activities
     activities = scenario.get("activities", [])
     lines.append("\n## Current therapy activities")
     if not activities:
@@ -79,7 +79,7 @@ def therapy_to_natural_language(scenario: dict) -> str:
                 line += f"\n  {act['description']}"
             lines.append(line)
 
-    # Attività scadute
+    # Expired activities
     expired = scenario.get("expired_activities", [])
     if expired:
         lines.append("\n## Expired activities")

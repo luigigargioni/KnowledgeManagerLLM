@@ -42,7 +42,7 @@ class Agent:
         Runs a specific tool of the agent.
         The function can be overridden by subclasses to implement specific behaviors.
         """
-        logger.warning(f"[{self.name}] Tool non trovato: {tool_name}")
+        logger.warning(f"[{self.name}] Tool not found: {tool_name}")
         return f"Tool '{tool_name}' not found in agent '{self.name}'"
 
     def as_tool_declaration(self, description: str, parameters: dict = None) -> dict:

@@ -12,7 +12,7 @@ from config_loader import RESULTS_DIR
 
 RESULTS_EXCEL_PATH = RESULTS_DIR / "all_results.xlsx"
 
-# Colonne del foglio principale (una riga per obiettivo)
+# Columns of the main sheet (one row per objective)
 _OBJECTIVE_COLUMNS = [
     "test_date",
     "batch_id",
@@ -27,13 +27,13 @@ _OBJECTIVE_COLUMNS = [
     "final_therapy",
 ]
 
-# Colori per i vari status
+# Colors for the various statuses
 _STATUS_FILLS = {
-    "completed": PatternFill("solid", fgColor="C6EFCE"),  # verde
-    "partial": PatternFill("solid", fgColor="FFEB9C"),  # giallo
-    "failed": PatternFill("solid", fgColor="FFC7CE"),  # rosso
-    "not_attempted": PatternFill("solid", fgColor="D9D9D9"),  # grigio
-    "error": PatternFill("solid", fgColor="F4CCCC"),  # rosso scuro
+    "completed": PatternFill("solid", fgColor="C6EFCE"),  # green
+    "partial": PatternFill("solid", fgColor="FFEB9C"),  # yellow
+    "failed": PatternFill("solid", fgColor="FFC7CE"),  # red
+    "not_attempted": PatternFill("solid", fgColor="D9D9D9"),  # gray
+    "error": PatternFill("solid", fgColor="F4CCCC"),  # dark red
 }
 
 _HEADER_FILL = PatternFill("solid", fgColor="2F4F7F")
@@ -50,20 +50,20 @@ _THIN_BORDER = Border(
 
 def _get_or_create_workbook() -> tuple[openpyxl.Workbook, bool]:
     """
-    Carica il workbook esistente o ne crea uno nuovo.
-    Restituisce (workbook, is_new).
+    Load the existing workbook or create a new one.
+    Returns (workbook, is_new).
     """
     if RESULTS_EXCEL_PATH.exists():
         return openpyxl.load_workbook(RESULTS_EXCEL_PATH), False
 
     wb = openpyxl.Workbook()
-    wb.remove(wb.active)  # rimuove il foglio default vuoto
+    wb.remove(wb.active)  # remove the empty default sheet
     return wb, True
 
 
 def _get_or_create_sheet(wb: openpyxl.Workbook, sheet_name: str, is_new_wb: bool):
     """
-    Restituisce il foglio esistente o ne crea uno nuovo con intestazioni.
+    Return the existing sheet or create a new one with headers.
     """
     if sheet_name in wb.sheetnames:
         return wb[sheet_name]
@@ -121,21 +121,21 @@ def append_batch_results(
     excel_path: Path = RESULTS_EXCEL_PATH,
 ) -> Path:
     """
-    Aggiunge i risultati di un batch run al file Excel globale.
-    Se il file non esiste viene creato. Se esiste, le righe vengono
-    appese preservando i dati delle esecuzioni precedenti.
+    Append the results of a batch run to the global Excel file.
+    If the file does not exist it is created. If it exists, rows are
+    appended preserving data from previous runs.
 
-    Ogni obiettivo di ogni scenario occupa una riga separata.
-    Le colonne scenario_id e test_date identificano univocamente l'esecuzione.
+    Each objective of each scenario occupies a separate row.
+    The scenario_id and test_date columns uniquely identify the run.
 
     Args:
-        evaluations: lista di dict prodotti da JudgeAgent.evaluate(),
-                     arricchiti da test.py con scenario_id, patient, turns, elapsed_seconds
-        batch_id:    identificatore del batch (es. "20260630_143000")
-        excel_path:  path del file Excel globale (default: logs/batch_results/all_results.xlsx)
+        evaluations: list of dicts produced by JudgeAgent.evaluate(),
+                     enriched by test.py with scenario_id, patient, turns, elapsed_seconds
+        batch_id:    batch identifier (e.g. "20260630_143000")
+        excel_path:  path of the global Excel file (default: logs/batch_results/all_results.xlsx)
 
     Returns:
-        Path del file Excel aggiornato.
+        Path of the updated Excel file.
     """
     excel_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -148,7 +148,7 @@ def append_batch_results(
     test_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if evaluation.get("status") == "error":
-        # Scenario fallito: scrivi una riga singola con lo stato di errore
+        # Failed scenario: write a single row with the error status
         row = [
             test_date,
             batch_id,
@@ -193,7 +193,7 @@ def append_batch_results(
         row_idx = ws.max_row
         for col_idx in range(1, len(_OBJECTIVE_COLUMNS) + 1):
             _style_cell(ws.cell(row_idx, col_idx), overall_status)
-    # Freezes la riga di intestazione
+    # Freeze the header row
     ws.freeze_panes = "A2"
 
     wb.save(excel_path)

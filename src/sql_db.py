@@ -1,6 +1,6 @@
 """
-Modulo per la gestione del database PostgreSQL
-Usa SQLAlchemy come ORM con psycopg2 come driver
+Module for managing the PostgreSQL database
+Uses SQLAlchemy as ORM with psycopg2 as driver
 """
 
 import json
@@ -46,16 +46,16 @@ class Patient(Base):
     )
     created_at = Column(DateTime, default=datetime.now, nullable=False)
 
-    # Relazione con le versioni della terapia
+    # Relationship with therapy versions
     therapy_versions = relationship(
         "TherapyVersion", back_populates="patient", order_by="TherapyVersion.created_at"
     )
 
     def calculate_age(self):
-        """Calcola l'età del paziente in base alla data di nascita"""
+        """Calculate the patient's age based on the birth date"""
         today = datetime.now()
         age = today.year - self.birth_date.year
-        # Correggi se il compleanno non è ancora passato quest'anno
+        # Correct if the birthday has not yet occurred this year
         if (today.month, today.day) < (self.birth_date.month, self.birth_date.day):
             age -= 1
         return age
@@ -83,7 +83,7 @@ class TherapyVersion(Base):
     )
     notes = Column(Text)
 
-    # Relazione con il paziente
+    # Relationship with the patient
     patient = relationship("Patient", back_populates="therapy_versions")
 
     def to_dict(self):
@@ -160,13 +160,13 @@ class DatabaseManager:
         medical_conditions: list = None,
     ) -> dict:
         """
-        Crea un nuovo paziente
+        Create a new patient
 
         Args:
-            name: Nome completo del paziente
-            gender: Genere (es: "Male", "Female")
-            birth_date: Data di nascita (datetime object)
-            medical_conditions: Lista di condizioni mediche (default: [])
+            name: Full name of the patient
+            gender: Gender (e.g. "Male", "Female")
+            birth_date: Date of birth (datetime object)
+            medical_conditions: List of medical conditions (default: [])
         """
         with self.get_session() as session:
             try:
@@ -187,14 +187,14 @@ class DatabaseManager:
                 return {"status": "error", "message": str(e)}
 
     def get_patient(self, patient_id: int) -> dict:
-        """Recupera un paziente dal suo ID numerico"""
+        """Retrieve a patient by numeric ID"""
         with self.get_session() as session:
             try:
                 patient = session.query(Patient).filter_by(id=patient_id).first()
                 if not patient:
                     return {
                         "status": "error",
-                        "message": f"Paziente con ID {patient_id} non trovato",
+                        "message": f"Patient with ID {patient_id} not found",
                     }
                 return {"status": "success", "patient": patient.to_dict()}
             except SQLAlchemyError as e:
@@ -202,7 +202,7 @@ class DatabaseManager:
                 return {"status": "error", "message": str(e)}
 
     def get_patient_by_name(self, name: str) -> dict:
-        """Recupera un paziente dal nome (case-insensitive)"""
+        """Retrieve a patient by name (case-insensitive)"""
         with self.get_session() as session:
             try:
                 patient = (
@@ -213,7 +213,7 @@ class DatabaseManager:
                 if not patient:
                     return {
                         "status": "error",
-                        "message": f"Paziente '{name}' non trovato",
+                        "message": f"Patient '{name}' not found",
                     }
                 return {"status": "success", "patient": patient.to_dict()}
             except SQLAlchemyError as e:
@@ -221,7 +221,7 @@ class DatabaseManager:
                 return {"status": "error", "message": str(e)}
 
     def get_all_patients(self) -> dict:
-        """Recupera tutti i pazienti ordinati per nome"""
+        """Retrieve all patients ordered by name"""
         with self.get_session() as session:
             try:
                 patients = session.query(Patient).order_by(Patient.name).all()
@@ -236,11 +236,11 @@ class DatabaseManager:
 
     def update_patient(self, patient_id: int, **updates) -> dict:
         """
-        Aggiorna i campi di un paziente
+        Update patient fields
 
         Args:
-            patient_id: ID del paziente
-            **updates: Campi da aggiornare (name, gender, birth_date, medical_conditions)
+            patient_id: Patient ID
+            **updates: Fields to update (name, gender, birth_date, medical_conditions)
         """
         with self.get_session() as session:
             try:
@@ -248,7 +248,7 @@ class DatabaseManager:
                 if not patient:
                     return {
                         "status": "error",
-                        "message": f"Paziente con ID {patient_id} non trovato",
+                        "message": f"Patient with ID {patient_id} not found",
                     }
 
                 for key, value in updates.items():
@@ -269,14 +269,14 @@ class DatabaseManager:
     def save_therapy_version(
         self, patient_id: int, activities: list, notes: str = None
     ) -> dict:
-        """Salva una nuova versione della terapia (append-only)"""
+        """Save a new therapy version (append-only)"""
         with self.get_session() as session:
             try:
                 patient = session.query(Patient).filter_by(id=patient_id).first()
                 if not patient:
                     return {
                         "status": "error",
-                        "message": f"Paziente con ID {patient_id} non trovato",
+                        "message": f"Patient with ID {patient_id} not found",
                     }
 
                 version = TherapyVersion(
@@ -301,14 +301,14 @@ class DatabaseManager:
                 return {"status": "error", "message": str(e)}
 
     def get_latest_therapy(self, patient_id: int) -> dict:
-        """Ottiene l'ultima versione della terapia per un paziente"""
+        """Get the latest therapy version for a patient"""
         with self.get_session() as session:
             try:
                 patient = session.query(Patient).filter_by(id=patient_id).first()
                 if not patient:
                     return {
                         "status": "error",
-                        "message": f"Paziente con ID {patient_id} non trovato",
+                        "message": f"Patient with ID {patient_id} not found",
                     }
 
                 therapy = (
@@ -322,7 +322,7 @@ class DatabaseManager:
                     return {
                         "status": "success",
                         "therapy": None,
-                        "message": "Nessuna terapia salvata per questo paziente",
+                        "message": "No therapy saved for this patient",
                     }
 
                 return {"status": "success", "therapy": therapy.to_dict()}
@@ -332,14 +332,14 @@ class DatabaseManager:
                 return {"status": "error", "message": str(e)}
 
     def get_therapy_history(self, patient_id: int) -> dict:
-        """Ottiene tutto lo storico delle terapie per un paziente"""
+        """Get the full therapy history for a patient"""
         with self.get_session() as session:
             try:
                 patient = session.query(Patient).filter_by(id=patient_id).first()
                 if not patient:
                     return {
                         "status": "error",
-                        "message": f"Paziente con ID {patient_id} non trovato",
+                        "message": f"Patient with ID {patient_id} not found",
                     }
 
                 versions = (
@@ -365,8 +365,8 @@ class DatabaseManager:
 
     def load_session(self, patient_id: int) -> dict:
         """
-        Carica l'ultima versione della terapia dal DB e scrive il therapy.json.
-        Se non esiste nessuna versione, crea un JSON vuoto con i soli dati anagrafici.
+        Load the latest therapy version from the DB and write therapy.json.
+        If no version exists, create an empty JSON with only the patient's demographic data.
         """
         therapy_path = THERAPY_FILE
         therapy_path.parent.mkdir(exist_ok=True)
@@ -437,13 +437,13 @@ class DatabaseManager:
 
     def save_session(self, notes: str = None) -> dict:
         """
-        Legge il therapy.json corrente e salva una nuova versione nel DB.
-        Chiamato alla fine di ogni sessione (CLI o Streamlit).
+        Read the current therapy.json and save a new version to the DB.
+        Called at the end of each session (CLI or Streamlit).
         """
         therapy_path = THERAPY_FILE
 
         if not therapy_path.exists():
-            msg = f"therapy.json non trovato in '{THERAPY_FILE}'"
+            msg = f"therapy.json not found in '{THERAPY_FILE}'"
             logger.warning(f"[DB] save_session skipped: {msg}")
             return {"status": "error", "message": msg}
 
@@ -455,7 +455,7 @@ class DatabaseManager:
             activities = data.get("activities", [])
 
             if not patient_id:
-                msg = "Nessun patient_id nel therapy.json"
+                msg = "No patient_id in therapy.json"
                 logger.warning(f"[DB] save_session skipped: {msg}")
                 return {"status": "error", "message": msg}
 
@@ -471,8 +471,8 @@ class DatabaseManager:
 
     def seed_test_data(self, patient_id: str, patients_folder: Path = None) -> dict:
         """
-        Inserisce dati di test nel database.
-        Idempotente: non crea duplicati se eseguita più volte.
+        Insert test data into the database.
+        Idempotent: does not create duplicates if run multiple times.
         """
 
         folder = (patients_folder or PATIENTS_DATA_FOLDER) / str(patient_id)
@@ -489,7 +489,7 @@ class DatabaseManager:
             )
 
         if therapy:
-            name = therapy["patient_full_name"] or "Mario Rossi"
+            name = therapy["patient_full_name"] or "John Doe"
             result = self.get_patient_by_name(name)
 
             if result["status"] == "success":
@@ -498,7 +498,7 @@ class DatabaseManager:
                     f"[DB] seed: patient {name} already exists (ID: {patient_id}), skipping"
                 )
             else:
-                # Crea il paziente
+                # Create the patient
                 birth_date = datetime.strptime(
                     therapy["birth_date"], "%Y-%m-%dT%H:%M:%S"
                 ) or datetime(1957, 5, 15)

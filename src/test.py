@@ -65,8 +65,8 @@ def run_scenario(
     batch_log_dir: Path,
 ) -> dict:
     """
-    Esegue un singolo scenario e restituisce il risultato della valutazione.
-    Lancia eccezioni in caso di errore — il caller decide se continuare.
+    Run a single scenario and return the evaluation result.
+    Raises exceptions on error — the caller decides whether to continue.
     """
     start = time()
     logger = setup_logger(
@@ -75,7 +75,7 @@ def run_scenario(
     )
     logger.info(f"[SCENARIO {scenario_id}] Starting")
 
-    # ── Carica e installa la terapia dello scenario ───────────────────────
+    # ── Load and install the scenario therapy ───────────────────────
     scenario = load_scenario(scenario_id)
     install_scenario_therapy(scenario)
     logger.info(
@@ -83,21 +83,21 @@ def run_scenario(
     )
 
     vector_db.seed_patient_data(str(scenario.get("patient_id")))
-    # ── Inizializza Chat in modalità stateless (no DB) ────────────────────
+    # ── Initialize Chat in stateless mode (no DB) ────────────────────
     chat = OllamaChat(
         model=MODEL,
         database_manager=None,  # stateless
         vector_db=vector_db,
     )
 
-    # ── CaregiverAgent con contesto terapia + obiettivi ───────────────────
+    # ── CaregiverAgent with therapy context + objectives ───────────────────
     therapy_context = therapy_to_natural_language(scenario)
     script = scenario.get("objectives", "")
     full_script = f"#SCENARIO\n{script}\n#PATIENT CONTEXT\n{therapy_context}"
 
     caregiver = CaregiverAgent(script=full_script)
 
-    # ── Loop conversazione ────────────────────────────────────────────────
+    # ── Conversation loop ────────────────────────────────────────────────
     first_message = chat.chat_agent.conversation_history[-1]["content"]
     logger.info(f"[SCENARIO {scenario_id}] Conversation started")
 
@@ -105,7 +105,7 @@ def run_scenario(
     turns = 0
 
     for turn in range(max_turns):
-        # Caregiver riceve risposta chatbot e genera il prossimo messaggio
+        # Caregiver receives chatbot response and generates the next message
         caregiver.conversation_history.append(
             {"role": "user", "content": chatbot_response}
         )
@@ -143,7 +143,7 @@ def run_scenario(
             f"[SCENARIO {scenario_id}] Max turns ({max_turns}) reached without exit"
         )
 
-    # ── Valutazione ───────────────────────────────────────────────────────
+    # ── Evaluation ───────────────────────────────────────────────────────
     transcript = build_transcript(chat.chat_agent.conversation_history)
     final_therapy = chat._therapy_snapshots[-1]["therapy"]
     final_therapy.pop("objectives")
@@ -197,7 +197,7 @@ def print_scenario_summary(scenario_id: int, evaluation: dict) -> None:
 def main():
     args = parse_args()
 
-    # Se --to non è specificato, girano tutti
+    # If --to is not specified, run all scenarios
     to_id = (
         args.to_id
         if args.to_id is not None
@@ -205,7 +205,7 @@ def main():
     )
     scenario_ids = list(range(args.from_id, to_id + 1))
 
-    # Cartella di output per questa batch run
+    # Output folder for this batch run
     batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     batch_log_dir = RESULTS_DIR / batch_id
     batch_log_dir.mkdir(parents=True, exist_ok=True)
@@ -223,13 +223,13 @@ def main():
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
 
-    # Logger globale del batch
+    # Global batch logger
     logger.info(
         f"[BATCH] Starting – scenarios {args.from_id}→{to_id} "
         f"({len(scenario_ids)} total) | batch_id={batch_id}"
     )
 
-    # Vector DB condiviso tra tutti gli scenari
+    # Vector DB shared across all scenarios
     vector_db = VectorDBManager()
     vdb_available = vector_db.initialize()
     if vdb_available:
@@ -288,7 +288,7 @@ def main():
             print(f"Scenario {scenario_id:>3} | ERROR: {str(e)[:80]}")
             failed.append({"scenario_id": scenario_id, "error": str(e)})
 
-    # ── Salva risultati ───────────────────────────────────────────────────
+    # ── Save results ───────────────────────────────────────────────────
     results_path = batch_log_dir / "results.json"
     results_path.write_text(
         json.dumps(
@@ -299,7 +299,7 @@ def main():
         encoding="utf-8",
     )
 
-    # ── Sommario finale ───────────────────────────────────────────────────
+    # ── Final summary ───────────────────────────────────────────────────
     total = len(results)
     n_completed = sum(1 for r in results if r.get("overall_status") == "completed")
     n_partial = sum(1 for r in results if r.get("overall_status") == "partial")
