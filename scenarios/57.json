@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 57 — Add Activity with Non-Existent Dependency\n\n## Context\nLaura's caregiver wants to add a social activity that depends on a meditation session that doesn't exist in the schedule yet.\n\n## Objectives\n1. Add a social activity 'Book club meeting', 60 minutes, every Wednesday at 18:00, with a dependency on a meditation session that doesn't exist in the schedule yet.\n2. If the assistant reports that the dependency does not exist, acknowledge the error and ask to add the activity without the dependency.\n3. Confirm the corrected activity."
+    "objectives": "# Scenario 57 — Add Activity After Non-Existent Activity\n\n## Context\nLaura's caregiver wants to add a social activity after her yoga session, which doesn't exist in the schedule yet.\n\n## Objectives\n1. Add a social activity 'Book club meeting', 60 minutes, every Wednesday at 18:00, after her yoga session.\n2. If the assistant reports that the yoga session does not exist in the schedule, acknowledge the error and ask to add the activity without the requirement.\n3. Confirm the corrected activity."
 }

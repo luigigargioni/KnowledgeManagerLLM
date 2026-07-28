@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 58 — Remove Activity Blocked by Dependent\n\n## Context\nLaura's caregiver wants to remove the morning walk, but it is a dependency for the meditation session.\n\n## Objectives\n1. Remove the morning walk activity.\n2. If the assistant reports that the activity cannot be removed because it is a dependency for the meditation session, acknowledge the error.\n3. Ask to remove the meditation activity first, then remove the morning walk.\n4. Confirm both removals."
+    "objectives": "# Scenario 58 — Remove Activity Blocked by Dependent\n\n## Context\nLaura's caregiver wants to remove the morning walk, but the meditation session depends on it.\n\n## Objectives\n1. Remove the morning walk activity.\n2. If the assistant reports that the activity cannot be removed because the meditation session depends on it, acknowledge the error.\n3. Ask to remove the meditation activity first, then remove the morning walk.\n4. Confirm both removals."
 }

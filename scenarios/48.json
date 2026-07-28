@@ -84,5 +84,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 48 — Update Middle Activity Breaking Dependency Chain\n\n## Context\nSamuel's caregiver wants to extend the vital signs check duration, but this would cause it to overlap with the physiotherapy that depends on it.\n\n## Objectives\n1. Update the vital signs check to last 25 minutes instead of 10.\n2. If the assistant detects a temporal ordering violation with the dependency on physiotherapy, acknowledge the error.\n3. Ask to move the physiotherapy to 08:50 to accommodate the longer vital signs check.\n4. Confirm both changes."
+    "objectives": "# Scenario 48 — Update Middle Activity Breaking Activity Chain\n\n## Context\nSamuel's caregiver wants to extend the vital signs check duration, but this would cause it to overlap with the physiotherapy that depends on it.\n\n## Objectives\n1. Update the vital signs check to last 25 minutes instead of 10.\n2. If the assistant detects a temporal ordering violation with the physiotherapy, acknowledge the error.\n3. Ask to move the physiotherapy to 08:50 to accommodate the longer vital signs check.\n4. Confirm both changes."
 }

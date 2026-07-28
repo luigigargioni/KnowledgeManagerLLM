@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 98 — Remove Activity Blocked by Dependent\n\n## Context\nCarol's caregiver wants to remove the Furosemide medication, but it is a dependency for the daily weight check.\n\n## Objectives\n1. Remove the Furosemide medication activity.\n2. If the assistant reports that the activity cannot be removed because it is a dependency for the daily weight check, acknowledge the error.\n3. Ask to remove the weight check first, then remove the Furosemide.\n4. Confirm both removals."
+    "objectives": "# Scenario 98 — Remove Activity Blocked by Dependent\n\n## Context\nCarol's caregiver wants to remove the Furosemide medication, but the daily weight check depends on it.\n\n## Objectives\n1. Remove the Furosemide medication activity.\n2. If the assistant reports that the activity cannot be removed because the daily weight check depends on it, acknowledge the error.\n3. Ask to remove the weight check first, then remove the Furosemide.\n4. Confirm both removals."
 }

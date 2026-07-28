@@ -70,5 +70,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 88 — Update Breaking Dependency Ordering\n\n## Context\nRose's caregiver wants to move the evening relaxation earlier, which would break the dependency on the Donepezil medication.\n\n## Objectives\n1. Update the evening relaxation to start at 19:50 instead of 20:10.\n2. If the assistant detects a temporal ordering violation with the dependency on the Donepezil medication, acknowledge the error.\n3. Ask to remove the dependency on the Donepezil medication and set it to depend on dinner instead.\n4. Confirm the corrected update."
+    "objectives": "# Scenario 88 — Update Breaking Activity Ordering\n\n## Context\nRose's caregiver wants to move the evening relaxation earlier, which would break the scheduling order with the Donepezil medication.\n\n## Objectives\n1. Update the evening relaxation to start at 19:50 instead of 20:10.\n2. If the assistant detects a temporal ordering violation with the Donepezil medication, acknowledge the error.\n3. Ask to change it so it takes place after dinner instead of after the Donepezil medication.\n4. Confirm the corrected update."
 }
