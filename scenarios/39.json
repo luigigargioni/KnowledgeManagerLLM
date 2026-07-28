@@ -58,5 +58,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 39 — Update Validity Period\n\n## Context\nFrank's physiotherapy program was originally scheduled to end in August, but his doctor wants to extend it through October.\n\n## Objectives\n1. Update the physiotherapy activity (ph_001) to extend its valid_until from 2026-08-31 to 2026-10-31.\n2. Once the assistant confirms the validity period update."
+    "objectives": "# Scenario 39 — Update Validity Period\n\n## Context\nFrank's physiotherapy program was originally scheduled to end in August, but his doctor wants to extend it through October.\n\n## Objectives\n1. Update the physiotherapy activity to extend its valid_until from 2026-08-31 to 2026-10-31.\n2. Once the assistant confirms the validity period update."
 }

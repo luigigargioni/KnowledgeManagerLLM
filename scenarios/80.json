@@ -59,5 +59,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 80 — Complex Unknown Medicine Then Safe Add\n\n## Context\nJoan's caregiver wants to add a medication called 'Celecoxib' for arthritis pain, and also add Ferrous Sulfate for her anemia.\n\n## Objectives\n1. Request adding Celecoxib as a medication, 200mg, every day at 09:00 after breakfast.\n2. If the assistant reports that Celecoxib is not found in the medicine database, acknowledge and do not proceed with it.\n3. Then request adding Ferrous Sulfate as a medication, 325mg, every day at 08:15 after breakfast, with a dependency on 'br_001'.\n4. Confirm the Ferrous Sulfate addition."
+    "objectives": "# Scenario 80 — Complex Unknown Medicine Then Safe Add\n\n## Context\nJoan's caregiver wants to add a medication called 'Celecoxib' for arthritis pain, and also add Ferrous Sulfate for her anemia.\n\n## Objectives\n1. Request adding Celecoxib as a medication, 200mg, every day at 09:00 after breakfast.\n2. If the assistant reports that Celecoxib is not found in the medicine database, acknowledge and do not proceed with it.\n3. Then request adding Ferrous Sulfate as a medication, 325mg, every day at 08:15 after breakfast.\n4. Confirm the Ferrous Sulfate addition."
 }

@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 13 — Add Sweet Dessert with History Warning\n\n## Context\nRobert's family wants to add a regular evening dessert to his meal plan. However, Robert has a history of blood glucose spikes after eating high-sugar desserts.\n\n## Objectives\n1. Add a dessert activity, 'Evening sweet dessert', 15 minutes, every day at 20:00 after dinner, with a dependency on 'di_001'.\n2. If the assistant warns about Robert's past glucose spike from high-sugar desserts, acknowledge the concern and ask for a sugar-free alternative.\n3. Follow the assistant's recommendation and confirm the final activity."
+    "objectives": "# Scenario 13 — Add Sweet Dessert with History Warning\n\n## Context\nRobert's family wants to add a regular evening dessert to his meal plan. However, Robert has a history of blood glucose spikes after eating high-sugar desserts.\n\n## Objectives\n1. Add a dessert activity, 'Evening sweet dessert', 15 minutes, every day at 20:00 after dinner.\n2. If the assistant warns about Robert's past glucose spike from high-sugar desserts, acknowledge the concern and ask for a sugar-free alternative.\n3. Follow the assistant's recommendation and confirm the final activity."
 }

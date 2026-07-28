@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 62 — Add Safe Lisinopril Medication\n\n## Context\nAnne's doctor has prescribed Lisinopril to manage her hypertension.\n\n## Objectives\n1. Add Lisinopril as a medication, 10mg, every day at 08:15 after breakfast, with a dependency on 'br_001'.\n2. Once the assistant confirms the medication is safe and added."
+    "objectives": "# Scenario 62 — Add Safe Lisinopril Medication\n\n## Context\nAnne's doctor has prescribed Lisinopril to manage her hypertension.\n\n## Objectives\n1. Add Lisinopril as a medication, 10mg, every day at 08:15 after breakfast.\n2. Once the assistant confirms the medication is safe and added."
 }

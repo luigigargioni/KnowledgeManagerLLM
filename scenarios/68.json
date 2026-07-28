@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 68 — Update Breaking Dependency Ordering\n\n## Context\nAnne's caregiver wants to move the glucose check earlier, which would break the dependency on the Metformin medication.\n\n## Objectives\n1. Update the glucose check (hc_001) to start at 08:08 instead of 08:20.\n2. If the assistant detects a temporal ordering violation with the dependency on med_001, acknowledge the error.\n3. Ask to remove the dependency on med_001 and set it to depend on br_001 instead.\n4. Confirm the corrected update."
+    "objectives": "# Scenario 68 — Update Breaking Dependency Ordering\n\n## Context\nAnne's caregiver wants to move the glucose check earlier, which would break the dependency on the Metformin medication.\n\n## Objectives\n1. Update the glucose check to start at 08:08 instead of 08:20.\n2. If the assistant detects a temporal ordering violation with the dependency on the Metformin medication, acknowledge the error.\n3. Ask to remove the dependency on the Metformin medication and set it to depend on breakfast instead.\n4. Confirm the corrected update."
 }

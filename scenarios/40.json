@@ -70,5 +70,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 40 — Complex Remove, Add, and Update\n\n## Context\nFrank's caregiver wants to replace his morning walk with a gentler indoor stretching session, add a new health checkup that depends on breakfast, and update the reading time.\n\n## Objectives\n1. Remove the morning walk activity (wl_001).\n2. Add a new indoor stretching activity, 30 minutes, every Monday, Wednesday, and Friday at 10:00.\n3. Add a blood pressure check activity, 10 minutes, every day at 08:30, with a dependency on 'br_001'.\n4. Update the reading time (rlx_001) to start at 10:45 instead of 11:00.\n5. Confirm all changes."
+    "objectives": "# Scenario 40 — Complex Remove, Add, and Update\n\n## Context\nFrank's caregiver wants to replace his morning walk with a gentler indoor stretching session, add a new health checkup that depends on breakfast, and update the reading time.\n\n## Objectives\n1. Remove the morning walk activity.\n2. Add a new indoor stretching activity, 30 minutes, every Monday, Wednesday, and Friday at 10:00.\n3. Add a blood pressure check activity, 10 minutes, every day at 08:30, with a dependency on breakfast.\n4. Update the reading time to start at 10:45 instead of 11:00.\n5. Confirm all changes."
 }

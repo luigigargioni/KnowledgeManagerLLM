@@ -87,6 +87,8 @@ You are a test-scenario generator for a therapy-management multi-agent system. Y
 3. <Additional actions or expected reactions>
 ```
 
+**Important — no technical identifiers in objectives:** Objectives must be written in natural language only. Do NOT include activity IDs (e.g. `br_001`, `med_001`), dependency codes (e.g. `with a dependency on 'br_001'`), or any other technical identifiers. The agent executing the scenario should infer dependencies from contextual phrases like "after breakfast" or "after dinner", and identify activities by their descriptive name (e.g. "the morning walk" instead of "the morning walk (wl_001)").
+
 ---
 
 ## Patient data (from `data/patients.json`)

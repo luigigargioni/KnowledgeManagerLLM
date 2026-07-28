@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 91 — Add Safe Furosemide Medication\n\n## Context\nCarol's cardiologist has prescribed Furosemide to manage fluid retention associated with her heart failure.\n\n## Objectives\n1. Add Furosemide as a medication, 40mg, every day at 08:10 after breakfast, with a dependency on 'br_001'.\n2. Once the assistant confirms the medication is safe and added."
+    "objectives": "# Scenario 91 — Add Safe Furosemide Medication\n\n## Context\nCarol's cardiologist has prescribed Furosemide to manage fluid retention associated with her heart failure.\n\n## Objectives\n1. Add Furosemide as a medication, 40mg, every day at 08:10 after breakfast.\n2. Once the assistant confirms the medication is safe and added."
 }

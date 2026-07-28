@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 10 — Complex Multi-Step with Conflict Resolution\n\n## Context\nDavid's caregiver needs to add a new medication, then update the evening walk time which will conflict with dinner, and finally add a social activity.\n\n## Objectives\n1. Add Ibuprofen as a medication, 400mg, every day at 12:45 after lunch.\n2. Update the evening walk (wl_001) to start at 19:00 instead of 18:00, which should conflict with dinner.\n3. If a conflict is detected, accept the assistant's suggested alternative time.\n4. Add a social activity 'Family video call', 30 minutes, every Sunday at 16:00.\n5. Confirm all changes."
+    "objectives": "# Scenario 10 — Complex Multi-Step with Conflict Resolution\n\n## Context\nDavid's caregiver needs to add a new medication, then update the evening walk time which will conflict with dinner, and finally add a social activity.\n\n## Objectives\n1. Add Ibuprofen as a medication, 400mg, every day at 12:45 after lunch.\n2. Update the evening walk to start at 19:00 instead of 18:00, which should conflict with dinner.\n3. If a conflict is detected, accept the assistant's suggested alternative time.\n4. Add a social activity 'Family video call', 30 minutes, every Sunday at 16:00.\n5. Confirm all changes."
 }
