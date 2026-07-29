@@ -59,5 +59,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 15 — Remove Daily Walk with History Warning\n\n## Context\nRobert's caregiver wants to remove the daily morning walk due to upcoming bad weather. However, Robert has a history of weight gain and mood decline when he missed his daily walk routine.\n\n## Objectives\n1. Remove the morning walk activity.\n2. If the assistant warns about Robert's past decline when he missed his daily walks, acknowledge the concern and ask if an indoor alternative would be better.\n3. Follow the assistant's recommendation — either remove the walk and add an indoor alternative, or keep the walk.\n4. Confirm the final decision."
+    "objectives": "# Scenario 15 — Remove Daily Walk with History Warning\n\n## Context\nRobert's caregiver wants to remove the daily morning walk due to upcoming bad weather. However, Robert has a history of weight gain and mood decline when he missed his daily walk routine.\n\n## Objectives\n1. Remove the morning walk activity. If the assistant warns about Robert's past decline when he missed his daily walks, acknowledge the concern and ask if an indoor alternative would be better, then follow the assistant's recommendation — either remove the walk and add an indoor alternative, or keep the walk."
 }

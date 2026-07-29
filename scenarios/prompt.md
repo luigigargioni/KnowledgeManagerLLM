@@ -82,10 +82,16 @@ You are a test-scenario generator for a therapy-management multi-agent system. Y
 <2-4 sentences describing the clinical/caregiver situation that motivates the scenario>
 
 ## Objectives
-1. <First action the caregiver should request, in natural language>
-2. <Second action, if any>
-3. <Additional actions or expected reactions>
+1. <A single CRUD operation (add, update, or remove an activity), with all relevant details and conditional outcomes embedded directly within this step>
+2. <Next independent CRUD operation, if any, also self-contained>
+3. <Additional independent CRUD operations, if any>
 ```
+
+**Important — each numbered objective must be a single self-contained CRUD operation:** Each step should independently describe an add, update, or remove of an activity, with all details (dosage, time, days, duration, dependencies) and any conditional outcomes (warnings, conflicts, errors, alternative suggestions, confirmations) embedded directly within that step. Do NOT use separate numbered steps for:
+- Conditional reactions (e.g. "If the assistant warns...") — embed these inside the CRUD operation they relate to.
+- Confirmations (e.g. "Confirm all changes") — omit these entirely as they are not CRUD operations.
+- Queries (e.g. "Ask the assistant whether X is safe") — embed these inside the subsequent CRUD operation they precede.
+- Multiple updates to the same activity — merge them into a single update step.
 
 **Important — no technical identifiers or dependency language in objectives:** Objectives must be written in natural language only. Do NOT include activity IDs (e.g. `br_001`, `med_001`), dependency codes (e.g. `with a dependency on 'br_001'`), or any other technical identifiers. Do NOT use the word "dependency" or "dependency on" — instead, use temporal language like "after taking [medication]", "after [activity]", or "before [activity]". The agent executing the scenario should infer scheduling order from contextual phrases like "after breakfast" or "after dinner", and identify activities by their descriptive name (e.g. "the morning walk" instead of "the morning walk (wl_001)").
 
@@ -276,7 +282,7 @@ Across each patient's 10 scenarios, ensure variety in:
 3. **Complexity**: some scenarios are simple (single add, no conflicts), others are complex (multi-step with conflicts and resolutions).
 4. **Category coverage**: use different activity categories across scenarios.
 5. **Validity periods**: some scenarios use `null` validity, others use date ranges, some include `expired_activities`.
-6. **Objective structure**: vary the number of objectives (1–4 per scenario) and the interaction patterns.
+6. **Objective structure**: vary the number of objectives (1–4 per scenario), each being a self-contained CRUD operation with conditional outcomes embedded within.
 
 ---
 

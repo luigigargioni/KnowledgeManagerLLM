@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 17 — Add Activity with Scheduling Conflict\n\n## Context\nRobert's caregiver wants to add a health checkup that overlaps with his lunch time.\n\n## Objectives\n1. Add a blood glucose measurement activity, 30 minutes, every day at 12:45.\n2. If the assistant detects a scheduling conflict with lunch, accept its suggested alternative time.\n3. Confirm the activity at the suggested time."
+    "objectives": "# Scenario 17 — Add Activity with Scheduling Conflict\n\n## Context\nRobert's caregiver wants to add a health checkup that overlaps with his lunch time.\n\n## Objectives\n1. Add a blood glucose measurement activity, 30 minutes, every day at 12:45. If the assistant detects a scheduling conflict with lunch, accept its suggested alternative time."
 }

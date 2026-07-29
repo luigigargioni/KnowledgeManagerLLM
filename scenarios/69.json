@@ -60,5 +60,5 @@
             "category": "therapy"
         }
     ],
-    "objectives": "# Scenario 69 — Expired Activity Replacement with Validity Period\n\n## Context\nAnne had a physiotherapy program that expired in May. Her doctor wants to start a new therapy program for the rest of the year.\n\n## Objectives\n1. Add a new physical therapy activity, 45 minutes, every Tuesday and Thursday at 15:00, valid from 2026-07-01 to 2026-12-31.\n2. Once the assistant confirms the new activity is added and notes the expired previous therapy."
+    "objectives": "# Scenario 69 — Expired Activity Replacement with Validity Period\n\n## Context\nAnne had a physiotherapy program that expired in May. Her doctor wants to start a new therapy program for the rest of the year.\n\n## Objectives\n1. Add a new physical therapy activity, 45 minutes, every Tuesday and Thursday at 15:00, valid from 2026-07-01 to 2026-12-31."
 }

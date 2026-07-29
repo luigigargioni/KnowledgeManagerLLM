@@ -46,5 +46,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 89 — Add Activity After Non-Existent Activity\n\n## Context\nRose's caregiver wants to add a social activity after her physiotherapy session, which doesn't exist in the schedule.\n\n## Objectives\n1. Add a social activity 'Reminiscence group', 45 minutes, every Wednesday at 15:00, after her physiotherapy session.\n2. If the assistant reports that the physiotherapy session does not exist in the schedule, acknowledge the error and ask to add the activity without the requirement.\n3. Confirm the corrected activity."
+    "objectives": "# Scenario 89 — Add Activity After Non-Existent Activity\n\n## Context\nRose's caregiver wants to add a social activity after her physiotherapy session, which doesn't exist in the schedule.\n\n## Objectives\n1. Add a social activity 'Reminiscence group', 45 minutes, every Wednesday at 15:00, after her physiotherapy session. If the assistant reports that the physiotherapy session does not exist in the schedule, acknowledge the error and ask to add the activity without the requirement, then confirm the corrected activity."
 }

@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 54 — Add Yoga Relaxation Activity\n\n## Context\nLaura's doctor has recommended yoga to help manage both her perimenopause symptoms and mild hypertension. She previously benefited from a yoga routine.\n\n## Objectives\n1. Add a yoga activity, 45 minutes, every Monday, Wednesday, and Friday at 07:00.\n2. Once the assistant confirms the activity is added."
+    "objectives": "# Scenario 54 — Add Yoga Relaxation Activity\n\n## Context\nLaura's doctor has recommended yoga to help manage both her perimenopause symptoms and mild hypertension. She previously benefited from a yoga routine.\n\n## Objectives\n1. Add a yoga activity, 45 minutes, every Monday, Wednesday, and Friday at 07:00."
 }

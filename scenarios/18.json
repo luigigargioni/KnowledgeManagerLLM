@@ -83,5 +83,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 18 — Remove Blocked Activity Chain Middle\n\n## Context\nRobert's caregiver wants to remove the blood pressure check activity, but the morning walk depends on it.\n\n## Objectives\n1. Remove the blood pressure check activity.\n2. If the assistant reports that the activity cannot be removed because the morning walk depends on it, acknowledge the error.\n3. Ask to remove the requirement that the morning walk happens after the blood pressure check first, then remove the blood pressure check.\n4. Confirm both changes."
+    "objectives": "# Scenario 18 — Remove Blocked Activity Chain Middle\n\n## Context\nRobert's caregiver wants to remove the blood pressure check activity, but the morning walk depends on it.\n\n## Objectives\n1. Remove the blood pressure check activity. If the assistant reports that the activity cannot be removed because the morning walk depends on it, acknowledge the error, then first update the morning walk to remove the requirement that it happens after the blood pressure check, and finally remove the blood pressure check."
 }

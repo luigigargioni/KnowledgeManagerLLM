@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 72 — Add Safe Ferrous Sulfate Medication\n\n## Context\nJoan's hematologist has prescribed Ferrous Sulfate to treat her iron-deficiency anemia.\n\n## Objectives\n1. Add Ferrous Sulfate as a medication, 325mg, every day at 08:15 after breakfast.\n2. Once the assistant confirms the medication is safe and added."
+    "objectives": "# Scenario 72 — Add Safe Ferrous Sulfate Medication\n\n## Context\nJoan's hematologist has prescribed Ferrous Sulfate to treat her iron-deficiency anemia.\n\n## Objectives\n1. Add Ferrous Sulfate as a medication, 325mg, every day at 08:15 after breakfast."
 }

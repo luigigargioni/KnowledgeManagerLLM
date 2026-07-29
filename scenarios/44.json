@@ -48,5 +48,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 44 — Add Extended Bed Rest with History Warning\n\n## Context\nSamuel's caregiver wants to add a prolonged bed rest period in the afternoon. However, Samuel has a history of confusion after prolonged bed rest.\n\n## Objectives\n1. Add an extended bed rest activity, 120 minutes, every day at 14:00.\n2. If the assistant warns about Samuel's past confusion from prolonged bed rest, acknowledge the concern and ask if shorter periods with regular repositioning would be better.\n3. Follow the assistant's recommendation and confirm the final activity."
+    "objectives": "# Scenario 44 — Add Extended Bed Rest with History Warning\n\n## Context\nSamuel's caregiver wants to add a prolonged bed rest period in the afternoon. However, Samuel has a history of confusion after prolonged bed rest.\n\n## Objectives\n1. Add an extended bed rest activity, 120 minutes, every day at 14:00. If the assistant warns about Samuel's past confusion from prolonged bed rest, acknowledge the concern and ask if shorter periods with regular repositioning would be better, then follow the assistant's recommendation and confirm the final activity."
 }

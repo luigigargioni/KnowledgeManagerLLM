@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 27 — Add Activity After Existing Activity\n\n## Context\nAnthony's caregiver wants to add a relaxation activity that depends on completing the blood pressure check first.\n\n## Objectives\n1. Add a meditation activity, 20 minutes, every day at 08:35, after the blood pressure check.\n2. Once the assistant confirms the scheduling order is valid and the activity is added."
+    "objectives": "# Scenario 27 — Add Activity After Existing Activity\n\n## Context\nAnthony's caregiver wants to add a relaxation activity that depends on completing the blood pressure check first.\n\n## Objectives\n1. Add a meditation activity, 20 minutes, every day at 08:35, after the blood pressure check."
 }

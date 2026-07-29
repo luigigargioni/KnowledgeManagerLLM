@@ -58,5 +58,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 84 — Remove Evening Meal with History Warning\n\n## Context\nRose's caregiver wants to remove the evening dinner activity because Rose often says she's not hungry. However, Rose has a history of dizziness and confusion after missing evening meals.\n\n## Objectives\n1. Remove the dinner activity.\n2. If the assistant warns about Rose's past dizziness from missing evening meals, acknowledge the concern and ask if a lighter evening meal would be better than removing it entirely.\n3. Follow the assistant's recommendation — either keep a modified dinner or replace it with a light snack.\n4. Confirm the final decision."
+    "objectives": "# Scenario 84 — Remove Evening Meal with History Warning\n\n## Context\nRose's caregiver wants to remove the evening dinner activity because Rose often says she's not hungry. However, Rose has a history of dizziness and confusion after missing evening meals.\n\n## Objectives\n1. Remove the dinner activity. If the assistant warns about Rose's past dizziness from missing evening meals, acknowledge the concern and ask if a lighter evening meal would be better than removing it entirely, then follow the assistant's recommendation — either keep a modified dinner or replace it with a light snack, and confirm the final decision."
 }

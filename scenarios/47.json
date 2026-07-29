@@ -48,5 +48,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 47 — Add Caution Insulin Medication\n\n## Context\nSamuel has been diagnosed with elevated blood sugar and his doctor wants to add Insulin. However, his dementia raises the risk of dosing errors.\n\n## Objectives\n1. Add Insulin as a medication, 5 units, every day at 08:15 after breakfast.\n2. If the assistant issues a caution warning about dosing error risk with dementia, acknowledge the warning but explain that a caregiver will administer the Insulin.\n3. Confirm the medication addition."
+    "objectives": "# Scenario 47 — Add Caution Insulin Medication\n\n## Context\nSamuel has been diagnosed with elevated blood sugar and his doctor wants to add Insulin. However, his dementia raises the risk of dosing errors.\n\n## Objectives\n1. Add Insulin as a medication, 5 units, every day at 08:15 after breakfast. If the assistant issues a caution warning about dosing error risk with dementia, acknowledge the warning but explain that a caregiver will administer the Insulin, and confirm the medication addition."
 }

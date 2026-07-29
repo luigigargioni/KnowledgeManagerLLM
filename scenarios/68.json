@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 68 — Update Breaking Activity Ordering\n\n## Context\nAnne's caregiver wants to move the glucose check earlier, which would break the scheduling order with the Metformin medication.\n\n## Objectives\n1. Update the glucose check to start at 08:08 instead of 08:20.\n2. If the assistant detects a temporal ordering violation with the Metformin medication, acknowledge the error.\n3. Ask to change it so it takes place after breakfast instead of after the Metformin medication.\n4. Confirm the corrected update."
+    "objectives": "# Scenario 68 — Update Breaking Activity Ordering\n\n## Context\nAnne's caregiver wants to move the glucose check earlier, which would break the scheduling order with the Metformin medication.\n\n## Objectives\n1. Update the glucose check to start at 08:08 instead of 08:20. If the assistant detects a temporal ordering violation with the Metformin medication, acknowledge the error, then ask to change it so it takes place after breakfast instead of after the Metformin medication, and confirm the corrected update."
 }

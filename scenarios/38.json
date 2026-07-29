@@ -190,5 +190,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 38 — Scheduling Conflict with No Available Alternative\n\n## Context\nFrank's schedule is very packed. The caregiver wants to add a new health checkup at 14:30, but there may be no available alternative times.\n\n## Objectives\n1. Add a kidney function check activity, 30 minutes, every Tuesday and Thursday at 14:30.\n2. If the assistant detects a conflict with the afternoon snack and cannot find an available alternative time, acknowledge that the schedule is full.\n3. Ask the assistant what it recommends — either rescheduling an existing activity or finding a gap.\n4. Follow the assistant's recommendation."
+    "objectives": "# Scenario 38 — Scheduling Conflict with No Available Alternative\n\n## Context\nFrank's schedule is very packed. The caregiver wants to add a new health checkup at 14:30, but there may be no available alternative times.\n\n## Objectives\n1. Add a kidney function check activity, 30 minutes, every Tuesday and Thursday at 14:30. If the assistant detects a conflict with the afternoon snack and cannot find an available alternative time, acknowledge that the schedule is full, then ask the assistant what it recommends — either rescheduling an existing activity or finding a gap, and follow the assistant's recommendation."
 }

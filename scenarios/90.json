@@ -58,5 +58,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 90 — Complex Add, Update, and Remove\n\n## Context\nRose's caregiver wants to add a new therapy, update the memory exercises, and remove the current relaxation activity.\n\n## Objectives\n1. Add a cognitive stimulation therapy activity, 45 minutes, every Monday and Thursday at 14:00.\n2. Update the memory exercises to last 45 minutes instead of 30 and move to 09:30.\n3. Remove the memory exercises activity since the new therapy replaces it.\n4. Confirm all changes."
+    "objectives": "# Scenario 90 — Complex Add, Update, and Remove\n\n## Context\nRose's caregiver wants to add a new therapy, update the memory exercises, and remove the current relaxation activity.\n\n## Objectives\n1. Add a cognitive stimulation therapy activity, 45 minutes, every Monday and Thursday at 14:00.\n2. Update the memory exercises to last 45 minutes instead of 30 and move to 09:30, then remove the memory exercises activity since the new therapy replaces it."
 }

@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 26 — Update Breaking Activity Ordering\n\n## Context\nAnthony's caregiver wants to move the blood pressure check earlier, but this would break the scheduling order since it would start before the aspirin ends.\n\n## Objectives\n1. Update the blood pressure check to start at 08:08 instead of 08:20.\n2. If the assistant detects a temporal ordering violation with the aspirin medication, acknowledge the error.\n3. Ask to update the schedule instead — change it so it takes place after breakfast instead of after the aspirin medication.\n4. Confirm the corrected update."
+    "objectives": "# Scenario 26 — Update Breaking Activity Ordering\n\n## Context\nAnthony's caregiver wants to move the blood pressure check earlier, but this would break the scheduling order since it would start before the aspirin ends.\n\n## Objectives\n1. Update the blood pressure check to start at 08:08 instead of 08:20. If the assistant detects a temporal ordering violation with the aspirin medication, acknowledge the error, then ask to update the schedule instead — change it so it takes place after breakfast instead of after the aspirin medication, and confirm the corrected update."
 }

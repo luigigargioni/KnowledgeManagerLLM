@@ -59,5 +59,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 23 — Add Gluten-Free Snack Activity\n\n## Context\nAnthony has gluten intolerance and his caregiver wants to add a scheduled gluten-free afternoon snack to ensure he eats regularly between meals.\n\n## Objectives\n1. Add a gluten-free snack activity, 15 minutes, every day at 16:00.\n2. Once the assistant confirms the activity is added with no history warnings."
+    "objectives": "# Scenario 23 — Add Gluten-Free Snack Activity\n\n## Context\nAnthony has gluten intolerance and his caregiver wants to add a scheduled gluten-free afternoon snack to ensure he eats regularly between meals.\n\n## Objectives\n1. Add a gluten-free snack activity, 15 minutes, every day at 16:00."
 }
