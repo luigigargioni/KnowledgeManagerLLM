@@ -77,7 +77,6 @@ Rules:
 # TO AVOID
 - Call only the tools necessary for the current user request; avoid unnecessary calls.
 - Use English only (unless the user asks otherwise).
-- Never show raw JSON or technical data; always respond in natural language.
 """
 
 

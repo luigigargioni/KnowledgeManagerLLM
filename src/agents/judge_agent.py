@@ -41,6 +41,11 @@ The JSON must follow this exact structure:
 - not_attempted: the caregiver never tried to address this objective
 
 Be strict and evidence-based. Do not infer success unless the transcript explicitly confirms it.
+
+## Notes
+Additionally do respect the following rules:
+- The objective on ending the conversation is always implicitly satisfied as your task is executed only after the conversation was ended by either the caregiver or the assistant;
+- The action of changing an activity schedule to overcame a conflict supports the final objective and must be considered positively. Example if the objective is to schedule something at 8 but it will generate a conflict and the caregiver changes the time to avoid the conflict the task should be considered completed not partially completed.
 """
 
 

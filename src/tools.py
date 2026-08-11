@@ -105,6 +105,9 @@ def get_all_activities():
 
         logger.info(f"[THERAPY] Retrieved {len(data['activities'])} activities")
         result = dict(data)
+        if "objectives" in result:
+            result.pop("objectives")
+
         result["status"] = "success"
         return json.dumps(result, indent=2, ensure_ascii=False)
 
@@ -130,6 +133,8 @@ def _validate_date_field(value, field_name: str):
     """Return an error message string if *value* is a non-None string in an
     unrecognised date format; return None when the value is acceptable."""
     if value is None:
+        return None
+    if len(value) == 0:
         return None
     for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
         try:
@@ -448,7 +453,12 @@ def add_therapy_activity(activity_data):
 
         # Validate that valid_from precedes valid_until when both are provided
         vf = activity_data.get("valid_from")
+        if vf:
+            vf = vf if len(vf) > 0 else None
+
         vu = activity_data.get("valid_until")
+        if vu:
+            vu = vu if len(vu) > 0 else None
         if vf and vu:
             vf_dt = _parse_activity_date(vf)
             vu_dt = _parse_activity_date(vu)
