@@ -1,6 +1,7 @@
 # scenario_loader.py
 
 import json
+import re
 
 from config_loader import SCENARIOS_DIR, THERAPY_FILE
 
@@ -31,6 +32,70 @@ def install_scenario_therapy(scenario: dict) -> None:
         json.dumps(scenario, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+
+
+# Clauses that tell the caregiver what the assistant is expected to do (or not do).
+# "First ask the assistant …" is deliberately NOT included: that one is an
+# instruction to act, it has to be known up front and it reveals no answer.
+_CONDITIONAL_RE = re.compile(r"\b(?:If the assistant|Verify that the assistant)\b", re.IGNORECASE)
+
+
+def split_objectives(objectives: str) -> tuple[str, str]:
+    """
+    Split a scenario's objectives into what the caregiver may know up front and
+    what must stay hidden until the assistant has had its turn.
+
+    Many scenarios exist to test whether the assistant *itself* raises something —
+    a history warning, a scheduling conflict, a blocking dependency — and encode
+    the expected reaction as "If the assistant warns about X, acknowledge…".
+    Handing that to the caregiver together with the initial request tells it the
+    answer: it then mentions X in its own first message, or reacts to a warning
+    that never came. Either way the behaviour under test is never observed, while
+    the objective still looks satisfied.
+
+    Returns (initial, deferred):
+      - initial:  the bare imperative requests, with no title and no context
+      - deferred: the title, the context and the conditional clauses, to be
+                  revealed only after the assistant has replied
+
+    Scenarios without a conditional clause are returned unchanged, with an empty
+    deferred part.
+    """
+    if not _CONDITIONAL_RE.search(objectives or ""):
+        return objectives, ""
+
+    lines = (objectives or "").splitlines()
+    try:
+        start = next(
+            i for i, line in enumerate(lines) if line.strip().lower().startswith("## objectives")
+        )
+    except StopIteration:
+        # Unexpected layout: withholding nothing is safer than mangling the script.
+        return objectives, ""
+
+    preamble = "\n".join(lines[:start]).strip()
+    objective_lines = lines[start + 1 :]
+
+    kept, withheld = [], []
+    for line in objective_lines:
+        match = _CONDITIONAL_RE.search(line)
+        if match:
+            kept.append(line[: match.start()].rstrip())
+            withheld.append(line[match.start() :].strip())
+        else:
+            kept.append(line)
+
+    initial = "## Objectives\n" + "\n".join(kept).strip()
+
+    deferred_parts = []
+    if preamble:
+        deferred_parts.append(preamble)
+    if withheld:
+        deferred_parts.append(
+            "## How to react if the assistant raises it\n"
+            + "\n".join(f"- {clause}" for clause in withheld)
+        )
+    return initial, "\n\n".join(deferred_parts)
 
 
 def therapy_to_natural_language(scenario: dict) -> str:

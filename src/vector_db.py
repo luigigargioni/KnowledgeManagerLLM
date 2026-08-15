@@ -66,13 +66,20 @@ CONFLICT_QUERY_THRESHOLD = 0.65
 MEDICINE_DISTANCE_THRESHOLD = 0.80
 
 # Cosine distance thresholds for patient history RAG queries.
-# Two separate values are used because the consequences of a missed match differ:
-#   - "danger" events (e.g. severe adverse reactions): better to surface a false positive
-#     than to silently miss a genuine risk, so the threshold is set higher (more permissive).
-#   - "warning" events (e.g. mild discomfort): a stricter threshold avoids flooding the LLM
-#     with low-relevance cautions that could reduce the signal-to-noise ratio.
+# The two values used to differ (0.85 for "danger", 0.70 for "warning") on the
+# assumption that warning-level events are less costly to miss. Measured against
+# the current dataset that assumption did not hold: every event the scenarios are
+# designed to surface is typed "warning", and the enriched queries land between
+# 0.45 and 0.85 — so the stricter value silently dropped exactly the events under
+# test (e.g. Frank's dehydration event against an outdoor gardening request sat at
+# 0.75, and Rose's overnight-stay event at 0.845).
+# Both are therefore aligned at 0.85. The cost is roughly one extra low-relevance
+# event per query, which the caller can weigh using the relevance_score returned
+# with each event; the benefit is that safety history stops being invisible.
+# The constants stay separate so the distinction can be re-tuned if the dataset
+# starts using "danger" meaningfully.
 PATIENT_HISTORY_DANGER_THRESHOLD = 0.85
-PATIENT_HISTORY_WARNING_THRESHOLD = 0.70
+PATIENT_HISTORY_WARNING_THRESHOLD = 0.85
 
 # Maximum cosine distance accepted when querying patient preferences.
 # 0.80 is intentionally permissive: preferences are heterogeneous (dietary, physical,
@@ -137,6 +144,111 @@ class VectorDBManager:
             logger.error(f"[VECTOR_DB] Initialization failed: {e}")
             return False
 
+    def counts(self) -> dict[str, int]:
+        """Number of documents currently held in each collection."""
+        return {
+            COLLECTION_MEDICINES: self._medicines.count(),
+            COLLECTION_PATIENT_HISTORY: self._patient_history.count(),
+            COLLECTION_CONFLICT_RESOLUTIONS: self._conflict_resolutions.count(),
+            COLLECTION_PATIENT_PREFERENCES: self._patient_preferences.count(),
+        }
+
+    def reset(self) -> bool:
+        """
+        Drop and recreate all four collections, then reopen them.
+
+        Seeding is idempotent by document id, which means a store left over from
+        an earlier dataset is never corrected: stale documents keep answering
+        queries under ids that no longer describe the current patients, and
+        renamed source files are indexed alongside their obsolete versions
+        instead of replacing them. A batch run must therefore start from an empty
+        store rather than trusting whatever is on disk.
+        """
+        if self.client is None:
+            logger.error("[VECTOR_DB] reset() called before initialize()")
+            return False
+        try:
+            for name in (
+                COLLECTION_MEDICINES,
+                COLLECTION_PATIENT_HISTORY,
+                COLLECTION_CONFLICT_RESOLUTIONS,
+                COLLECTION_PATIENT_PREFERENCES,
+            ):
+                try:
+                    self.client.delete_collection(name)
+                except Exception:
+                    # Not an error: the collection may simply not exist yet.
+                    logger.debug(f"[VECTOR_DB] Nothing to delete for '{name}'")
+            logger.info("[VECTOR_DB] All collections dropped")
+            return self.initialize()
+        except Exception as e:
+            logger.error(f"[VECTOR_DB] reset failed: {e}")
+            return False
+
+    def seed_all_patients(self, patients_folder: Path = None) -> list[str]:
+        """
+        Seed every patient that has a data folder. Returns the ids seeded.
+        """
+        folder = patients_folder or PATIENTS_DATA_FOLDER
+        if not folder.exists():
+            logger.error(f"[VECTOR_DB] Patients data folder not found: {folder}")
+            return []
+
+        patient_ids = sorted(
+            (p.name for p in folder.iterdir() if p.is_dir()),
+            key=lambda name: (
+                not name.isdigit(),
+                int(name) if name.isdigit() else name,
+            ),
+        )
+        for patient_id in patient_ids:
+            self.seed_patient_data(patient_id, patients_folder=folder)
+
+        logger.info(
+            f"[VECTOR_DB] Seeded {len(patient_ids)} patient folder(s): {', '.join(patient_ids)}"
+        )
+        return patient_ids
+
+    def verify_seed(self, medicines_folder: Path = None) -> list[str]:
+        """
+        Check that the store actually holds what the source files describe.
+
+        Returns a list of human-readable problems; empty means the store is
+        consistent with the data folders. Seeding failures used to be swallowed
+        by the try/except in seed_patient_data and only surfaced as an agent that
+        mysteriously never warned about anything, so the caller is expected to
+        treat a non-empty result as fatal.
+        """
+        problems: list[str] = []
+
+        folder = medicines_folder or MEDICINES_FOLDER
+        expected_medicines = {f.stem.lower() for f in folder.glob("*.md")}
+        indexed_medicines = set(self._medicines.get()["ids"])
+        missing = expected_medicines - indexed_medicines
+        if missing:
+            problems.append(
+                f"{len(missing)} medicine file(s) not indexed: {', '.join(sorted(missing))}"
+            )
+        unexpected = indexed_medicines - expected_medicines
+        if unexpected:
+            problems.append(
+                f"{len(unexpected)} indexed medicine(s) with no source file "
+                f"(stale store?): {', '.join(sorted(unexpected))}"
+            )
+
+        history_meta = self._patient_history.get(include=["metadatas"])["metadatas"]
+        history_patients = {m.get("patient_id") for m in history_meta}
+        for patient_dir in sorted(PATIENTS_DATA_FOLDER.glob("*/history.json")):
+            patient_id = patient_dir.parent.name
+            if patient_id not in history_patients:
+                problems.append(f"patient {patient_id} has history.json but no indexed events")
+
+        for problem in problems:
+            logger.error(f"[VECTOR_DB] Seed verification: {problem}")
+        if not problems:
+            logger.info(f"[VECTOR_DB] Seed verified – {self.counts()}")
+        return problems
+
     # ═══════════════════════════════════════════════════════════════════════════
     # MEDICINES
     # ═══════════════════════════════════════════════════════════════════════════
@@ -161,9 +273,7 @@ class VectorDBManager:
         for md_file in md_files:
             doc_id = md_file.stem.lower()  # e.g. "aspirina"
             if doc_id in existing_ids:
-                logger.debug(
-                    f"[VECTOR_DB] Medicine '{doc_id}' already indexed – skipping"
-                )
+                logger.debug(f"[VECTOR_DB] Medicine '{doc_id}' already indexed – skipping")
                 continue
             try:
                 content = md_file.read_text(encoding="utf-8")
@@ -223,18 +333,14 @@ class VectorDBManager:
                 or meta.get("name", "").lower() in query_norm
             ]
             if name_matched:
-                logger.info(
-                    f"[VECTOR_DB] query_medicines: name-based match for '{query}'"
-                )
+                logger.info(f"[VECTOR_DB] query_medicines: name-based match for '{query}'")
                 return "\n\n---\n\n".join(name_matched)
 
             # ── Step 2: distance-based fallback ─────────────────────────────
             # Only used when the medicine name is not directly in the query
             # (e.g. a description like "anti-inflammatory for headache").
             matched = [
-                doc
-                for doc, dist in zip(docs, distances)
-                if dist <= MEDICINE_DISTANCE_THRESHOLD
+                doc for doc, dist in zip(docs, distances) if dist <= MEDICINE_DISTANCE_THRESHOLD
             ]
 
             if not matched:
@@ -292,9 +398,7 @@ class VectorDBManager:
             )
             count += 1
 
-        logger.info(
-            f"[VECTOR_DB] Seeded {count} patient history events for patient {patient_id}"
-        )
+        logger.info(f"[VECTOR_DB] Seeded {count} patient history events for patient {patient_id}")
         return count
 
     def query_patient_history(
@@ -349,9 +453,7 @@ class VectorDBManager:
     # CONFLICT RESOLUTIONS
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def seed_conflict_resolutions(
-        self, patient_id: str, resolutions: list[dict]
-    ) -> int:
+    def seed_conflict_resolutions(self, patient_id: str, resolutions: list[dict]) -> int:
         """
         Seed historical conflict resolution patterns for a patient.
         Each resolution dict must contain:
@@ -384,9 +486,7 @@ class VectorDBManager:
             )
             count += 1
 
-        logger.info(
-            f"[VECTOR_DB] Seeded {count} conflict resolution(s) for patient {patient_id}"
-        )
+        logger.info(f"[VECTOR_DB] Seeded {count} conflict resolution(s) for patient {patient_id}")
         return count
 
     def query_conflict_resolutions(
@@ -463,8 +563,7 @@ class VectorDBManager:
                         break
 
             resolution_id = (
-                f"cr_{patient_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_"
-                f"{str(uuid.uuid4())[:8]}"
+                f"cr_{patient_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{str(uuid.uuid4())[:8]}"
             )
             self._conflict_resolutions.add(
                 documents=[description],
@@ -586,9 +685,7 @@ class VectorDBManager:
                     }
                 ],
             )
-            logger.info(
-                f"[VECTOR_DB] Preference {action} for patient {patient_id}: {pref_id}"
-            )
+            logger.info(f"[VECTOR_DB] Preference {action} for patient {patient_id}: {pref_id}")
             return True, action
         except Exception as e:
             logger.error(f"[VECTOR_DB] upsert_patient_preference error: {e}")
@@ -617,9 +714,7 @@ class VectorDBManager:
             pref_id = f"pref_seed_{patient_id}_{content_hash}"
 
             if pref_id in existing_ids:
-                logger.debug(
-                    f"[VECTOR_DB] Seed preference already present, skipping: {pref_id}"
-                )
+                logger.debug(f"[VECTOR_DB] Seed preference already present, skipping: {pref_id}")
                 continue
 
             try:
@@ -636,13 +731,9 @@ class VectorDBManager:
                 )
                 count += 1
             except Exception as e:
-                logger.error(
-                    f"[VECTOR_DB] seed_patient_preferences error for {pref_id}: {e}"
-                )
+                logger.error(f"[VECTOR_DB] seed_patient_preferences error for {pref_id}: {e}")
 
-        logger.info(
-            f"[VECTOR_DB] Seeded {count} preference(s) for patient {patient_id}"
-        )
+        logger.info(f"[VECTOR_DB] Seeded {count} preference(s) for patient {patient_id}")
         return count
 
     def seed_patient_data(self, patient_id: str, patients_folder: Path = None) -> None:
@@ -692,9 +783,7 @@ class VectorDBManager:
         if preferences_file.exists():
             try:
                 preferences = _json.loads(preferences_file.read_text(encoding="utf-8"))
-                n = self.seed_patient_preferences(
-                    patient_id=patient_id, preferences=preferences
-                )
+                n = self.seed_patient_preferences(patient_id=patient_id, preferences=preferences)
                 logger.info(
                     f"[VECTOR_DB] Seeded {n} new preference(s) for patient "
                     f"{patient_id} from {preferences_file}"
@@ -712,9 +801,7 @@ class VectorDBManager:
         if conflict_file.exists():
             try:
                 resolutions = _json.loads(conflict_file.read_text(encoding="utf-8"))
-                n = self.seed_conflict_resolutions(
-                    patient_id=patient_id, resolutions=resolutions
-                )
+                n = self.seed_conflict_resolutions(patient_id=patient_id, resolutions=resolutions)
                 logger.info(
                     f"[VECTOR_DB] Seeded {n} conflict resolution(s) for patient {patient_id} "
                     f"from {conflict_file}"
@@ -727,6 +814,4 @@ class VectorDBManager:
                 f"at {conflict_file}"
             )
 
-        logger.info(
-            f"[VECTOR_DB] Patient data seeding complete for patient {patient_id}"
-        )
+        logger.info(f"[VECTOR_DB] Patient data seeding complete for patient {patient_id}")

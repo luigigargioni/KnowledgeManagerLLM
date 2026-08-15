@@ -14,16 +14,20 @@ from agents.judge_agent import JudgeAgent
 from chat import OllamaChat
 from config_loader import DEFAULT_PATIENT_ID, MODEL
 from sql_db import DatabaseManager
-from utils import build_transcript, get_system_info, setup_logger
+from therapy_diff import diff_therapies, render_diff
+from utils import (
+    build_transcript,
+    get_system_info,
+    is_exit_message,
+    setup_logger,
+)
 from vector_db import VectorDBManager
 
 logger = setup_logger()
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="KnowledgeManagerLLM - LLM Chat Interface"
-    )
+    parser = argparse.ArgumentParser(description="KnowledgeManagerLLM - LLM Chat Interface")
     parser.add_argument(
         "--input",
         "-i",
@@ -92,13 +96,22 @@ def run_agent_mode(chat, script: str, delay: float) -> None:
     print("=" * 60)
 
     transcript = build_transcript(chat.chat_agent.conversation_history)
+
+    # First snapshot is taken at startup, so it holds the state the session began
+    # from; diffing it against the last one gives what was actually applied.
+    initial_therapy = chat._therapy_snapshots[0]["therapy"]
+    final_therapy = chat._therapy_snapshots[-1]["therapy"]
+    change_summary = render_diff(diff_therapies(initial_therapy, final_therapy))
+    print(f"\nApplied changes:\n{change_summary}\n")
+
     judge = JudgeAgent()
     evaluation = judge.evaluate(
         client=chat.client,
         model=chat.model,
         script=script,
         transcript=transcript,
-        therapy=json.dumps(chat._therapy_snapshots[-1]),
+        therapy=json.dumps(final_therapy),
+        changes=change_summary,
     )
 
     evaluation["script"] = script
@@ -112,9 +125,7 @@ def run_agent_mode(chat, script: str, delay: float) -> None:
     # Saving of the evalutaion json
     output_path = logger.session_dir / "evaluation.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(evaluation, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    output_path.write_text(json.dumps(evaluation, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"[Judge] Evaluation saved to {output_path}")
 
     return evaluation
@@ -165,7 +176,7 @@ def run_agent_mode_old(chat: OllamaChat, script: str, delay: float) -> None:
         print(f"You (agent): {caregiver_message}\n")
 
         # Exit condition
-        if caregiver_message.strip().lower() in ["exit", "quit", "esci"]:
+        if is_exit_message(caregiver_message):
             logger.info(f"[AGENT] Caregiver agent sent exit after {turn + 1} turn(s)")
             break
 
@@ -228,9 +239,7 @@ def main():
     vdb_available = vector_db.initialize()
     if vdb_available:
         seeded = vector_db.seed_medicines()
-        logger.info(
-            f"[CONFIG] Vector DB ready – {seeded} medicine file(s) newly indexed"
-        )
+        logger.info(f"[CONFIG] Vector DB ready – {seeded} medicine file(s) newly indexed")
         vector_db.seed_patient_data(str(DEFAULT_PATIENT_ID))
     else:
         logger.warning("[CONFIG] Vector DB not available – RAG features disabled")
@@ -244,9 +253,7 @@ def main():
         db.seed_test_data(patient_id=str(DEFAULT_PATIENT_ID))
         db.load_session(int(DEFAULT_PATIENT_ID))
     else:
-        logger.warning(
-            "[CONFIG] Database not available – session will not be persisted"
-        )
+        logger.warning("[CONFIG] Database not available – session will not be persisted")
 
     # ── Chat ──────────────────────────────────────────────────────────────
     chat = OllamaChat(

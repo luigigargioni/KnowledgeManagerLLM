@@ -78,9 +78,7 @@ class TherapyVersion(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.now, nullable=False)
-    activities = Column(
-        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
-    )
+    activities = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     notes = Column(Text)
 
     # Relationship with the patient
@@ -126,9 +124,7 @@ class DatabaseManager:
                 pool_size=5,
                 max_overflow=10,
             )
-            self.SessionLocal = sessionmaker(
-                bind=self.engine, autoflush=False, autocommit=False
-            )
+            self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
             # Migration to create tables if not exist
             Base.metadata.create_all(self.engine)
             logger.info("[DB] Connected and tables ensured")
@@ -205,11 +201,7 @@ class DatabaseManager:
         """Retrieve a patient by name (case-insensitive)"""
         with self.get_session() as session:
             try:
-                patient = (
-                    session.query(Patient)
-                    .filter(Patient.name.ilike(f"%{name}%"))
-                    .first()
-                )
+                patient = session.query(Patient).filter(Patient.name.ilike(f"%{name}%")).first()
                 if not patient:
                     return {
                         "status": "error",
@@ -266,9 +258,7 @@ class DatabaseManager:
 
     # Therapies
 
-    def save_therapy_version(
-        self, patient_id: int, activities: list, notes: str = None
-    ) -> dict:
+    def save_therapy_version(self, patient_id: int, activities: list, notes: str = None) -> dict:
         """Save a new therapy version (append-only)"""
         with self.get_session() as session:
             try:
@@ -349,9 +339,7 @@ class DatabaseManager:
                     .all()
                 )
 
-                logger.info(
-                    f"[DB] Retrieved {len(versions)} therapy versions for {patient.name}"
-                )
+                logger.info(f"[DB] Retrieved {len(versions)} therapy versions for {patient.name}")
                 return {
                     "status": "success",
                     "patient": patient.to_dict(),
@@ -380,9 +368,7 @@ class DatabaseManager:
         latest = self.get_latest_therapy(patient_id)
 
         if latest["therapy"] is None:
-            logger.info(
-                f"[DB] No therapy found for patient ID {patient_id}, creating empty JSON"
-            )
+            logger.info(f"[DB] No therapy found for patient ID {patient_id}, creating empty JSON")
             data = {
                 "patient_id": patient["id"],
                 "patient_full_name": patient["name"],
@@ -394,9 +380,7 @@ class DatabaseManager:
             }
         else:
             therapy = latest["therapy"]
-            logger.info(
-                f"[DB] Loading therapy version {therapy['id']} for patient ID {patient_id}"
-            )
+            logger.info(f"[DB] Loading therapy version {therapy['id']} for patient ID {patient_id}")
 
             def _parse_date(d: str) -> datetime:
                 """Accept YYYY-MM-DD or ISO 8601 datetime strings."""
@@ -410,8 +394,7 @@ class DatabaseManager:
             valid_activities = [
                 x
                 for x in therapy["activities"]
-                if not x["valid_until"]
-                or _parse_date(x["valid_until"]) > datetime.now()
+                if not x["valid_until"] or _parse_date(x["valid_until"]) > datetime.now()
             ]
             expired_activities = [
                 x
@@ -484,9 +467,7 @@ class DatabaseManager:
             except Exception as e:
                 logger.error(f"[DB] Failed to load therapy file{therapy_file}: {e}")
         else:
-            logger.debug(
-                f"[DB] No therapy file found for patient {patient_id} at {therapy_file}"
-            )
+            logger.debug(f"[DB] No therapy file found for patient {patient_id} at {therapy_file}")
 
         if therapy:
             name = therapy["patient_full_name"] or "John Doe"

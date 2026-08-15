@@ -41,20 +41,44 @@ Execute steps in order:
    Call get_patient_preferences() to personalise suggestions to the patient's habits.
 
 4. CONFIRMATION (mandatory)
-   Ask for user confirmation asbout the action you are going to perform. 
+   Ask for user confirmation about the action you are going to perform.
 
 5. ACTION EXECUTION (mandatory)
    Procede to call add_therapy_activity, remove_therapy_activity or update_therapy_activity depending on the request.
    The functions add_therapy_activity and update_therapy_activity already include checks on possible temporal overlappings between activities and/or broken depencencies
    sequences so YOU DON'T NEED to do those check yourself.
-   If no conflicts emerge DO present the result to the user. Adding, updating or removing an activity must be the last steps of the flow before passing the baton back to the
+   Read the tool result before answering: report success only if it returned
+   "status": "success", otherwise report the error or conflict it returned.
+   Adding, updating or removing an activity must be the last steps of the flow before passing the baton back to the
    user.
+   When an update is meant to re-order an activity relative to another one, set
+   dependencies to the new activity_id. Emptying the dependency list removes the
+   ordering constraint altogether, which is not the same thing.
 
 6. CONFLICT RESOLUTION
    If a scheduling conflict occurs, present the conflict, suggested alternative times,
    and any past_resolution_hints from the tool result.
    DO NOT resolve conflicts on your own; always consult the caregiver.
 
+
+# REPORTING RESULTS — never state an outcome you have not read in a tool result
+This is absolute and overrides any wish to sound helpful or conclusive.
+
+- A change is done ONLY when the corresponding tool has returned "status": "success".
+  Until then, never write that an activity was added, updated or removed, and never
+  use a confirmation mark for it. Announce the intention, call the tool, then report
+  what the tool actually returned.
+- If a tool returns an error or a conflict, say plainly that the change did NOT
+  happen and give the reason it reported. Never present a failed action as done, and
+  never retry silently.
+- Never claim that a safety check, a conflict check, a history lookup or a
+  preference lookup found something (or found nothing) before that tool has
+  returned. Saying "I verified there are no conflicts" and only afterwards
+  discovering an overlap is a serious error: run the check first, report second.
+- Never state an activity_id you have not read in a tool result, and prefer the
+  activity name when talking to the caregiver.
+- If you are unsure whether a change was applied, call get_therapy_activities and
+  look, instead of guessing.
 
 # Getting additional information
 If the user request information about some medication, counterindication or interaction between medication and activities do call delegate_to_checker_agent with an adequate message.
@@ -100,15 +124,13 @@ _MANAGER_TOOLS = [
         "function": {
             "name": "add_therapy_activity",
             "description": """Adds a new activity to the therapy of the current patient.
-                Requires: activity_id, name, day_of_week, time, duration_minutes.
-                Optional: description, dependencies, valid_from, valid_until""",
+                Requires: name, category, day_of_week, time, duration_minutes.
+                Optional: description, dependencies, valid_from, valid_until.
+                Do NOT provide an activity_id: it is assigned automatically and
+                returned in the response. Never state an id you have not read there.""",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "activity_id": {
-                        "type": "string",
-                        "description": "Unique ID (e.g.: 'lb_001')",
-                    },
                     "name": {"type": "string", "description": "Name of the activity"},
                     "description": {
                         "type": "string",
@@ -137,8 +159,8 @@ _MANAGER_TOOLS = [
                     "valid_until": {"type": "string", "description": "YYYY-MM-DD"},
                 },
                 "required": [
-                    "activity_id",
                     "name",
+                    "category",
                     "day_of_week",
                     "time",
                     "duration_minutes",
@@ -192,9 +214,7 @@ _MANAGER_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_patient_preferences",
-            "description": (
-                "Retrieve known preferences and habits of the current patient. "
-            ),
+            "description": ("Retrieve known preferences and habits of the current patient. "),
             "parameters": {
                 "type": "object",
                 "properties": {

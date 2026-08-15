@@ -18,9 +18,7 @@ class Agent:
         self.conversation_history = []
 
         if agent_prompt:
-            self.conversation_history.append(
-                {"role": "system", "content": agent_prompt}
-            )
+            self.conversation_history.append({"role": "system", "content": agent_prompt})
 
         self.inject_context()
         logger.info(
@@ -28,9 +26,7 @@ class Agent:
         )
 
     def reset_agent(self):
-        self.conversation_history = (
-            [self.conversation_history[0]] if self.prompt else []
-        )
+        self.conversation_history = [self.conversation_history[0]] if self.prompt else []
         self.inject_context()
 
     def inject_context(self):

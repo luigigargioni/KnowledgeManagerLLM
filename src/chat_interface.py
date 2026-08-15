@@ -14,7 +14,7 @@ from config_loader import (
     THERAPY_FILE,
 )
 from sql_db import DatabaseManager
-from utils import get_system_info, setup_logger
+from utils import get_system_info, setup_logger, visible_turns
 from vector_db import VectorDBManager
 
 # Must be the first Streamlit command
@@ -41,9 +41,7 @@ if "db" not in st.session_state:
     if db_available:
         db.seed_test_data(patient_id=str(DEFAULT_PATIENT_ID))
     else:
-        logger.warning(
-            "[CONFIG] Database not available - session will not be persisted"
-        )
+        logger.warning("[CONFIG] Database not available - session will not be persisted")
     st.session_state.db = db
     st.session_state.db_available = db_available
 
@@ -76,9 +74,7 @@ patient_labels = {p[0]: p[1] for p in available_patients}
 
 if "selected_patient_id" not in st.session_state:
     # Restore from URL (survives F5), fall back to env default
-    st.session_state.selected_patient_id = st.query_params.get(
-        "patient", DEFAULT_PATIENT_ID
-    )
+    st.session_state.selected_patient_id = st.query_params.get("patient", DEFAULT_PATIENT_ID)
 
 if "processing" not in st.session_state:
     st.session_state.processing = False
@@ -151,9 +147,7 @@ if "chat" not in st.session_state:
         database_manager=st.session_state.db if st.session_state.db_available else None,
         vector_db=st.session_state.vector_db,
     )
-    st.session_state.first_message = (
-        st.session_state.chat.chat_agent.conversation_history[-1]
-    )
+    st.session_state.first_message = st.session_state.chat.chat_agent.conversation_history[-1]
 
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
@@ -178,28 +172,15 @@ if st.session_state.session_ended:
 #    st.markdown(st.session_state.first_message["content"])
 
 
-for idx, message in enumerate(
-    [
-        m
-        for m in st.session_state.chat.chat_agent.conversation_history
-        if m["role"] in ["assistant", "user"]
-    ]
-):
-    if message["role"] not in ["assistant", "user"]:
-        continue
-
+for idx, message in enumerate(visible_turns(st.session_state.chat.chat_agent.conversation_history)):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-        if st.button(
-            "go back here", key=f"rewind_{idx}", icon="🔄", icon_position="right"
-        ):
+        if st.button("go back here", key=f"rewind_{idx}", icon="🔄", icon_position="right"):
             logger.info(
                 f"[REWIND] Conversation was reloaded from message {idx} - {message['role'].upper()}: {f'{message["content"][:80]}...' if len(message['content']) > 80 else message['content']}"
             )
-            full_idx = st.session_state.chat.chat_agent.conversation_history.index(
-                message
-            )
+            full_idx = st.session_state.chat.chat_agent.conversation_history.index(message)
             st.session_state.chat.chat_agent.conversation_history = (
                 st.session_state.chat.chat_agent.conversation_history[: full_idx + 1]
             )
@@ -253,9 +234,7 @@ if st.session_state.processing and st.session_state.pending_message:
             response_gen = st.session_state.chat.send_message(user_message)
         elapsed = time() - start
 
-        st.session_state.conversation.append(
-            {"role": "assistant", "message": response_gen}
-        )
+        st.session_state.conversation.append({"role": "assistant", "message": response_gen})
 
         with st.container():
             st.markdown(response_gen)
@@ -283,9 +262,9 @@ with st.sidebar:
             birth_date_desc = ""
             if birth_date:
                 try:
-                    birth_date_desc = datetime.strptime(
-                        birth_date, "%Y-%m-%dT%H:%M:%S"
-                    ).strftime("%d/%m/%Y")
+                    birth_date_desc = datetime.strptime(birth_date, "%Y-%m-%dT%H:%M:%S").strftime(
+                        "%d/%m/%Y"
+                    )
                 except Exception:
                     birth_date_desc = ""
             age = therapy_data.get("age", "0")
@@ -318,9 +297,7 @@ with st.sidebar:
             if activities:
                 with st.expander(f"Activities ({len(activities)})"):
                     for act in activities:
-                        days = ", ".join(
-                            days_map[d] for d in act.get("day_of_week", [])
-                        )
+                        days = ", ".join(days_map[d] for d in act.get("day_of_week", []))
 
                         st.markdown(
                             f"**{act['name']}**  \n"
@@ -331,21 +308,15 @@ with st.sidebar:
                             dep_names = []
                             for dep in act["dependencies"]:
                                 dep_names += [
-                                    x["name"]
-                                    for x in activities
-                                    if x["activity_id"] == dep
+                                    x["name"] for x in activities if x["activity_id"] == dep
                                 ]
                             st.caption(f"Depends on: {', '.join(dep_names)}")
                         st.write("")
 
             if expired_activities:
-                with st.expander(
-                    f"Activities that expired today ({len(expired_activities)})"
-                ):
+                with st.expander(f"Activities that expired today ({len(expired_activities)})"):
                     for act in expired_activities:
-                        days = ", ".join(
-                            days_map[d] for d in act.get("day_of_week", [])
-                        )
+                        days = ", ".join(days_map[d] for d in act.get("day_of_week", []))
 
                         st.markdown(
                             f"**{act['name']}**  \nUntil: {act['valid_until']}  \n"
@@ -402,11 +373,7 @@ with st.sidebar:
         if not logs_root.exists():
             return []
         return sorted(
-            [
-                d
-                for d in logs_root.iterdir()
-                if d.is_dir() and (d / "chat.log").exists()
-            ],
+            [d for d in logs_root.iterdir() if d.is_dir() and (d / "chat.log").exists()],
             reverse=True,  # most recent first
         )
 

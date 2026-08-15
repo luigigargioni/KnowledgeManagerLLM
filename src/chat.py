@@ -4,7 +4,6 @@ from time import time
 
 from openai import OpenAI
 
-import prompts as prompts
 import tools as tools
 from agents.agent import Agent
 from agents.check_agent import TherapyCheckAgent
@@ -22,7 +21,7 @@ from session_extractor import (
     extract_and_save_patient_preferences,
 )
 from sql_db import DatabaseManager
-from utils import addAgentFilterLogger, get_current_logger
+from utils import addAgentFilterLogger, get_current_logger, visible_turns
 from utils import load_past_session as _load
 
 logger = get_current_logger()
@@ -42,9 +41,7 @@ def _make_client() -> OpenAI:
 def build_first_message(therapy_json):
     therapy = json.loads(therapy_json)
     # Support both key names for robustness
-    patient_name = therapy.get("patient_full_name") or therapy.get(
-        "patient_name", "Unknown"
-    )
+    patient_name = therapy.get("patient_full_name") or therapy.get("patient_name", "Unknown")
     first_message = (
         f"Hi I'm your therapy management assistant!  \n"
         f"The current patient is **{patient_name}**. "
@@ -141,9 +138,7 @@ class Chat:
         self.tools = self.chat_agent.tools
 
         first_message = build_first_message(THERAPY_FILE.read_text(encoding="utf-8"))
-        self.chat_agent.conversation_history.append(
-            {"role": "assistant", "content": first_message}
-        )
+        self.chat_agent.conversation_history.append({"role": "assistant", "content": first_message})
 
         self._therapy_snapshots: list[dict] = []
         self._save_therapy_snapshot()
@@ -154,16 +149,7 @@ class Chat:
         Used later for rewind feature.
         """
 
-        current_idx = (
-            len(
-                [
-                    m
-                    for m in self.chat_agent.conversation_history
-                    if m["role"] in ["assistant", "user"]
-                ]
-            )
-            - 1
-        )
+        current_idx = len(visible_turns(self.chat_agent.conversation_history)) - 1
         therapy = json.loads(THERAPY_FILE.read_text(encoding="utf-8"))
 
         self._therapy_snapshots.append(
@@ -192,9 +178,7 @@ class Chat:
         """
 
         # Find the last snapshot with idx <= message_idx
-        candidates = [
-            s for s in self._therapy_snapshots if s["message_idx"] <= message_idx
-        ]
+        candidates = [s for s in self._therapy_snapshots if s["message_idx"] <= message_idx]
         if not candidates:
             logger.warning(
                 f"[SNAPSHOT] No snapshot found for message_idx<={message_idx}, keeping current therapy"
@@ -255,9 +239,7 @@ class Chat:
         2. save_session (requires db_manager and vector_db)
         Everything else is delegated to the chat_agent.
         """
-        logger.debug(
-            f"[{agent.name.upper()}][TOOL] Executing: {tool_name}({tool_arguments})"
-        )
+        logger.debug(f"[{agent.name.upper()}][TOOL] Executing: {tool_name}({tool_arguments})")
 
         # 1. Delegation
         if tool_name in self._agent_registry:
@@ -301,28 +283,42 @@ class Chat:
             )
             msg = response.choices[0].message
 
-            # agent.conversation_history.append(msg.model_dump(exclude_none=True))
-
             if not msg.tool_calls:
                 reply = msg.content or ""
                 if agent.zero_shot:
                     agent.reset_agent()
                 else:
-                    agent.conversation_history.append(
-                        {"role": "assistant", "content": reply}
-                    )
+                    agent.conversation_history.append({"role": "assistant", "content": reply})
                 logger.debug(f"[{agent.name.upper()}][REPLY] {reply}")
                 return reply
 
-            logger.debug(
-                f"[{agent.name.upper()}][TOOL] Requested {len(msg.tool_calls)} tools"
+            logger.debug(f"[{agent.name.upper()}][TOOL] Requested {len(msg.tool_calls)} tools")
+
+            # Record the assistant turn that requested the tools BEFORE appending
+            # their results. Without it the next iteration sees role=tool messages
+            # with no matching tool_calls, so the agent loses track of the actions
+            # it just requested and can only guess their outcome.
+            agent.conversation_history.append(
+                {
+                    "role": "assistant",
+                    "content": msg.content or "",
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                        }
+                        for tc in msg.tool_calls
+                    ],
+                }
             )
 
             for tc in msg.tool_calls:
                 # Here the chat supervisor decide which agent to call or to close the session
-                result = self.execute_tool(
-                    agent, tc.function.name, tc.function.arguments
-                )
+                result = self.execute_tool(agent, tc.function.name, tc.function.arguments)
                 agent.conversation_history.append(
                     {
                         "role": "tool",
@@ -359,11 +355,7 @@ class Chat:
         """
         # Determine the index of the first user message
         first_user_idx = next(
-            (
-                i
-                for i, m in enumerate(self.conversation_history)
-                if m.get("role") == "user"
-            ),
+            (i for i, m in enumerate(self.conversation_history) if m.get("role") == "user"),
             len(self.conversation_history),
         )
 
@@ -372,9 +364,7 @@ class Chat:
             role = msg.get("role")
             # Pre-conversation context: tool msgs without tool_call_id → system
             if role == "tool" and "tool_call_id" not in msg:
-                normalized.append(
-                    {"role": "system", "content": f"[Context] {msg['content']}"}
-                )
+                normalized.append({"role": "system", "content": f"[Context] {msg['content']}"})
             # Pre-conversation assistant msg (e.g. the welcome message) → system
             elif role == "assistant" and i < first_user_idx:
                 normalized.append(
@@ -399,9 +389,7 @@ class Chat:
         Returns the save_session result dict.
         """
         if self.session_ended:
-            logger.warning(
-                "[SESSION] end_session called but session is already ended – skipping"
-            )
+            logger.warning("[SESSION] end_session called but session is already ended – skipping")
             return {"status": "skipped", "message": "Session already ended"}
 
         logger.info("[SESSION] Starting end-of-session processing")
@@ -409,38 +397,25 @@ class Chat:
         # ── Vector DB extraction ────────────────────────────────────────────
         if self.vector_db is not None:
             patient_id = tools._get_patient_id()
-            logger.info(
-                f"[SESSION] Running vector DB extraction for patient {patient_id}"
-            )
+            logger.info(f"[SESSION] Running vector DB extraction for patient {patient_id}")
 
-            n_conflicts = extract_and_save_conflict_resolutions(
+            extract_and_save_conflict_resolutions(
                 self.conversation_history, self.vector_db, patient_id
             )
-            n_prefs = extract_and_save_patient_preferences(
+            extract_and_save_patient_preferences(
                 self.conversation_history, self.vector_db, patient_id
             )
         else:
-            logger.warning(
-                "[SESSION] Vector DB not available – skipping knowledge extraction"
-            )
+            logger.warning("[SESSION] Vector DB not available – skipping knowledge extraction")
 
         # ── PostgreSQL save ────────────────────────────────────────────────
         if self.database_manager:
             logger.info("[SESSION] Persisting therapy to PostgreSQL")
             result = self.database_manager.save_session()
-            if result.get("status") == "success":
-                v_id = result.get("version", {}).get("id")
-                # logger.info(
-                #    f"[SESSION] Therapy persisted to PostgreSQL – version #{v_id}"
-                # ) REDUNDANT LOG
-            else:
-                logger.error(
-                    f"[SESSION] PostgreSQL save failed: {result.get('message')}"
-                )
+            if result.get("status") != "success":
+                logger.error(f"[SESSION] PostgreSQL save failed: {result.get('message')}")
         else:
-            logger.warning(
-                "[SESSION] No database manager – therapy not persisted to PostgreSQL"
-            )
+            logger.warning("[SESSION] No database manager – therapy not persisted to PostgreSQL")
             result = {"status": "skipped", "message": "No database manager available"}
 
         # ── Mark session as ended ────────────────────────────────────────────

@@ -1,0 +1,17 @@
+# flake8 does not read pyproject.toml, so the project style declared in
+# [tool.ruff] is mirrored here. Keep the two in sync.
+[flake8]
+max-line-length = 100
+# E501: line length is already enforced by ruff format at 100.
+# E203/W503: conflict with ruff format (black-compatible) slicing and
+# line-break-before-binary-operator style.
+extend-ignore = E501, E203, W503
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    chromadb,
+    logs

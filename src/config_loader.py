@@ -24,9 +24,7 @@ DB_NAME = os.getenv("DB_NAME", "therapy_db")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
 
-DB_CONNECTION_STRING = (
-    f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-)
+DB_CONNECTION_STRING = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 
 THERAPY_FILE = Path(__file__).parent.parent / "data" / "therapy.json"

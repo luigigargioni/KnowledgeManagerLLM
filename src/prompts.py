@@ -90,7 +90,7 @@ Execute steps in order:
    Call get_patient_preferences() to personalise suggestions to the patient's habits.
 
 5. CONFIRMATION (mandatory)
-   Ask for user confirmation asbout the action you are going to perform. 
+   Ask for user confirmation about the action you are going to perform.
 
 6. ACTION EXECUTION (mandatory)
    Procede to call add_therapy_activity, remove_therapy_activity or update_therapy_activity depending on the request.
@@ -209,7 +209,7 @@ Execute steps in order:
    Call get_patient_preferences() to personalise suggestions to the patient's habits.
 
 4. CONFIRMATION (mandatory)
-   Ask for user confirmation asbout the action you are going to perform. 
+   Ask for user confirmation about the action you are going to perform.
 
 5. ACTION EXECUTION (mandatory)
    Procede to call add_therapy_activity, remove_therapy_activity or update_therapy_activity depending on the request.

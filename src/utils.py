@@ -104,9 +104,7 @@ def setup_logger(
     # Chat-only log file
     chat_handler = logging.FileHandler(f"{session_dir}/chat.log", encoding="utf-8")
     chat_handler.setLevel(FILE_LOG_LEVEL)
-    chat_formatter = logging.Formatter(
-        "%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
+    chat_formatter = logging.Formatter("%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     chat_handler.setFormatter(chat_formatter)
     chat_handler.addFilter(StartWithFilter(filter_string="[CHAT]"))
 
@@ -127,9 +125,7 @@ def setup_logger(
     )
     if len(gpu_info) > 0:
         for info in gpu_info:
-            logger.info(
-                f"[SESSION] GPU {info['gpu']}: {info['name']} ({info['memory']})"
-            )
+            logger.info(f"[SESSION] GPU {info['gpu']}: {info['name']} ({info['memory']})")
 
     logger.info(f"[SESSION] Provider={LLM_PROVIDER} Model={MODEL}")
 
@@ -216,9 +212,7 @@ def parse_chat_log(log_path: str | Path) -> list[dict]:
     return history
 
 
-def populate_agent_history(
-    agent, log_path: str | Path, keep_system_prompt: bool = True
-) -> None:
+def populate_agent_history(agent, log_path: str | Path, keep_system_prompt: bool = True) -> None:
     """
     Populate agent.conversation_history from a log file,
     preserving the initial system prompt if present.
@@ -279,9 +273,7 @@ def load_past_session(
     # Load snapshots if present
     if snapshots_path.exists():
         snapshots = json.loads(snapshots_path.read_text(encoding="utf-8"))
-        logger.info(
-            f"[LOAD] Loaded {len(snapshots)} therapy snapshots from {session_log_dir}"
-        )
+        logger.info(f"[LOAD] Loaded {len(snapshots)} therapy snapshots from {session_log_dir}")
     else:
         logger.warning(
             f"[LOAD] No therapy_snapshots.json found in {session_log_dir} – "
@@ -292,6 +284,61 @@ def load_past_session(
     return snapshots
 
 
+EXIT_WORDS = ("exit", "quit", "esci")
+
+# The caregiver agent is told to end by sending only "exit", but in practice it
+# almost always appends it to a closing pleasantry ("No further edits needed on
+# my end.exit") or wraps it ("(exit)"). Matching the whole message exactly meant
+# those turns were forwarded to the assistant instead and the conversation kept
+# going past its intended end.
+_EXIT_RE = re.compile(
+    r"(?:^|[\s.!?;:,()\[\]*\"'—-])(" + "|".join(EXIT_WORDS) + r")"
+    r"[\s.!?;:,()\[\]*\"']*$",
+    re.IGNORECASE,
+)
+
+
+def is_exit_message(message: str) -> bool:
+    """
+    True when the caregiver signalled the end of the conversation.
+
+    Accepts the bare keyword as well as a message whose last word is one of the
+    exit keywords, which is how the simulated caregiver actually ends turns.
+    """
+    text = (message or "").strip()
+    if not text:
+        return False
+    if text.lower().strip("\"'*()[]. !?") in EXIT_WORDS:
+        return True
+    return bool(_EXIT_RE.search(text))
+
+
+def is_visible_turn(msg: dict) -> bool:
+    """
+    True for the user/assistant turns that were actually exchanged with the
+    caregiver.
+
+    Excludes system and tool messages, and the internal assistant turns that
+    only carry tool calls: those belong to the agent's working history, not to
+    the conversation. Every consumer that walks the history as a dialogue
+    (transcript, therapy snapshots, chat UI, knowledge extraction) must agree on
+    this definition, otherwise message indexes drift apart.
+    """
+    role = msg.get("role")
+    if role == "user":
+        return True
+    if role != "assistant":
+        return False
+    if msg.get("tool_calls"):
+        return False
+    return bool((msg.get("content") or "").strip())
+
+
+def visible_turns(conversation_history: list[dict]) -> list[dict]:
+    """Return only the turns the caregiver actually saw, in order."""
+    return [m for m in conversation_history if is_visible_turn(m)]
+
+
 def build_transcript(conversation_history: list[dict]) -> str:
     """
     Build a readable transcript for the JudgeAgent
@@ -299,10 +346,7 @@ def build_transcript(conversation_history: list[dict]) -> str:
     Filter only user/assistant messages.
     """
     lines = []
-    for msg in conversation_history:
-        role = msg.get("role")
-        if role == "user":
-            lines.append(f"CAREGIVER: {msg['content']}")
-        elif role == "assistant":
-            lines.append(f"CHATBOT: {msg['content']}")
+    for msg in visible_turns(conversation_history):
+        speaker = "CAREGIVER" if msg["role"] == "user" else "CHATBOT"
+        lines.append(f"{speaker}: {msg['content']}")
     return "\n\n".join(lines)

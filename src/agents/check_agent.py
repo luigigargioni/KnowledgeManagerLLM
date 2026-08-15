@@ -5,7 +5,7 @@ import tools
 from agents.agent import Agent
 
 _PROMPT = """You are a specialist in analysing interactions between activites, medications and patients' health conditions.
-Your tasks: 
+Your tasks:
 1. checking if an activity in a therapy plan is safe for the patients according to their medical conditions and already present activities.
 2. giving information about medicines and the patient therapy plan
 
@@ -182,7 +182,10 @@ _CHECK_ACTIVITY_PARAMETERS = {
     "properties": {
         "activity_id": {
             "type": "string",
-            "description": "Unique ID of the activity (e.g.: 'lb_001')",
+            "description": (
+                "ID of the activity, only when checking one that already exists. "
+                "Omit it for an activity that has not been created yet."
+            ),
         },
         "name": {"type": "string", "description": "Name of the activity"},
         "description": {
@@ -217,7 +220,7 @@ _CHECK_ACTIVITY_PARAMETERS = {
             "description": "Valid until date (YYYY-MM-DD)",
         },
     },
-    "required": ["activity_id", "name", "day_of_week", "time", "duration_minutes"],
+    "required": ["name", "day_of_week", "time", "duration_minutes"],
 }
 
 

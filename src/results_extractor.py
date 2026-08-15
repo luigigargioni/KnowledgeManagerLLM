@@ -79,9 +79,7 @@ def _write_headers(ws, columns: list[str]) -> None:
         cell.font = _HEADER_FONT
         cell.fill = _HEADER_FILL
         cell.border = _THIN_BORDER
-        cell.alignment = Alignment(
-            horizontal="center", vertical="center", wrap_text=True
-        )
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
 
 def _style_cell(cell, status: str | None = None) -> None:
@@ -107,9 +105,7 @@ def _set_column_widths(ws, columns: list[str]) -> None:
         "final_therapy": 50,
     }
     for col_idx, col_name in enumerate(columns, start=1):
-        ws.column_dimensions[get_column_letter(col_idx)].width = widths.get(
-            col_name, 20
-        )
+        ws.column_dimensions[get_column_letter(col_idx)].width = widths.get(col_name, 20)
 
 
 def append_batch_results(

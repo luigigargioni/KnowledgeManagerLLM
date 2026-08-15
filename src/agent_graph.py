@@ -6,6 +6,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
+from utils import is_exit_message
+
 
 class TherapyState(TypedDict):
     messages: Annotated[list, add_messages]
@@ -27,9 +29,7 @@ def build_therapy_graph(chat, caregiver):
             messages=caregiver.conversation_history,
         )
         caregiver_message = response.choices[0].message.content or ""
-        caregiver.conversation_history.append(
-            {"role": "assistant", "content": caregiver_message}
-        )
+        caregiver.conversation_history.append({"role": "assistant", "content": caregiver_message})
 
         return {"messages": [HumanMessage(content=caregiver_message)]}
 
@@ -39,8 +39,7 @@ def build_therapy_graph(chat, caregiver):
         return {"messages": [AIMessage(content=response)]}
 
     def should_continue(state: TherapyState) -> str:
-        last = state["messages"][-1].content.strip().lower()
-        if last in ["exit", "quit", "esci"]:
+        if is_exit_message(state["messages"][-1].content):
             return "end"
         return "therapy_manager"
 

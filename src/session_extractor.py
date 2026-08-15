@@ -16,7 +16,7 @@ from openai import OpenAI
 
 from config_loader import LLM_PROVIDER, LLM_TIMEOUT, MODEL, OLLAMA_URL, OPENAI_API_KEY
 from prompts import _CONFLICT_EXTRACTION_PROMPT, _PREFERENCE_EXTRACTION_PROMPT
-from utils import get_current_logger
+from utils import get_current_logger, visible_turns
 
 logger = get_current_logger()
 
@@ -30,14 +30,9 @@ def _format_conversation(conversation_history: list[dict]) -> str:
     System messages and init-context tool injections are also skipped.
     """
     lines = []
-    for msg in conversation_history:
-        role = msg.get("role", "")
-        content = msg.get("content", "")
-        if role == "user":
-            lines.append(f"Caregiver: {content}")
-        elif role == "assistant":
-            if content:
-                lines.append(f"Assistant: {content}")
+    for msg in visible_turns(conversation_history):
+        speaker = "Caregiver" if msg["role"] == "user" else "Assistant"
+        lines.append(f"{speaker}: {msg['content']}")
     return "\n".join(lines)
 
 
@@ -120,9 +115,7 @@ def extract_and_save_conflict_resolutions(
             )
             if ok:
                 saved += 1
-                logger.debug(
-                    f"[EXTRACTOR] Conflict resolution saved: {description[:80]!r}"
-                )
+                logger.debug(f"[EXTRACTOR] Conflict resolution saved: {description[:80]!r}")
 
     logger.info(f"[EXTRACTOR] {saved} conflict resolution(s) saved")
     return saved

@@ -1,0 +1,20 @@
+[
+    {
+        "description": "After Anthony ate at a restaurant without confirming the dish was gluten-free, he developed abdominal pain and bloating that lasted through the following day.",
+        "activity_name": "Meal outside the home",
+        "event_type": "warning",
+        "date": "2026-01-27"
+    },
+    {
+        "description": "Anthony felt chest tightness and shortness of breath during a brisk uphill walk and had to stop and rest. The cardiologist advised keeping walking sessions on flat ground and at a moderate pace.",
+        "activity_name": "Brisk uphill walk",
+        "event_type": "warning",
+        "date": "2026-03-16"
+    },
+    {
+        "description": "Anthony completed his cardiology follow-up with a stable ECG. Preventive aspirin after breakfast is well tolerated with no gastric discomfort reported.",
+        "activity_name": "Cardiology follow-up",
+        "event_type": "info",
+        "date": "2026-05-21"
+    }
+]

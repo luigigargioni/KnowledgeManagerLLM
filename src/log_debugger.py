@@ -11,9 +11,7 @@ import streamlit as st
 from config_loader import THERAPY_FILE
 
 # Must be first Streamlit command
-st.set_page_config(
-    page_title="Log Debugger - KnowledgeManagerLLM", page_icon="🐛", layout="wide"
-)
+st.set_page_config(page_title="Log Debugger - KnowledgeManagerLLM", page_icon="🐛", layout="wide")
 
 st.title("🐛 Log Debugger")
 st.caption("Interactive log viewer for chat sessions")
@@ -199,9 +197,9 @@ with st.sidebar:
             birth_date_desc = ""
             if birth_date:
                 try:
-                    birth_date_desc = datetime.strptime(
-                        birth_date, "%Y-%m-%dT%H:%M:%S"
-                    ).strftime("%d/%m/%Y")
+                    birth_date_desc = datetime.strptime(birth_date, "%Y-%m-%dT%H:%M:%S").strftime(
+                        "%d/%m/%Y"
+                    )
                 except Exception:
                     birth_date_desc = ""
             age = therapy_data.get("age", "0")
@@ -234,9 +232,7 @@ with st.sidebar:
             if activities:
                 with st.expander(f"Activities ({len(activities)})"):
                     for act in activities:
-                        days = ", ".join(
-                            days_map[d] for d in act.get("day_of_week", [])
-                        )
+                        days = ", ".join(days_map[d] for d in act.get("day_of_week", []))
 
                         st.markdown(
                             f"**{act['name']}**  \n"
@@ -247,21 +243,15 @@ with st.sidebar:
                             dep_names = []
                             for dep in act["dependencies"]:
                                 dep_names += [
-                                    x["name"]
-                                    for x in activities
-                                    if x["activity_id"] == dep
+                                    x["name"] for x in activities if x["activity_id"] == dep
                                 ]
                             st.caption(f"Depends on: {', '.join(dep_names)}")
                         st.write("")
 
             if expired_activities:
-                with st.expander(
-                    f"Activities that expired today ({len(expired_activities)})"
-                ):
+                with st.expander(f"Activities that expired today ({len(expired_activities)})"):
                     for act in expired_activities:
-                        days = ", ".join(
-                            days_map[d] for d in act.get("day_of_week", [])
-                        )
+                        days = ", ".join(days_map[d] for d in act.get("day_of_week", []))
 
                         st.markdown(
                             f"**{act['name']}**  \nUntil: {act['valid_until']}  \n"
@@ -420,9 +410,7 @@ with tab_stats:
 
     with col2:
         st.subheader("Entries by Level")
-        sorted_levels = sorted(
-            stats["levels"].items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_levels = sorted(stats["levels"].items(), key=lambda x: x[1], reverse=True)
         for level, count in sorted_levels:
             st.progress(count / stats["total_lines"], text=f"{level}: {count}")
 
@@ -450,15 +438,11 @@ with tab_raw:
 
     filtered_raw = log_lines
     if search_term:
-        filtered_raw = [
-            line for line in log_lines if search_term.lower() in line.lower()
-        ]
+        filtered_raw = [line for line in log_lines if search_term.lower() in line.lower()]
         st.caption(f"Found {len(filtered_raw)} matching lines")
 
     # Display with line numbers
-    code_content = "\n".join(
-        f"{i + 1:4d} | {line}" for i, line in enumerate(filtered_raw)
-    )
+    code_content = "\n".join(f"{i + 1:4d} | {line}" for i, line in enumerate(filtered_raw))
     st.code(code_content, language=None, line_numbers=False)
 
 
