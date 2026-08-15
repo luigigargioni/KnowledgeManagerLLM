@@ -24,6 +24,7 @@ _OBJECTIVE_COLUMNS = [
     "objectives",
     "judge_check",
     "conversation",
+    "initial_therapy",
     "final_therapy",
 ]
 
@@ -48,13 +49,13 @@ _THIN_BORDER = Border(
 )
 
 
-def _get_or_create_workbook() -> tuple[openpyxl.Workbook, bool]:
+def _get_or_create_workbook(path: Path = RESULTS_EXCEL_PATH) -> tuple[openpyxl.Workbook, bool]:
     """
     Load the existing workbook or create a new one.
     Returns (workbook, is_new).
     """
-    if RESULTS_EXCEL_PATH.exists():
-        return openpyxl.load_workbook(RESULTS_EXCEL_PATH), False
+    if path.exists():
+        return openpyxl.load_workbook(path), False
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)  # remove the empty default sheet
@@ -73,13 +74,47 @@ def _get_or_create_sheet(wb: openpyxl.Workbook, sheet_name: str, is_new_wb: bool
     return ws
 
 
+def _write_header_cell(ws, col_idx: int, col_name: str) -> None:
+    cell = ws.cell(row=1, column=col_idx, value=col_name)
+    cell.font = _HEADER_FONT
+    cell.fill = _HEADER_FILL
+    cell.border = _THIN_BORDER
+    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+
 def _write_headers(ws, columns: list[str]) -> None:
     for col_idx, col_name in enumerate(columns, start=1):
-        cell = ws.cell(row=1, column=col_idx, value=col_name)
-        cell.font = _HEADER_FONT
-        cell.fill = _HEADER_FILL
-        cell.border = _THIN_BORDER
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        _write_header_cell(ws, col_idx, col_name)
+
+
+def _sync_headers(ws) -> list[str]:
+    """
+    Return the sheet's actual column layout, appending any column this module
+    knows about that the sheet does not have yet.
+
+    Workbooks written by an earlier version lack the newer columns. Rewriting
+    the header in the canonical order would shift every row already stored, so
+    a missing column is added at the end instead and rows are always written by
+    column name, never by position.
+    """
+    existing = [cell.value for cell in ws[1] if cell.value]
+    if not existing:
+        _write_headers(ws, _OBJECTIVE_COLUMNS)
+        return list(_OBJECTIVE_COLUMNS)
+
+    for col_name in _OBJECTIVE_COLUMNS:
+        if col_name not in existing:
+            existing.append(col_name)
+            _write_header_cell(ws, len(existing), col_name)
+    return existing
+
+
+def _append_row(ws, columns: list[str], values: dict, status: str | None) -> int:
+    """Append one row, matching values to the sheet's columns by name."""
+    row_idx = ws.max_row + 1
+    for col_idx, col_name in enumerate(columns, start=1):
+        _style_cell(ws.cell(row=row_idx, column=col_idx, value=values.get(col_name, "")), status)
+    return row_idx
 
 
 def _style_cell(cell, status: str | None = None) -> None:
@@ -102,6 +137,7 @@ def _set_column_widths(ws, columns: list[str]) -> None:
         "judge_check": 50,
         "objectives": 50,
         "conversation": 80,
+        "initial_therapy": 50,
         "final_therapy": 50,
     }
     for col_idx, col_name in enumerate(columns, start=1):
@@ -113,6 +149,7 @@ def append_batch_results(
     batch_id: str,
     scenario: str,
     conversation: str,
+    initial_therapy: dict,
     final_therapy: dict,
     excel_path: Path = RESULTS_EXCEL_PATH,
 ) -> Path:
@@ -128,6 +165,8 @@ def append_batch_results(
         evaluations: list of dicts produced by JudgeAgent.evaluate(),
                      enriched by test.py with scenario_id, patient, turns, elapsed_seconds
         batch_id:    batch identifier (e.g. "20260630_143000")
+        initial_therapy: the scenario's therapy as installed before the conversation
+        final_therapy:   the therapy as it stands at the end of the conversation
         excel_path:  path of the global Excel file (default: logs/batch_results/all_results.xlsx)
 
     Returns:
@@ -135,60 +174,50 @@ def append_batch_results(
     """
     excel_path.parent.mkdir(parents=True, exist_ok=True)
 
-    wb, is_new_wb = _get_or_create_workbook()
+    wb, is_new_wb = _get_or_create_workbook(excel_path)
     ws = _get_or_create_sheet(wb, "Results", is_new_wb)
+    columns = _sync_headers(ws)
 
-    if is_new_wb or "Results" not in wb.sheetnames or ws.max_row == 1:
-        _set_column_widths(ws, _OBJECTIVE_COLUMNS)
+    if ws.max_row == 1:
+        _set_column_widths(ws, columns)
 
     test_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    values = {
+        "test_date": test_date,
+        "batch_id": batch_id,
+        "scenario_id": evaluation.get("scenario_id", ""),
+        "patient": evaluation.get("patient", ""),
+        "turns": evaluation.get("turns", ""),
+        "elapsed_seconds": evaluation.get("elapsed_seconds", ""),
+        "objectives": scenario,
+        "conversation": conversation or "",
+        "initial_therapy": json.dumps(initial_therapy, indent=2),
+    }
+
     if evaluation.get("status") == "error":
-        # Failed scenario: write a single row with the error status
-        row = [
-            test_date,
-            batch_id,
-            evaluation.get("scenario_id", ""),
-            evaluation.get("patient", ""),
-            "error",
-            evaluation.get("turns", ""),
-            evaluation.get("elapsed_seconds", ""),
-            scenario,
-            evaluation.get("message", "Evaluation failed"),
-            evaluation.get("raw_output", "")[:500],
-            conversation or "",
-            "",
-        ]
-        ws.append(row)
-        row_idx = ws.max_row
-        for col_idx in range(1, len(_OBJECTIVE_COLUMNS) + 1):
-            _style_cell(ws.cell(row_idx, col_idx), "error")
-
+        # Failed scenario: write a single row with the error status. There is no
+        # judge verdict, so the failure message and the judge's unparsed output
+        # take the place of the checks.
+        status = "error"
+        raw_output = evaluation.get("raw_output", "")[:500]
+        values |= {
+            "overall_status": "error",
+            "judge_check": "\n\n".join(
+                filter(None, [evaluation.get("message", "Evaluation failed"), raw_output])
+            ),
+            "final_therapy": "",
+        }
     else:
-        scenario_id = evaluation.get("scenario_id", "")
-        patient = evaluation.get("patient", "")
-        overall_status = evaluation.get("overall_status", "")
-        turns = evaluation.get("turns", "")
-        elapsed = evaluation.get("elapsed_seconds", "")
-        objectives = evaluation.get("objectives", [])
+        status = evaluation.get("overall_status", "")
+        values |= {
+            "overall_status": status,
+            "judge_check": json.dumps(evaluation.get("objectives", []), indent=2),
+            "final_therapy": json.dumps(final_therapy, indent=2),
+        }
 
-        row = [
-            test_date,
-            batch_id,
-            scenario_id,
-            patient,
-            overall_status,
-            turns,
-            elapsed,
-            scenario,
-            json.dumps(objectives, indent=2),
-            conversation,
-            json.dumps(final_therapy, indent=2),
-        ]
-        ws.append(row)
-        row_idx = ws.max_row
-        for col_idx in range(1, len(_OBJECTIVE_COLUMNS) + 1):
-            _style_cell(ws.cell(row_idx, col_idx), overall_status)
+    _append_row(ws, columns, values, status)
+
     # Freeze the header row
     ws.freeze_panes = "A2"
 

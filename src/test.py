@@ -175,6 +175,10 @@ def run_scenario(
     final_therapy = chat._therapy_snapshots[-1]["therapy"]
     final_therapy.pop("objectives", None)
 
+    # The scenario as installed, minus the caregiver script: the starting point
+    # the final therapy has to be read against.
+    initial_therapy = {k: v for k, v in scenario.items() if k != "objectives"}
+
     # What actually changed, computed in code. The transcript alone cannot tell a
     # real success from a fabricated confirmation, so the judge is given this
     # change set as the authoritative record of the outcome.
@@ -212,7 +216,7 @@ def run_scenario(
     logger.info(
         f"[SCENARIO {scenario_id}] Evaluation complete – overall: {evaluation['overall_status']}"
     )
-    return evaluation, script, transcript, final_therapy
+    return evaluation, script, transcript, initial_therapy, final_therapy
 
 
 def print_scenario_summary(scenario_id: int, evaluation: dict) -> None:
@@ -301,7 +305,7 @@ def main():
         print(f"\n[{scenario_id}/{to_id}] Running scenario {scenario_id}...")
 
         try:
-            evaluation, scenario, transcript, final_therapy = run_scenario(
+            evaluation, scenario, transcript, initial_therapy, final_therapy = run_scenario(
                 scenario_id=scenario_id,
                 vector_db=vector_db,
                 delay=args.delay,
@@ -323,6 +327,7 @@ def main():
                 batch_id,
                 scenario,
                 transcript,
+                initial_therapy,
                 final_therapy,
             )
             print_scenario_summary(scenario_id, evaluation)
