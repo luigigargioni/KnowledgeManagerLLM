@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -12,7 +13,8 @@ from time import sleep, time
 from agents.caregiver_agent import CaregiverAgent
 from agents.judge_agent import JudgeAgent
 from chat import OllamaChat
-from config_loader import MODEL, RESULTS_DIR, SCENARIOS_DIR
+from config_loader import MAIN_LLM, RESULTS_DIR, SCENARIOS_DIR, SIM_LLM
+from llm_client import DailyQuotaExceeded, make_sim_client, usage_report
 from results_extractor import append_batch_results
 from scenario_loader import (
     install_scenario_therapy,
@@ -63,6 +65,7 @@ def run_scenario(
     delay: float,
     max_turns: int,
     batch_log_dir: Path,
+    sim_client,
 ) -> dict:
     """
     Run a single scenario and return the evaluation result.
@@ -86,8 +89,9 @@ def run_scenario(
     # resetting the store, and verifies the result before any scenario runs.
 
     # ── Initialize Chat in stateless mode (no DB) ────────────────────
+    # Chat is the system under test and builds its own client from MAIN_LLM;
+    # `sim_client` is the separate backend driving the caregiver and the judge.
     chat = OllamaChat(
-        model=MODEL,
         database_manager=None,  # stateless
         vector_db=vector_db,
     )
@@ -153,8 +157,9 @@ def run_scenario(
                 "reaction instructions delivered"
             )
 
-        response = chat.client.chat.completions.create(
-            model=chat.model,
+        # The caregiver is a simulation agent, not the system under test: it runs
+        # on its own backend (SIM_LLM), with its own provider, model and quota.
+        response = sim_client.chat.completions.create(
             messages=caregiver.conversation_history,
         )
         caregiver_message = response.choices[0].message.content or ""
@@ -206,8 +211,8 @@ def run_scenario(
 
     judge = JudgeAgent()
     evaluation = judge.evaluate(
-        client=chat.client,
-        model=chat.model,
+        client=sim_client,
+        model=SIM_LLM.model,
         script=script,
         transcript=transcript,
         therapy=json.dumps(final_therapy),
@@ -256,6 +261,14 @@ def print_scenario_summary(scenario_id: int, evaluation: dict) -> None:
 
 def main():
     args = parse_args()
+
+    # A redirected stdout on Windows defaults to cp1252, which cannot encode the
+    # status icons or the em dashes below. Without this, piping the batch to a
+    # file kills a scenario *after* it has been graded and saved, and records it
+    # as an error.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
 
     # If --to is not specified, run all scenarios
     to_id = (
@@ -316,13 +329,20 @@ def main():
         )
     logger.info(f"[BATCH] Vector DB ready – {vector_db.counts()}")
 
+    # One simulation client for the whole batch, so its rate-limit window and
+    # calibration carry across scenarios instead of restarting at every one.
+    sim_client = make_sim_client()
+
     print("=" * 60)
     print(f"  Batch test run — {len(scenario_ids)} scenario(s)")
+    print(f"  Assistant:      {MAIN_LLM.provider} / {MAIN_LLM.model}")
+    print(f"  Caregiver+judge: {SIM_LLM.provider} / {SIM_LLM.model}")
     print(f"  Output: {batch_log_dir}")
     print("=" * 60)
 
     results = []
     failed = []
+    quota_exceeded = None
 
     for scenario_id in scenario_ids:
         print(f"\n[{scenario_id}/{to_id}] Running scenario {scenario_id}...")
@@ -334,6 +354,7 @@ def main():
                 delay=args.delay,
                 max_turns=args.max_turns,
                 batch_log_dir=batch_log_dir,
+                sim_client=sim_client,
             )
 
             to_append = {
@@ -355,6 +376,17 @@ def main():
             )
             print_scenario_summary(scenario_id, evaluation)
 
+        except DailyQuotaExceeded as e:
+            # Nothing else can run today: stop here and keep what has been graded
+            # so far, instead of burning through the remaining scenarios with the
+            # same error and reporting them as if they had failed on their merits.
+            quota_exceeded = str(e)
+            logger.error(f"[BATCH] Daily quota exhausted at scenario {scenario_id}: {e}")
+            print(f"\n  Daily provider quota exhausted at scenario {scenario_id}:\n  {e}")
+            print(f"  Stopping the batch – scenarios {scenario_id}→{to_id} were not run.")
+            failed.append({"scenario_id": scenario_id, "error": str(e)})
+            break
+
         except FileNotFoundError as e:
             logger.warning(f"[BATCH] Scenario {scenario_id} skipped: {e}")
             print(f"Scenario {scenario_id:>3} | skipped (not found)")
@@ -366,10 +398,21 @@ def main():
             failed.append({"scenario_id": scenario_id, "error": str(e)})
 
     # ── Save results ───────────────────────────────────────────────────
+    usage = usage_report()
     results_path = batch_log_dir / "results.json"
     results_path.write_text(
         json.dumps(
-            {"batch_id": batch_id, "results": results, "failed": failed},
+            {
+                "batch_id": batch_id,
+                "provider": MAIN_LLM.provider,
+                "model": MAIN_LLM.model,
+                "sim_provider": SIM_LLM.provider,
+                "sim_model": SIM_LLM.model,
+                "usage": usage,
+                "quota_exceeded": quota_exceeded,
+                "results": results,
+                "failed": failed,
+            },
             indent=2,
             ensure_ascii=False,
         ),
@@ -400,6 +443,17 @@ def main():
         print(
             f"  Objective rate:    {obj_completed}/{obj_total} ({obj_completed / obj_total * 100:.1f}%)"
         )
+
+    # Consumption against the daily quota, so the next batch can be sized before
+    # it runs into a limit halfway through.
+    for entry in usage:
+        line = f"  {entry['quota']}: {entry['requests']} requests, ~{entry['tokens']} tokens"
+        if entry["rpd_limit"] or entry["tpd_limit"]:
+            line += f" (daily limits: {entry['rpd_limit']} RPD / {entry['tpd_limit']} TPD)"
+        print(line)
+    if quota_exceeded:
+        print(f"\n  BATCH INCOMPLETE – {quota_exceeded}")
+
     print(f"\n  Results saved to: {results_path}")
 
     logger.info(

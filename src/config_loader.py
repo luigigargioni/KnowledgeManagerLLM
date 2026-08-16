@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -8,14 +9,151 @@ load_dotenv()
 # General server settings
 FILE_LOG_LEVEL = os.getenv("FILE_LOG_LEVEL", "DEBUG")
 TERMINAL_LOG_LEVEL = os.getenv("TERMINAL_LOG_LEVEL", "WARNING")
-MODEL = os.getenv("MODEL", "qwen2.5:14b")
 CHECK_NVIDIA_GPU = int(os.getenv("CHECK_NVIDIA_GPU", "0")) == 1
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "120"))
 
+# ── LLM backends ─────────────────────────────────────────────────────────────
+# Two roles, configured independently:
+#   MAIN_LLM — the system under test: therapy manager, checker, extractors.
+#   SIM_LLM  — the simulated caregiver and the judge of the test harness.
+# Each has its own provider AND model, so the harness can grade a locally served
+# model with a cloud one, or keep the two on separate quotas of the same cloud.
+# Every SIM_* setting falls back to its MAIN counterpart when left empty.
+#
+# Credentials and endpoints belong to the provider, not to the role: both roles
+# on Groq share GROQ_API_KEY.
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-# Auto-detect provider: use OpenAI if an API key is set, otherwise use Ollama
-LLM_PROVIDER = "openai" if OPENAI_API_KEY else "ollama"
+OPENAI_URL = os.getenv("OPENAI_URL", "")  # empty = the SDK default
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_URL = os.getenv("GROQ_URL", "https://api.groq.com/openai/v1")
+
+SUPPORTED_PROVIDERS = ("openai", "groq", "ollama")
+
+_DEFAULT_MODELS = {
+    "groq": "openai/gpt-oss-120b",
+    "openai": "gpt-5.4-mini",
+    "ollama": "gpt-oss:20b",
+}
+
+# Client-side rate limits, per provider. The Groq figures are the free tier
+# (30 RPM, 8K TPM, 1K RPD, 200K TPD, counted per model); OpenAI and Ollama are
+# unthrottled here. 0 disables a limit.
+_RATE_LIMIT_DEFAULTS = {
+    "groq": {"rpm": 30, "tpm": 8000, "rpd": 1000, "tpd": 200_000},
+    "openai": {"rpm": 0, "tpm": 0, "rpd": 0, "tpd": 0},
+    "ollama": {"rpm": 0, "tpm": 0, "rpd": 0, "tpd": 0},
+}
+
+
+@dataclass(frozen=True)
+class LLMConfig:
+    """Everything needed to talk to one backend, for one role."""
+
+    role: str
+    provider: str
+    model: str
+    api_key: str
+    base_url: str | None
+    timeout: int
+    reasoning_effort: str
+    rpm: int
+    tpm: int
+    rpd: int
+    tpd: int
+    completion_reserve: int
+    max_retries: int
+    max_retry_wait: float
+
+    @property
+    def quota_key(self) -> str:
+        """Identity of the quota this config consumes (providers count per model)."""
+        return f"{self.provider}:{self.model}"
+
+    def describe(self) -> str:
+        return f"{self.role}={self.provider}/{self.model}"
+
+
+def _env(name: str, prefix: str = "", default: str = "") -> str:
+    return os.getenv(f"{prefix}{name}", default).strip()
+
+
+def _resolve_provider(prefix: str, fallback: str | None) -> str:
+    """Explicit PROVIDER wins; otherwise infer from the keys, then fall back."""
+    provider = _env("PROVIDER", prefix).lower()
+    if provider:
+        if provider not in SUPPORTED_PROVIDERS:
+            raise ValueError(
+                f"Unknown {prefix}PROVIDER '{provider}' in .env – "
+                f"supported: {', '.join(SUPPORTED_PROVIDERS)}"
+            )
+        return provider
+    if fallback:
+        return fallback
+    if OPENAI_API_KEY:
+        return "openai"
+    if GROQ_API_KEY:
+        return "groq"
+    return "ollama"
+
+
+def _credentials(provider: str) -> tuple[str, str | None]:
+    if provider == "openai":
+        return OPENAI_API_KEY, (OPENAI_URL or None)
+    if provider == "groq":
+        return GROQ_API_KEY, GROQ_URL
+    # Ollama ignores the key but the OpenAI SDK insists on a non-empty one
+    return "ollama", f"{OLLAMA_URL}/v1"
+
+
+def _int_env(name: str, prefix: str, default: int) -> int:
+    raw = _env(name, prefix)
+    return int(raw) if raw else default
+
+
+def _build_config(role: str, prefix: str, base: "LLMConfig | None" = None) -> LLMConfig:
+    """
+    Build one role's configuration. `base` is the config this role falls back to
+    when a setting is left empty (SIM_* inherits from MAIN unless overridden).
+    """
+    provider = _resolve_provider(prefix, base.provider if base else None)
+    model = _env("MODEL", prefix) or (
+        base.model if base and base.provider == provider else _DEFAULT_MODELS[provider]
+    )
+    api_key, base_url = _credentials(provider)
+    limits = _RATE_LIMIT_DEFAULTS[provider]
+
+    reasoning = os.getenv(f"{prefix}REASONING_EFFORT")
+    if reasoning is None:
+        reasoning = base.reasoning_effort if base else "low"
+
+    return LLMConfig(
+        role=role,
+        provider=provider,
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+        timeout=_int_env("LLM_TIMEOUT", prefix, base.timeout if base else 120),
+        reasoning_effort=reasoning.strip(),
+        rpm=_int_env("LLM_RPM", prefix, limits["rpm"]),
+        tpm=_int_env("LLM_TPM", prefix, limits["tpm"]),
+        rpd=_int_env("LLM_RPD", prefix, limits["rpd"]),
+        tpd=_int_env("LLM_TPD", prefix, limits["tpd"]),
+        completion_reserve=_int_env("LLM_COMPLETION_RESERVE", prefix, 1200),
+        max_retries=_int_env("LLM_MAX_RETRIES", prefix, 5),
+        max_retry_wait=float(_int_env("LLM_MAX_RETRY_WAIT", prefix, 300)),
+    )
+
+
+MAIN_LLM = _build_config("main", prefix="")
+SIM_LLM = _build_config("sim", prefix="SIM_", base=MAIN_LLM)
+
+# Backwards-compatible aliases: the rest of the code reads these names.
+LLM_PROVIDER = MAIN_LLM.provider
+MODEL = MAIN_LLM.model
+SIM_PROVIDER = SIM_LLM.provider
+SIM_MODEL = SIM_LLM.model
+LLM_TIMEOUT = MAIN_LLM.timeout
+REASONING_EFFORT = MAIN_LLM.reasoning_effort
 
 
 DB_HOST = os.getenv("DB_HOST", "localhost")

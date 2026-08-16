@@ -137,15 +137,34 @@ pip install -e .
 Copy `.env.example` to `.env` and fill in every variable:
 
 ```ini
-# LLM backend – use one of the two options below
+# Two backends are configured independently:
+#   MAIN — the system under test (therapy manager + checker)
+#   SIM  — the test harness (simulated caregiver + judge)
+# Each has its own provider AND model. Any SIM_* left empty falls back to MAIN.
+# PROVIDER: openai | groq | ollama; empty = inferred from the keys below
+# (OpenAI first, then Groq), falling back to Ollama.
 
-# Option A: local Ollama
+PROVIDER=ollama
 MODEL=gpt-oss:20b
-OLLAMA_URL=http://localhost:11434
 
-# Option B: OpenAI cloud (set a valid key; the Ollama settings are ignored)
+SIM_PROVIDER=
+SIM_MODEL=
+
+# Credentials and endpoints belong to the provider, not the role
+OLLAMA_URL=http://localhost:11434
 # OPENAI_API_KEY=sk-...
-# MODEL=gpt-5.4-mini
+# GROQ_API_KEY=gsk_...
+
+# Example – grade a locally served model with a cloud one:
+#   PROVIDER=ollama       MODEL=gpt-oss:20b
+#   SIM_PROVIDER=groq     SIM_MODEL=openai/gpt-oss-20b
+# Example – both on Groq, two models = two separate quotas:
+#   PROVIDER=groq         MODEL=openai/gpt-oss-120b
+#   SIM_PROVIDER=groq     SIM_MODEL=openai/gpt-oss-20b
+
+# Sent on every call; supported by the gpt-oss family (low|medium|high),
+# rejected by models without a reasoning mode – leave empty for those.
+REASONING_EFFORT=low
 
 # LLM request timeout in seconds
 LLM_TIMEOUT=120
@@ -187,6 +206,16 @@ ollama serve
 The model must support the `/api/chat` endpoint (i.e. be a chat model, not a completion-only model).
 
 **OpenAI** – no local server needed; just set `OPENAI_API_KEY` in `.env`.
+
+**Groq** – no local server needed; set `GROQ_API_KEY` and `PROVIDER=groq`. Groq enforces
+per-model rate limits (the free tier gives 30 RPM / 8K TPM / 1K RPD / 200K TPD on both
+`openai/gpt-oss-120b` and `openai/gpt-oss-20b`), so requests are paced client-side before
+being sent. The limits follow the provider of each role automatically — leave `LLM_*` /
+`SIM_LLM_*` unset unless the account has a different tier. A batch stops with a clear
+message when a daily quota runs out, and the tokens consumed are reported in
+`logs/batch_results/<batch_id>/results.json`. On the 8K TPM free tier the per-minute budget
+is the binding constraint: pacing makes a scenario take several minutes, and a long
+conversation can grow past what a single request is allowed to carry.
 
 ---
 

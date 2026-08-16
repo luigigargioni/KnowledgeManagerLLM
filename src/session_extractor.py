@@ -12,9 +12,8 @@ When the caregiver saves a session this module:
 import json
 import re
 
-from openai import OpenAI
-
-from config_loader import LLM_PROVIDER, LLM_TIMEOUT, MODEL, OLLAMA_URL, OPENAI_API_KEY
+from config_loader import MODEL
+from llm_client import make_main_client
 from prompts import _CONFLICT_EXTRACTION_PROMPT, _PREFERENCE_EXTRACTION_PROMPT
 from utils import get_current_logger, visible_turns
 
@@ -36,20 +35,13 @@ def _format_conversation(conversation_history: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _make_extractor_client() -> OpenAI:
-    """Return an OpenAI-compatible client for the configured provider."""
-    if LLM_PROVIDER == "openai":
-        return OpenAI(api_key=OPENAI_API_KEY, timeout=LLM_TIMEOUT)
-    return OpenAI(base_url=f"{OLLAMA_URL}/v1", api_key="ollama", timeout=LLM_TIMEOUT)
-
-
 def _call_llm(system_prompt: str, user_text: str) -> list[dict]:
     """
     Call the LLM with a specialised system prompt.
-    Works with both OpenAI cloud and local Ollama.
+    Works with every provider supported by llm_client.make_client().
     Returns the parsed JSON list, or an empty list on failure.
     """
-    client = _make_extractor_client()
+    client = make_main_client()
     try:
         response = client.chat.completions.create(
             model=MODEL,

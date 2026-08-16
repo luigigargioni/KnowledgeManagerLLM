@@ -32,9 +32,29 @@ ruff format .                 # format (double quotes, spaces)
 
 There is **no unit test suite**. `test.py` is the scenario batch runner — "running the tests" means running scenarios and reading the `JudgeAgent` verdicts. Doing so needs a live LLM backend and takes minutes per scenario.
 
-Runtime prerequisites: an LLM backend (Ollama at `OLLAMA_URL`, or OpenAI with `OPENAI_API_KEY`) and — for `main.py` / the Streamlit UI only — PostgreSQL. `test.py` runs stateless without a database. Config lives in `.env` (copy from `.env.example`); everything is read in `config_loader.py`.
+Runtime prerequisites: an LLM backend (Ollama at `OLLAMA_URL`, OpenAI with `OPENAI_API_KEY`, or Groq with `GROQ_API_KEY`) and — for `main.py` / the Streamlit UI only — PostgreSQL. `test.py` runs stateless without a database. Config lives in `.env` (copy from `.env.example`); everything is read in `config_loader.py`.
 
 ## Architecture
+
+### The LLM backends — two roles, independently configured
+
+`config_loader` builds two `LLMConfig` objects, and `llm_client` is the only place a client is constructed:
+
+| Role | Config | Client | Who uses it |
+|---|---|---|---|
+| system under test | `MAIN_LLM` (`PROVIDER`, `MODEL`, …) | `make_main_client()` | `Chat` (therapy manager + checker), `session_extractor` |
+| simulation | `SIM_LLM` (`SIM_PROVIDER`, `SIM_MODEL`, …) | `make_sim_client()` | caregiver in `test.py` / `agent_graph.py` / `main.py`, `JudgeAgent` |
+
+Each role has its own **provider and model**, so a locally served model can be graded by a cloud one. Every `SIM_*` setting falls back to its `MAIN` counterpart when empty; credentials and endpoints belong to the provider (`GROQ_API_KEY`, `OLLAMA_URL`, …) and are shared by both roles. All three providers speak the OpenAI protocol, so only the base URL and key differ. `PROVIDER` left empty is inferred: OpenAI key → Groq key → Ollama.
+
+A client knows its own model, so `create(...)` may omit `model=`. Keeping the roles apart matters on Groq, where quotas are counted per model, and it keeps the simulated user off the model being measured.
+
+The client returned by `make_client()` is a `RateLimitedClient` proxy exposing the usual `.chat.completions.create(...)`. It paces requests against a 60-second sliding window *before* sending, using limits carried by the config (`LLM_RPM`/`LLM_TPM`, `SIM_LLM_RPM`/…), reconciles its token estimate with the `usage` the provider reports — the char→token ratio is *calibrated per quota* after the first responses, because these prompts tokenise near 7.5 chars/token and a naive estimate halves throughput — and retries 429s using `Retry-After`. Quotas are keyed `provider:model`, so two roles on the same model share one budget. Two failures are made explicit instead of being retried blindly:
+
+- `DailyQuotaExceeded` — `LLM_RPD`/`LLM_TPD` reached, or the provider asked for a wait longer than `LLM_MAX_RETRY_WAIT`. `test.py` catches it and stops the batch, keeping the scenarios already graded.
+- `RequestTooLarge` — HTTP 413: the prompt alone exceeds the per-minute token budget, so no wait can help. On Groq's free tier (8K TPM) a therapy-manager request starts around 3.6K tokens and grows with every tool result, so long conversations do hit this.
+
+Limits default to 0 (disabled) for OpenAI and Ollama, and to the Groq free-tier figures for `groq` — per role, so `PROVIDER=ollama` with `SIM_PROVIDER=groq` throttles only the simulation side.
 
 ### Multi-agent structure
 
@@ -52,6 +72,27 @@ A worker is exposed to the supervisor via `Agent.as_tool_declaration()`, which p
 ### Two conversation drivers
 
 `main.py --input` builds a **LangGraph** loop (`agent_graph.py`): `caregiver → therapy_manager → caregiver`, terminating when `is_exit_message()` matches. `test.py` drives the same two parties with a **plain Python loop** instead, because it needs to inject deferred context mid-conversation (see below). Both paths must stay behaviourally equivalent; `main.py:run_agent_mode_old` is dead code kept for reference.
+
+### Where the tokens go
+
+Measured on Groq (`prompt_tokens` from the API, scenario 1, `openai/gpt-oss-120b`), one therapy-manager request costs:
+
+| Component | Tokens | Re-sent on |
+|---|---|---|
+| system prompt (after compaction; was 1396) | ~1130 | every call |
+| 9 tool declarations | 564 | every call |
+| injected context (datetime + therapy) | 281 | every call |
+| each user turn + tool result | ~290 | accumulates |
+
+One 6-turn scenario ran 17 manager calls + 5 checker calls ≈ 75K tokens on the assistant side alone, so **the system prompts and the tool schemas are over half of a scenario's budget** — they are re-sent in full on every iteration of the agent loop. On a tokens-per-minute-capped tier that is throughput, not just cost.
+
+Three things are already done and should stay done:
+
+- tool results are serialised compactly (`tools._tool_json`; `indent=2` cost ~35% of the payload in pure whitespace);
+- the checker injects its context once per reset, not twice;
+- both system prompts were compacted by removing repetition only. In the manager, several rules were stated in two or three sections at once (conflict resolution, id handling, "rely on the tools for overlap checks"): static cost per call 2413 → 1975 tokens. In the checker, a prose `# TOOLS` list repeated what `_CHECK_TOOLS` already declares — and repeated the two most important when-to-call rules a third time inside the steps: 1414 → 1279 tokens per call.
+
+Keep both deduplicated. A tool's when-to-call instruction belongs in its schema description, which the model always sees; a behavioural rule belongs in exactly one section of the prompt. Restating either "for emphasis" costs on every iteration of the loop.
 
 ### Evaluation is diff-based, not transcript-based
 
@@ -82,8 +123,8 @@ Scheduling is deliberately **not** the LLM's job. `tools.py` compares time overl
 
 ## Gotchas
 
-- **Provider selection is implicit**: `LLM_PROVIDER` is derived in `config_loader.py` as `"openai" if OPENAI_API_KEY else "ollama"`. The `PROVIDER` and `GROQ_API_KEY` keys in `.env.example` are not read by any code.
-- `_run_agent_loop` passes `reasoning_effort="low"` on every completion call — fine for `gpt-oss`/OpenAI reasoning models, rejected by others.
+- **Provider selection can be implicit**: with `PROVIDER` empty, `config_loader.py` picks OpenAI if `OPENAI_API_KEY` is set, then Groq if `GROQ_API_KEY` is set, else Ollama. A `.env` holding several keys therefore needs `PROVIDER` set explicitly.
+- `_run_agent_loop` passes `reasoning_effort` from its client's config (default `"low"`) on every completion call. The `gpt-oss` family accepts it on every provider; plain chat models answer 400. `llm_client` catches that specific 400, drops the parameter for that quota and retries, so switching provider does not require touching the knob — one wasted request per model per process, and a `model rejected 'reasoning_effort'` warning in the log. Set `REASONING_EFFORT=` / `SIM_REASONING_EFFORT=` empty to avoid even that.
 - `Chat.conversation_history` stays empty; the real history is `chat.chat_agent.conversation_history`. `end_session()` still passes the empty list to the extractors, so end-of-session extraction currently sees nothing.
 - `prompts.py` holds the *old* agent prompts; the live ones are inline in each `agents/*.py`. Only `_CONFLICT_EXTRACTION_PROMPT` and `_PREFERENCE_EXTRACTION_PROMPT` are still used (by `session_extractor.py`).
 - The README has drifted: scenarios are `scenarios/<id>.json` (not `scenarios/<id>/scenario.json`), and it still lists `agent.py`, `session_manager.py` and `log_parser.py`, which no longer exist (their code moved into `agents/`, `chat.py` and `utils.py`). Prefer the source.

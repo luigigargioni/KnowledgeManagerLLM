@@ -2,20 +2,12 @@ import json
 from pathlib import Path
 from time import time
 
-from openai import OpenAI
-
 import tools as tools
 from agents.agent import Agent
 from agents.check_agent import TherapyCheckAgent
 from agents.therapy_manager_agent import TherapyManagerAgent
-from config_loader import (
-    LLM_PROVIDER,
-    LLM_TIMEOUT,
-    MODEL,
-    OLLAMA_URL,
-    OPENAI_API_KEY,
-    THERAPY_FILE,
-)
+from config_loader import THERAPY_FILE
+from llm_client import make_main_client
 from session_extractor import (
     extract_and_save_conflict_resolutions,
     extract_and_save_patient_preferences,
@@ -25,17 +17,6 @@ from utils import addAgentFilterLogger, get_current_logger, visible_turns
 from utils import load_past_session as _load
 
 logger = get_current_logger()
-
-
-def _make_client() -> OpenAI:
-    """Return an OpenAI-compatible client for the configured provider."""
-    if LLM_PROVIDER == "openai":
-        return OpenAI(
-            api_key=OPENAI_API_KEY,
-            timeout=LLM_TIMEOUT,
-        )
-    # Ollama exposes an OpenAI-compatible API at /v1
-    return OpenAI(base_url=f"{OLLAMA_URL}/v1", api_key="ollama", timeout=LLM_TIMEOUT)
 
 
 def build_first_message(therapy_json):
@@ -88,22 +69,23 @@ def build_first_message(therapy_json):
 class Chat:
     def __init__(
         self,
-        model=MODEL,
+        model: str | None = None,
         database_manager: DatabaseManager = None,
         vector_db=None,
     ):
         """
-        Initialise the LLM client.
-        Supports both OpenAI cloud and Ollama (auto-detected from OPENAI_API_KEY).
+        Initialise the LLM client of the system under test (MAIN_LLM).
+        Supports OpenAI cloud, Groq and Ollama (see llm_client.make_client).
 
         Args:
-            model: Model name to use
+            model: Model name; defaults to the one configured for MAIN_LLM
             system_prompt: System prompt to configure the model behaviour
             database_manager: DatabaseManager instance for session persistence
             vector_db: VectorDBManager instance for RAG features
         """
-        self.model = model
-        self.client = _make_client()
+        self.client = make_main_client()
+        # The client carries its own model; an explicit argument still wins.
+        self.model = model or self.client.model
         self.session_ended = False
         self.database_manager = database_manager
         self.vector_db = vector_db
@@ -275,11 +257,11 @@ class Chat:
         agent.conversation_history.append({"role": "user", "content": user_message})
 
         for _ in range(10):
+            # model and reasoning_effort come from the client's own config
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=agent.conversation_history,
                 tools=agent.tools,
-                reasoning_effort="low",
             )
             msg = response.choices[0].message
 

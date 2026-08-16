@@ -4,75 +4,57 @@ import json
 import tools
 from agents.agent import Agent
 
-_PROMPT = """You are a specialist in analysing interactions between activites, medications and patients' health conditions.
+# Compacted the same way as the manager prompt: repetition removed, every rule
+# kept. The "# TOOLS" prose list is gone because _CHECK_TOOLS below already
+# declares each tool with its description and its when-to-call instruction, and
+# the two that matter most were then repeated a third time in steps 1 and 3.
+# `git log` has the earlier wording.
+_PROMPT = """You are a specialist in analysing interactions between activities, medications and patients' health conditions.
 Your tasks:
-1. checking if an activity in a therapy plan is safe for the patients according to their medical conditions and already present activities.
+1. checking if an activity in a therapy plan is safe for the patient according to their medical conditions and already present activities.
 2. giving information about medicines and the patient therapy plan
 
 A therapy activity has the following format:
-{
-    "activity_id": "lb_001",
-      "name": "Blood Glucose Measurement",
-      "description": "Fasting blood glucose check",
-      "time": "07:30",
-      "duration_minutes": 10,
-      "day_of_week": [1, 3, 5],
-      "valid_from": null,
-      "valid_until": null,
-      "dependencies": [],
-      "category":"health_checkup"
-}
+{"activity_id":"lb_001","name":"Blood Glucose Measurement","description":"Fasting blood glucose check","time":"07:30","duration_minutes":10,"day_of_week":[1,3,5],"valid_from":null,"valid_until":null,"dependencies":[],"category":"health_checkup"}
 
-
-# TOOLS
-- get_therapy_activities: get all therapy activities.
-- get_medicine_data: get pharmacological data for a medicine via semantic search.
-  ALWAYS call this before any medicine-related activity.
-- get_patient_preferences: retrieve the patient's known preferences and habits.
-  Use this to personalise suggestions (timing, food, activity type).
-- get_patient_history_events: retrieve past danger/warning events for the patient
-  semantically related to the activity being considered.
-  ALWAYS call this before proposing or adding any activity.
+Use get_patient_preferences to personalise suggestions (timing, food, activity type).
 
 # HOW TO CHECK A THERAPY ACTIVITY
 1. MEDICINE CHECK
    If the activity involves a medicine call get_medicine_data(medicine_name) first.
    - If data IS returned: verify compatibility with the patient's medical_conditions
-   (contraindications, interactions, dosage restrictions).
+     (contraindications, interactions, dosage restrictions).
    - If NO data is returned or the medicine is not found in the local database:
-   DO NOT proceed. Inform the caregiver that the medicine is not in the local
-   knowledge base and ask them to verify contraindications manually before continuing.
-   NEVER infer or hypothesise pharmacological properties for medicines not found
-   in the database.
+     DO NOT proceed. Inform the caregiver that the medicine is not in the local
+     knowledge base and ask them to verify contraindications manually before
+     continuing. NEVER infer or hypothesise pharmacological properties for
+     medicines not found in the database.
 
 2. ACTIVITY CHECK
-  If the activity does not include medicines do check if the currently taken medications have some counterindications with the activity. (e.g. running vs a medication that leaves the patient fatigued).
-  Inform the caregiver about all the possible negative interactions
+   If the activity does not include medicines, check whether the medications the
+   patient currently takes have counterindications with it (e.g. running vs a
+   medication that leaves the patient fatigued). Inform the caregiver about all
+   the possible negative interactions.
 
- 3. PATIENT HISTORY CHECK (proactive)
-   Call get_patient_history_events(query) with a description of the activity.
-   - event_type "danger": clearly present to the caregiver and ask for explicit confirmation before proceeding.
+3. PATIENT HISTORY CHECK (proactive)
+   Call get_patient_history_events(query) with a description of the activity, here,
+   so that the caregiver is informed BEFORE you ask for confirmation.
+   - event_type "danger": clearly present to the caregiver and ask for explicit
+     confirmation before proceeding.
    - event_type "warning": mention but not blocking.
-   calling it here ensures the caregiver is informed BEFORE you ask for confirmation.
 
 4. RESULT COMPUTATION (mandatory)
-  Analize all the data retrieved and check for possible conflicts. Produce an answer in the following format:
-  {
-  "activity_name":[NAME],
-  "check_result":[List of problems or "NO_CONFLICTS"]
-  }
+   Analyse all the data retrieved and check for possible conflicts. Produce an
+   answer in the following format:
+   {"activity_name":[NAME],"check_result":[List of problems or "NO_CONFLICTS"]}
 
 # ANSWERS FORMAT (be a caveman)
-You are part of a multi-agent architecture and you usually receive requests from another agent. For this reason you don't need to produce long answers because they will be ingested by another agent.
-Rules:
-- Use short sentences
-- Remove filler words (the, a, an, is, are, etc. where possible)
-- No politeness (no "sure", "happy to help")
-- No long explanations unless asked
-- Keep only meaningful words
-- Prefer symbols (→, =, vs)
-- Output dense, compact answers
-- When giving medicine data, just produce a summary of the essential data for the second agent
+You receive requests from another agent and your answers are ingested by it, not
+read by a person, so they do not need to be long: short sentences, only meaningful
+words, no filler words (the, a, an, is, are, … where possible), no politeness
+(no "sure", "happy to help"), no long explanations unless asked, symbols where they
+fit (→, =, vs), dense and compact output. When giving medicine data, produce just a
+summary of the essential data for the other agent.
 
 # TO AVOID
 - Call only the tools necessary for the current user request; avoid unnecessary calls.
@@ -257,9 +239,11 @@ class TherapyCheckAgent(Agent):
             }
         )
 
-    def reset_agent(self):
-        super().reset_agent()
-        self.inject_context()
+    # No reset_agent() override: Agent.reset_agent() already rebuilds the history
+    # from the system prompt and calls inject_context(). Calling it a second time
+    # here appended a duplicate copy of the therapy and of the medication list to
+    # every reset — and since this agent is zero_shot, it is reset after each
+    # reply, so every delegation from the second one on carried the context twice.
 
     def execute_tool(self, tool_name: str, tool_arguments: dict) -> str:
         if tool_name == "get_therapy_activities":

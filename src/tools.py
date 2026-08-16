@@ -35,6 +35,21 @@ CATEGORY_ID_PREFIX = {
 logger = logging.getLogger("knowledge_manager")
 
 
+def _tool_json(payload) -> str:
+    """
+    Serialise a tool result for the model.
+
+    Compact on purpose: indentation is whitespace the model does not read but
+    the provider still bills, and every tool result stays in the conversation
+    for the rest of the session. Measured on a real therapy document, dropping
+    `indent=2` cuts the payload by ~35% of its tokens for identical content —
+    which on a tight tokens-per-minute budget is throughput, not just cost.
+    The file on disk keeps its indentation (see _save_therapy): that one is
+    read by people.
+    """
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
 # ─── Vector DB reference (injected at startup via set_vector_db) ──────────────
 _vector_db = None
 
@@ -161,7 +176,7 @@ def get_all_activities():
         if not data.get("activities"):
             # therapy.json uses 'patient_full_name'; older/default dicts may use 'patient_name'
             full_name = data.get("patient_full_name") or data.get("patient_name", "")
-            return json.dumps(
+            return _tool_json(
                 {
                     "status": "success",
                     "message": "No activities configured",
@@ -169,8 +184,6 @@ def get_all_activities():
                     "patient_full_name": full_name,
                     "activities": [],
                 },
-                indent=2,
-                ensure_ascii=False,
             )
 
         logger.info(f"[THERAPY] Retrieved {len(data['activities'])} activities")
@@ -179,11 +192,11 @@ def get_all_activities():
             result.pop("objectives")
 
         result["status"] = "success"
-        return json.dumps(result, indent=2, ensure_ascii=False)
+        return _tool_json(result)
 
     except Exception as e:
         logger.error(f"[THERAPY] Error getting activities: {e}")
-        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+        return _tool_json({"status": "error", "message": str(e)})
 
 
 def _parse_activity_date(d):
@@ -487,35 +500,33 @@ def add_therapy_activity(activity_data):
         ]
         for field in required_fields:
             if field not in activity_data:
-                return json.dumps(
+                return _tool_json(
                     {
                         "status": "error",
                         "message": f"Mandatory field missing: {field}",
                     },
-                    indent=2,
                 )
 
         # Validate category
         act_category = activity_data.get("category")
         if act_category not in CATEGORIES:
-            return json.dumps(
+            return _tool_json(
                 {
                     "status": "error",
                     "message": f"Category {act_category} is not allowed. Admitted values {','.join(CATEGORIES)}",
                 },
-                indent=2,
             )
 
         # Validate time format (must be HH:MM)
         time_err = _validate_time_field(activity_data.get("time"), "time")
         if time_err:
-            return json.dumps({"status": "error", "message": time_err}, indent=2)
+            return _tool_json({"status": "error", "message": time_err})
 
         # Validate optional date fields (must be YYYY-MM-DD or ISO 8601)
         for date_field in ("valid_from", "valid_until"):
             date_err = _validate_date_field(activity_data.get(date_field), date_field)
             if date_err:
-                return json.dumps({"status": "error", "message": date_err}, indent=2)
+                return _tool_json({"status": "error", "message": date_err})
 
         # Validate that valid_from precedes valid_until when both are provided
         vf = activity_data.get("valid_from")
@@ -529,18 +540,17 @@ def add_therapy_activity(activity_data):
             vf_dt = _parse_activity_date(vf)
             vu_dt = _parse_activity_date(vu)
             if vf_dt and vu_dt and vf_dt > vu_dt:
-                return json.dumps(
+                return _tool_json(
                     {
                         "status": "error",
                         "message": f"'valid_from' ({vf}) must be before or equal to 'valid_until' ({vu})",
                     },
-                    indent=2,
                 )
 
         # Validate day_of_week (non-empty, values 1–7)
         dow_err = _validate_day_of_week_field(activity_data.get("day_of_week"), "day_of_week")
         if dow_err:
-            return json.dumps({"status": "error", "message": dow_err}, indent=2)
+            return _tool_json({"status": "error", "message": dow_err})
 
         # Validate duration_minutes (must be a positive integer)
         duration = activity_data.get("duration_minutes", 0)
@@ -549,12 +559,11 @@ def add_therapy_activity(activity_data):
             duration = int(duration)
             activity_data["duration_minutes"] = duration
         if not isinstance(duration, int) or duration <= 0:
-            return json.dumps(
+            return _tool_json(
                 {
                     "status": "error",
                     "message": "duration_minutes must be a positive integer (e.g. 30, not 30.0)",
                 },
-                indent=2,
             )
 
         # Assign the activity_id here so it always follows the '<prefix>_<NNN>'
@@ -587,7 +596,7 @@ def add_therapy_activity(activity_data):
             existing_ids = {act["activity_id"] for act in data["activities"]}
             missing_deps = [dep for dep in new_activity["dependencies"] if dep not in existing_ids]
             if missing_deps:
-                return json.dumps(
+                return _tool_json(
                     {
                         "status": "error",
                         "message": (
@@ -595,7 +604,6 @@ def add_therapy_activity(activity_data):
                             "Use the exact activity_id."
                         ),
                     },
-                    indent=2,
                 )
 
             # Validate temporal ordering: every dependency must end before this activity starts
@@ -606,7 +614,7 @@ def add_therapy_activity(activity_data):
                 if dep:
                     dep_end = hhmm_to_minutes(dep["time"]) + dep["duration_minutes"]
                     if dep_end > new_start:
-                        return json.dumps(
+                        return _tool_json(
                             {
                                 "status": "error",
                                 "message": (
@@ -616,7 +624,6 @@ def add_therapy_activity(activity_data):
                                     "of this activity."
                                 ),
                             },
-                            indent=2,
                         )
 
         # ── Patient history check (RAG) ─────────────────────────────────────
@@ -635,7 +642,7 @@ def add_therapy_activity(activity_data):
             result = dict(conflict)
             if history_warnings:
                 result["patient_history_warnings"] = history_warnings
-            return json.dumps(result, indent=2, ensure_ascii=False)
+            return _tool_json(result)
         else:
             data["activities"].append(new_activity)
             data["activities"].sort(
@@ -655,11 +662,11 @@ def add_therapy_activity(activity_data):
             if history_warnings:
                 result["patient_history_warnings"] = history_warnings
 
-            return json.dumps(result, indent=2, ensure_ascii=False)
+            return _tool_json(result)
 
     except Exception as e:
         logger.error(f"[THERAPY] Error adding activity: {e}")
-        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+        return _tool_json({"status": "error", "message": str(e)})
 
 
 def update_therapy_activity(activity_id, updates):
@@ -683,12 +690,11 @@ def update_therapy_activity(activity_id, updates):
                 break
 
         if activity_index is None:
-            return json.dumps(
+            return _tool_json(
                 {
                     "status": "error",
                     "message": f"Couldn't find activity with id '{activity_id}'",
                 },
-                indent=2,
             )
 
         old_activity = copy.deepcopy(data["activities"][activity_index])
@@ -708,26 +714,25 @@ def update_therapy_activity(activity_id, updates):
         # Validate category
         if "category" in updates:
             if updates["category"] not in CATEGORIES:
-                return json.dumps(
+                return _tool_json(
                     {
                         "status": "error",
                         "message": f"Category {updates['category']} is not allowed. Admitted values {','.join(CATEGORIES)}",
                     },
-                    indent=2,
                 )
 
         # Validate time format if it is being updated (must be HH:MM)
         if "time" in updates:
             time_err = _validate_time_field(updates["time"], "time")
             if time_err:
-                return json.dumps({"status": "error", "message": time_err}, indent=2)
+                return _tool_json({"status": "error", "message": time_err})
 
         # Validate optional date fields (must be YYYY-MM-DD or ISO 8601)
         for date_field in ("valid_from", "valid_until"):
             if date_field in updates:
                 date_err = _validate_date_field(updates[date_field], date_field)
                 if date_err:
-                    return json.dumps({"status": "error", "message": date_err}, indent=2)
+                    return _tool_json({"status": "error", "message": date_err})
 
         # Validate that valid_from precedes valid_until (consider merged values from both
         # the update and the existing activity so partial updates are handled correctly)
@@ -737,19 +742,18 @@ def update_therapy_activity(activity_id, updates):
             vf_dt = _parse_activity_date(merged_vf)
             vu_dt = _parse_activity_date(merged_vu)
             if vf_dt and vu_dt and vf_dt > vu_dt:
-                return json.dumps(
+                return _tool_json(
                     {
                         "status": "error",
                         "message": f"'valid_from' ({merged_vf}) must be before or equal to 'valid_until' ({merged_vu})",
                     },
-                    indent=2,
                 )
 
         # Validate day_of_week if being updated (non-empty, values 1–7)
         if "day_of_week" in updates:
             dow_err = _validate_day_of_week_field(updates["day_of_week"], "day_of_week")
             if dow_err:
-                return json.dumps({"status": "error", "message": dow_err}, indent=2)
+                return _tool_json({"status": "error", "message": dow_err})
 
         # Validate duration_minutes if being updated (must be a positive integer)
         if "duration_minutes" in updates:
@@ -760,12 +764,11 @@ def update_therapy_activity(activity_id, updates):
                 updates["duration_minutes"] = duration
                 updated_activity["duration_minutes"] = duration
             if not isinstance(duration, int) or duration <= 0:
-                return json.dumps(
+                return _tool_json(
                     {
                         "status": "error",
                         "message": "duration_minutes must be a positive integer (e.g. 30, not 30.0)",
                     },
-                    indent=2,
                 )
 
         # Validate that updated dependencies exist in the schedule
@@ -774,7 +777,7 @@ def update_therapy_activity(activity_id, updates):
             existing_ids = {act["activity_id"] for act in temp_activities}
             missing_deps = [dep for dep in new_deps if dep not in existing_ids]
             if missing_deps:
-                return json.dumps(
+                return _tool_json(
                     {
                         "status": "error",
                         "message": (
@@ -782,7 +785,6 @@ def update_therapy_activity(activity_id, updates):
                             "Use the exact activity_id."
                         ),
                     },
-                    indent=2,
                 )
 
             # Validate temporal ordering: every dependency must end before this activity starts
@@ -793,7 +795,7 @@ def update_therapy_activity(activity_id, updates):
                 if dep:
                     dep_end = hhmm_to_minutes(dep["time"]) + dep["duration_minutes"]
                     if dep_end > updated_start:
-                        return json.dumps(
+                        return _tool_json(
                             {
                                 "status": "error",
                                 "message": (
@@ -803,7 +805,6 @@ def update_therapy_activity(activity_id, updates):
                                     "of this activity."
                                 ),
                             },
-                            indent=2,
                         )
 
         # ── Patient history check (RAG) ─────────────────────────────────────
@@ -821,7 +822,7 @@ def update_therapy_activity(activity_id, updates):
             result = dict(conflict)
             if history_warnings:
                 result["patient_history_warnings"] = history_warnings
-            return json.dumps(result, indent=2, ensure_ascii=False)
+            return _tool_json(result)
         else:
             # ── Dependent ordering check ──────────────────────────────────────
             # If time or duration changed, verify that every activity that lists
@@ -840,7 +841,7 @@ def update_therapy_activity(activity_id, updates):
                                 f"{minutes_to_hhmm(updated_end)}"
                             )
                 if violations:
-                    return json.dumps(
+                    return _tool_json(
                         {
                             "status": "error",
                             "message": (
@@ -849,7 +850,6 @@ def update_therapy_activity(activity_id, updates):
                                 f"dependent(s): {'; '.join(violations)}"
                             ),
                         },
-                        indent=2,
                     )
 
             # All checks passed – commit the update
@@ -871,11 +871,11 @@ def update_therapy_activity(activity_id, updates):
             if history_warnings:
                 result["patient_history_warnings"] = history_warnings
 
-            return json.dumps(result, indent=2, ensure_ascii=False)
+            return _tool_json(result)
 
     except Exception as e:
         logger.error(f"[THERAPY] Error updating activity: {e}")
-        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+        return _tool_json({"status": "error", "message": str(e)})
 
 
 def remove_therapy_activity(activity_id):
@@ -901,12 +901,11 @@ def remove_therapy_activity(activity_id):
                 break
 
         if activity_index is None:
-            return json.dumps(
+            return _tool_json(
                 {
                     "status": "error",
                     "message": f"Couldn't find activity with id '{activity_id}'",
                 },
-                indent=2,
             )
 
         # Second pass: check dependents using the activity's ID.
@@ -919,7 +918,7 @@ def remove_therapy_activity(activity_id):
         ]
 
         if dependent_activities:
-            return json.dumps(
+            return _tool_json(
                 {
                     "status": "error",
                     "message": (
@@ -927,7 +926,6 @@ def remove_therapy_activity(activity_id):
                         f"of: {', '.join(dependent_activities)}."
                     ),
                 },
-                indent=2,
             )
 
         data["activities"].pop(activity_index)
@@ -935,19 +933,17 @@ def remove_therapy_activity(activity_id):
 
         logger.info(f"[THERAPY] Removed activity: {activity_id} - {removed_activity['name']}")
 
-        return json.dumps(
+        return _tool_json(
             {
                 "status": "success",
                 "message": f"The activity '{removed_activity['name']}' has been removed successfully",
                 "removed_activity": removed_activity,
             },
-            indent=2,
-            ensure_ascii=False,
         )
 
     except Exception as e:
         logger.error(f"[THERAPY] Error removing activity: {e}")
-        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+        return _tool_json({"status": "error", "message": str(e)})
 
 
 def get_medicine_data(medicine_name: str) -> str:
@@ -971,26 +967,22 @@ def get_patient_preferences(query: str = "") -> str:
     """
     if _vector_db is None:
         logger.warning("[TOOLS] Vector DB not available – cannot retrieve preferences")
-        return json.dumps(
+        return _tool_json(
             {"status": "error", "message": "Vector DB not available"},
-            indent=2,
         )
     patient_id = _get_patient_id()
     prefs = _vector_db.query_patient_preferences(patient_id, query=query)
     if not prefs:
-        return json.dumps(
+        return _tool_json(
             {
                 "status": "success",
                 "patient_id": patient_id,
                 "preferences": [],
                 "message": "No preferences recorded for this patient.",
             },
-            indent=2,
         )
-    return json.dumps(
+    return _tool_json(
         {"status": "success", "patient_id": patient_id, "preferences": prefs},
-        indent=2,
-        ensure_ascii=False,
     )
 
 
@@ -1003,28 +995,24 @@ def get_patient_history_events(query: str) -> str:
     """
     if _vector_db is None:
         logger.warning("[TOOLS] Vector DB not available – cannot retrieve patient history")
-        return json.dumps(
+        return _tool_json(
             {"status": "error", "message": "Vector DB not available"},
-            indent=2,
         )
     patient_id = _get_patient_id()
     # Enrich the caller's query the same way the add/update paths do, so recall
     # does not depend on how precisely the agent happened to word the lookup.
     events = _vector_db.query_patient_history(patient_id, _history_query({"name": query}))
     if not events:
-        return json.dumps(
+        return _tool_json(
             {
                 "status": "success",
                 "patient_id": patient_id,
                 "events": [],
                 "message": "No relevant history events found for this activity.",
             },
-            indent=2,
         )
-    return json.dumps(
+    return _tool_json(
         {"status": "success", "patient_id": patient_id, "events": events},
-        indent=2,
-        ensure_ascii=False,
     )
 
 
@@ -1039,26 +1027,22 @@ def get_conflict_resolution_hints(query: str) -> str:
     """
     if _vector_db is None:
         logger.warning("[TOOLS] Vector DB not available – cannot retrieve conflict hints")
-        return json.dumps(
+        return _tool_json(
             {"status": "error", "message": "Vector DB not available"},
-            indent=2,
         )
     patient_id = _get_patient_id()
     hints = _vector_db.query_conflict_resolutions(query, patient_id=patient_id)
     if not hints:
-        return json.dumps(
+        return _tool_json(
             {
                 "status": "success",
                 "patient_id": patient_id,
                 "hints": [],
                 "message": "No past resolution hints found for this activity.",
             },
-            indent=2,
         )
-    return json.dumps(
+    return _tool_json(
         {"status": "success", "patient_id": patient_id, "hints": hints},
-        indent=2,
-        ensure_ascii=False,
     )
 
 

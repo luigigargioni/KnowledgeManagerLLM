@@ -12,7 +12,8 @@ from agent_graph import build_therapy_graph
 from agents.caregiver_agent import CaregiverAgent
 from agents.judge_agent import JudgeAgent
 from chat import OllamaChat
-from config_loader import DEFAULT_PATIENT_ID, MODEL
+from config_loader import DEFAULT_PATIENT_ID, MAIN_LLM, SIM_LLM
+from llm_client import make_sim_client
 from sql_db import DatabaseManager
 from therapy_diff import diff_therapies, render_diff
 from utils import (
@@ -105,9 +106,10 @@ def run_agent_mode(chat, script: str, delay: float) -> None:
     print(f"\nApplied changes:\n{change_summary}\n")
 
     judge = JudgeAgent()
+    sim_client = make_sim_client()  # the judge grades with the simulation backend
     evaluation = judge.evaluate(
-        client=chat.client,
-        model=chat.model,
+        client=sim_client,
+        model=sim_client.model,
         script=script,
         transcript=transcript,
         therapy=json.dumps(final_therapy),
@@ -139,7 +141,7 @@ def run_agent_mode_old(chat: OllamaChat, script: str, delay: float) -> None:
     import time as time_mod
 
     caregiver = CaregiverAgent(script=script)
-    client = chat.client  # same LLM client used by Chat
+    client = make_sim_client()  # the simulated user runs on the simulation backend
 
     print(f"[Agent mode] Script loaded ({len(script)} chars)\n")
 
@@ -161,7 +163,6 @@ def run_agent_mode_old(chat: OllamaChat, script: str, delay: float) -> None:
 
         # The caregiver generates its next move
         response = client.chat.completions.create(
-            model=chat.model,
             messages=caregiver.conversation_history,
             tools=caregiver.tools or None,
         )
@@ -257,7 +258,6 @@ def main():
 
     # ── Chat ──────────────────────────────────────────────────────────────
     chat = OllamaChat(
-        model=MODEL,
         database_manager=db if db_available else None,
         vector_db=vector_db,
     )
@@ -265,8 +265,9 @@ def main():
     print("=" * 60)
     print("  KnowledgeManagerLLM - LLM Chat Interface")
     print("=" * 60)
-    print(f"Model: {MODEL}")
+    print(f"Model: {MAIN_LLM.provider} / {MAIN_LLM.model}")
     if args.input:
+        print(f"Caregiver+judge: {SIM_LLM.provider} / {SIM_LLM.model}")
         print(f"Mode:  agent  |  script: {args.input}")
     else:
         print("Mode:  interactive  |  'exit' or 'quit' to end")

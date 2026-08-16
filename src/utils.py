@@ -15,9 +15,9 @@ import prompts as prompts
 from config_loader import (
     CHECK_NVIDIA_GPU,
     FILE_LOG_LEVEL,
-    LLM_PROVIDER,
     LOGS_FOLDER,
-    MODEL,
+    MAIN_LLM,
+    SIM_LLM,
     TERMINAL_LOG_LEVEL,
     THERAPY_FILE,
 )
@@ -127,7 +127,11 @@ def setup_logger(
         for info in gpu_info:
             logger.info(f"[SESSION] GPU {info['gpu']}: {info['name']} ({info['memory']})")
 
-    logger.info(f"[SESSION] Provider={LLM_PROVIDER} Model={MODEL}")
+    for cfg in (MAIN_LLM, SIM_LLM):
+        line = f"[SESSION] {cfg.role}: provider={cfg.provider} model={cfg.model}"
+        if cfg.rpm or cfg.tpm or cfg.rpd or cfg.tpd:
+            line += f" | limits {cfg.rpm} RPM / {cfg.tpm} TPM / {cfg.rpd} RPD / {cfg.tpd} TPD"
+        logger.info(line)
 
     return logger
 

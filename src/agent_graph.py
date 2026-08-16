@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
+from llm_client import make_sim_client
 from utils import is_exit_message
 
 
@@ -18,14 +19,16 @@ def build_therapy_graph(chat, caregiver):
     """
     Build the LangGraph that coordinates CaregiverAgent and Chat.
     """
+    # The simulated user talks to its own backend (SIM_LLM), exactly as in the
+    # batch runner; `chat` keeps the backend of the system under test.
+    sim_client = make_sim_client()
 
     def caregiver_node(state: TherapyState) -> dict:
 
         last_message = state["messages"][-1].content
 
         caregiver.conversation_history.append({"role": "user", "content": last_message})
-        response = chat.client.chat.completions.create(
-            model=chat.model,
+        response = sim_client.chat.completions.create(
             messages=caregiver.conversation_history,
         )
         caregiver_message = response.choices[0].message.content or ""
