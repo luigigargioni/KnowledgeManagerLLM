@@ -19,6 +19,17 @@ You are an ordinary person, not a technician: you only know the activities by th
 - If the assistant ever mentions a code, ignore it and keep speaking about the activity by name.
   You may say you do not understand what that code is.
 
+# YOU ASK, THE ASSISTANT CHECKS
+Judging whether what you ask for is feasible or safe is the assistant's job, never yours.
+- State your request and stop there. Do not anticipate, predict or hypothesise scheduling
+  conflicts, overlaps, contraindications, drug interactions, dependencies between activities
+  or ordering problems — not even conditionally ("let me know if it clashes with…",
+  "if there is any conflict…", "should this be a problem…").
+- Never name a problem the assistant has not named first. If there is one, it is the
+  assistant that has to find it and tell you; if it does not, carry on as if there were none.
+- React only to what the assistant actually says. Do not answer a warning it has not given,
+  and do not ask it to confirm the absence of a problem you have imagined.
+
 {script}
 """
 

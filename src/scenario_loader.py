@@ -37,7 +37,34 @@ def install_scenario_therapy(scenario: dict) -> None:
 # Clauses that tell the caregiver what the assistant is expected to do (or not do).
 # "First ask the assistant …" is deliberately NOT included: that one is an
 # instruction to act, it has to be known up front and it reveals no answer.
-_CONDITIONAL_RE = re.compile(r"\b(?:If the assistant|Verify that the assistant)\b", re.IGNORECASE)
+#
+# The third alternative catches the same conditional written without naming the
+# assistant ("If a conflict is detected", "If an error is reported"). Scenario 10
+# was phrased that way, matched nothing, and therefore handed the caregiver the
+# whole answer — title, context and all — in its opening message.
+_CONDITIONAL_RE = re.compile(
+    r"\b(?:"
+    r"If\s+the\s+assistant"
+    r"|Verify\s+that\s+the\s+assistant"
+    r"|If\s+(?:an?|the|any)\s+[\w\s'-]{0,40}?\bis\s+"
+    r"(?:detected|reported|found|flagged|raised|returned|triggered)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# The "# Scenario N – …" heading is harness metadata: no caregiver could know it,
+# and it routinely states the expected outcome ("Add *Safe* Metformin Medication",
+# "Add Health Checkup - *No History Warning*", "Complex Multi-Step with *Conflict
+# Resolution*"). In scenarios with a conditional clause it was already withheld
+# together with the rest of the preamble; the 36 scenarios without one were
+# handing it over verbatim. The judge still receives the untouched script, so
+# nothing is lost for grading.
+_TITLE_RE = re.compile(r"^[ \t]*#[ \t]*Scenario\b.*$", re.IGNORECASE | re.MULTILINE)
+
+
+def _strip_title(text: str) -> str:
+    """Remove the scenario heading from text meant for the caregiver."""
+    return _TITLE_RE.sub("", text or "").strip()
 
 
 def split_objectives(objectives: str) -> tuple[str, str]:
@@ -55,14 +82,15 @@ def split_objectives(objectives: str) -> tuple[str, str]:
 
     Returns (initial, deferred):
       - initial:  the bare imperative requests, with no title and no context
-      - deferred: the title, the context and the conditional clauses, to be
-                  revealed only after the assistant has replied
+      - deferred: the context and the conditional clauses, to be revealed only
+                  once the assistant has actually raised the point (see
+                  utils.assistant_raised_issue)
 
-    Scenarios without a conditional clause are returned unchanged, with an empty
-    deferred part.
+    Scenarios without a conditional clause keep their context, minus the title,
+    and get an empty deferred part.
     """
     if not _CONDITIONAL_RE.search(objectives or ""):
-        return objectives, ""
+        return _strip_title(objectives), ""
 
     lines = (objectives or "").splitlines()
     try:
@@ -71,9 +99,9 @@ def split_objectives(objectives: str) -> tuple[str, str]:
         )
     except StopIteration:
         # Unexpected layout: withholding nothing is safer than mangling the script.
-        return objectives, ""
+        return _strip_title(objectives), ""
 
-    preamble = "\n".join(lines[:start]).strip()
+    preamble = _strip_title("\n".join(lines[:start]))
     objective_lines = lines[start + 1 :]
 
     kept, withheld = [], []

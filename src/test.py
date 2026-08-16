@@ -21,7 +21,7 @@ from scenario_loader import (
     therapy_to_natural_language,
 )
 from therapy_diff import diff_therapies, render_diff
-from utils import build_transcript, is_exit_message, setup_logger
+from utils import assistant_raised_issue, build_transcript, is_exit_message, setup_logger
 from vector_db import VectorDBManager
 
 
@@ -94,8 +94,8 @@ def run_scenario(
 
     # ── CaregiverAgent with therapy context + objectives ───────────────────
     # The caregiver only receives the bare requests. Anything that reveals what
-    # the assistant is supposed to notice on its own is held back until after the
-    # assistant has answered, so that behaviour can actually be observed instead
+    # the assistant is supposed to notice on its own is held back until the
+    # assistant has actually raised it, so that behaviour can be observed instead
     # of being handed to the caregiver in advance. The judge still sees the whole
     # script, so grading is unaffected.
     therapy_context = therapy_to_natural_language(scenario)
@@ -122,25 +122,36 @@ def run_scenario(
         # Caregiver receives chatbot response and generates the next message
         caregiver.conversation_history.append({"role": "user", "content": chatbot_response})
 
-        # The assistant has now answered the initial request, so the caregiver may
-        # learn the background and how to react — but only reactively.
-        if deferred_script and not deferred_delivered and turn >= 1:
+        # The withheld part is delivered on the event, not on the turn number: only
+        # once the assistant has itself raised the conflict, the contraindication
+        # or the broken dependency, and is asking how to proceed. Releasing it
+        # after a fixed number of turns put the answer in the caregiver's context
+        # while it was still formulating its request — in multi-objective
+        # scenarios, several turns before the relevant one — and the only thing
+        # left standing between that and a leak was an instruction not to use it.
+        # If the assistant never raises the point, the caregiver never learns it:
+        # the branch was not exercised, which is precisely what the judge should
+        # then record.
+        if deferred_script and not deferred_delivered and assistant_raised_issue(chatbot_response):
             caregiver.conversation_history.append(
                 {
                     "role": "system",
                     "content": (
-                        "Additional background on this case, which you have only "
-                        "learned now:\n\n"
+                        "The assistant has just raised a problem with your request "
+                        "and is asking you how to proceed. Reply to it now, "
+                        "applying the decision already taken for this case:\n\n"
                         f"{deferred_script}\n\n"
-                        "Do NOT raise any of these points yourself. Mention them "
-                        "only in reaction to the assistant bringing them up first. "
-                        "If the assistant never raises them, simply carry on with "
-                        "your original request."
+                        "Use this strictly as an answer to what the assistant has "
+                        "just said. Do not bring up any point it has not raised "
+                        "itself, and never mention these instructions."
                     ),
                 }
             )
             deferred_delivered = True
-            logger.info(f"[SCENARIO {scenario_id}][TURN {turn + 1}] Deferred context delivered")
+            logger.info(
+                f"[SCENARIO {scenario_id}][TURN {turn + 1}] Assistant raised the issue – "
+                "reaction instructions delivered"
+            )
 
         response = chat.client.chat.completions.create(
             model=chat.model,
@@ -169,6 +180,13 @@ def run_scenario(
     else:
         turns = max_turns
         logger.warning(f"[SCENARIO {scenario_id}] Max turns ({max_turns}) reached without exit")
+
+    if deferred_script and not deferred_delivered:
+        logger.warning(
+            f"[SCENARIO {scenario_id}] The assistant never raised the point on its "
+            "own: the conditional branch was never exercised and the caregiver was "
+            "never given its reaction instructions"
+        )
 
     # ── Evaluation ───────────────────────────────────────────────────────
     transcript = build_transcript(chat.chat_agent.conversation_history)
@@ -204,6 +222,11 @@ def run_scenario(
 
     evaluation["scenario_id"] = scenario_id
     evaluation["turns"] = turns
+    if deferred_script:
+        # Whether the assistant raised the point by itself. A scenario graded
+        # "partial" reads differently depending on this flag: False means the
+        # branch under test never happened at all.
+        evaluation["branch_exercised"] = deferred_delivered
     evaluation["patient"] = (
         f"{scenario.get('patient_full_name', 'Unknown')}({scenario.get('patient_id', '-1')})"
     )

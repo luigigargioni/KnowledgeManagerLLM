@@ -313,6 +313,78 @@ def is_exit_message(message: str) -> bool:
     return bool(_EXIT_RE.search(text))
 
 
+# Vocabulary the assistant uses when it raises a problem and hands the decision
+# back to the caregiver. Two sources: the failure messages built in tools.py
+# ("cannot be scheduled at … overlaps with the activity named …", "Dependencies
+# not found in schedule", "Temporal ordering violation", "Cannot remove '…'
+# because it is a dependency of …"), and the safety findings the checker agent
+# returns for medicines and patient history.
+#
+# This gates the delivery of a scenario's withheld reaction clauses
+# (scenario_loader.split_objectives): the caregiver receives them only once the
+# assistant has actually said the thing, so it can react instead of predicting.
+# Recall matters more than precision here — a false positive puts the caregiver
+# back where it was before this gate existed, while a false negative leaves it
+# without its instructions for a branch that really was exercised.
+_ISSUE_MARKERS = (
+    # scheduling
+    "conflict",
+    "overlap",
+    "clash",
+    "same time",
+    "already scheduled",
+    "no available",
+    # offering an alternative means a problem was found first
+    "alternative",
+    # dependencies and temporal ordering
+    "dependenc",
+    "depends on",
+    "ordering",
+    "cannot be removed",
+    "cannot remove",
+    "blocked",
+    "does not exist",
+    "doesn't exist",
+    "not found",
+    "no activity",
+    # safety: medicines and patient history
+    "contraindicat",
+    "interaction",
+    "warning",
+    "warn you",
+    "caution",
+    "risk",
+    "unsafe",
+    "not recommended",
+    "not advisable",
+    "concern",
+    "flags",
+    "flagged",
+    "worsen",
+    "adverse",
+    "implication",
+    # how a history finding gets phrased once it comes back from the RAG lookup
+    "past episode",
+    "in the past",
+    "last time",
+    "history shows",
+    "previously",
+)
+
+
+def assistant_raised_issue(message: str) -> bool:
+    """
+    True when the assistant's reply raises a problem of its own accord.
+
+    Scheduling conflicts, broken dependencies, ordering violations,
+    contraindications and history warnings are exactly what the scenarios exist
+    to test, so the caregiver must never be the one to bring them up. It is told
+    how to react only from the moment this returns True.
+    """
+    text = (message or "").lower()
+    return any(marker in text for marker in _ISSUE_MARKERS)
+
+
 def is_visible_turn(msg: dict) -> bool:
     """
     True for the user/assistant turns that were actually exchanged with the
