@@ -35,6 +35,22 @@ CATEGORY_ID_PREFIX = {
 logger = logging.getLogger("knowledge_manager")
 
 
+# Machine-readable cause attached to the tool results the caregiver is supposed
+# to react to: a scheduling conflict, a missing or violated dependency, an
+# activity that cannot be removed. Everything else returning status "error" is a
+# validation slip the assistant fixes by itself (bad category, malformed time),
+# and must NOT be mistaken for a decision handed back to the caregiver.
+#
+# It exists because `chat.Chat` reads it to know, deterministically, that the
+# system raised something during a turn — see Chat._record_issue_signals and
+# test.py, which gates the delivery of a scenario's withheld reaction clauses on
+# it instead of guessing from the assistant's wording.
+ISSUE_SCHEDULE_CONFLICT = "schedule_conflict"
+ISSUE_MISSING_DEPENDENCY = "missing_dependency"
+ISSUE_TEMPORAL_ORDERING = "temporal_ordering"
+ISSUE_DEPENDENCY_BLOCKED = "dependency_blocked"
+
+
 def _tool_json(payload) -> str:
     """
     Serialise a tool result for the model.
@@ -461,6 +477,7 @@ def find_scheduling_conflicts(new_activity, schedule, patient_id: str = None):
 
         result: dict = {
             "status": "failure",
+            "issue": ISSUE_SCHEDULE_CONFLICT,
             "message": (
                 f"The activity '{new_activity['name']}' cannot be scheduled at "
                 f"{new_activity['time']} because it overlaps with the activity "
@@ -599,6 +616,7 @@ def add_therapy_activity(activity_data):
                 return _tool_json(
                     {
                         "status": "error",
+                        "issue": ISSUE_MISSING_DEPENDENCY,
                         "message": (
                             f"Dependencies not found in schedule: {', '.join(missing_deps)}. "
                             "Use the exact activity_id."
@@ -617,6 +635,7 @@ def add_therapy_activity(activity_data):
                         return _tool_json(
                             {
                                 "status": "error",
+                                "issue": ISSUE_TEMPORAL_ORDERING,
                                 "message": (
                                     f"Temporal ordering violation: dependency '{dep_id}' "
                                     f"({dep['name']}) ends at {minutes_to_hhmm(dep_end)}, "
@@ -780,6 +799,7 @@ def update_therapy_activity(activity_id, updates):
                 return _tool_json(
                     {
                         "status": "error",
+                        "issue": ISSUE_MISSING_DEPENDENCY,
                         "message": (
                             f"Dependencies not found in schedule: {', '.join(missing_deps)}. "
                             "Use the exact activity_id."
@@ -798,6 +818,7 @@ def update_therapy_activity(activity_id, updates):
                         return _tool_json(
                             {
                                 "status": "error",
+                                "issue": ISSUE_TEMPORAL_ORDERING,
                                 "message": (
                                     f"Temporal ordering violation: dependency '{dep_id}' "
                                     f"({dep['name']}) ends at {minutes_to_hhmm(dep_end)}, "
@@ -844,6 +865,7 @@ def update_therapy_activity(activity_id, updates):
                     return _tool_json(
                         {
                             "status": "error",
+                            "issue": ISSUE_TEMPORAL_ORDERING,
                             "message": (
                                 "Temporal ordering violation: the update would cause "
                                 "this activity to end after the start of its "
@@ -921,6 +943,7 @@ def remove_therapy_activity(activity_id):
             return _tool_json(
                 {
                     "status": "error",
+                    "issue": ISSUE_DEPENDENCY_BLOCKED,
                     "message": (
                         f"Cannot remove '{activity_name}' because it is a dependency "
                         f"of: {', '.join(dependent_activities)}."

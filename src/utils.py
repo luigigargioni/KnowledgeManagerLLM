@@ -376,6 +376,24 @@ _ISSUE_MARKERS = (
 )
 
 
+# The all-clear is phrased with the very words that name the problem: "I found
+# no conflicts", "safety review flagged no direct conflict", "there is no risk".
+# Matched naively, a reply saying nothing happened counted as one raising an
+# issue — in scenario 17 that delivered the caregiver its reaction instructions
+# one turn early, and it answered "yes, add it at the suggested alternative
+# time" when no alternative had been suggested. Negated occurrences are dropped
+# before the markers are looked for.
+#
+# Only nouns that make sense negated are listed: "not recommended" and "not
+# advisable" are markers themselves and must keep matching.
+_NEGATED_ISSUE_RE = re.compile(
+    r"\b(?:no|not|without|never|any)\s+(?:\w+\s+){0,2}?"
+    r"(?:conflicts?|overlaps?|clash\w*|interactions?|warnings?|cautions?|risks?"
+    r"|concerns?|contraindicat\w*|issues?|problems?|adverse\s+\w+)",
+    re.IGNORECASE,
+)
+
+
 def assistant_raised_issue(message: str) -> bool:
     """
     True when the assistant's reply raises a problem of its own accord.
@@ -385,8 +403,23 @@ def assistant_raised_issue(message: str) -> bool:
     to test, so the caregiver must never be the one to bring them up. It is told
     how to react only from the moment this returns True.
     """
-    text = (message or "").lower()
+    text = _NEGATED_ISSUE_RE.sub(" ", (message or "").lower())
     return any(marker in text for marker in _ISSUE_MARKERS)
+
+
+def assistant_handed_back(message: str) -> bool:
+    """
+    True when the assistant's reply looks like it is waiting for the caregiver.
+
+    Used only in combination with a deterministic signal from `Chat` (a tool
+    reported a conflict, a blocked dependency, a history hit): the signal proves
+    a problem was found, this only has to rule out the case where the assistant
+    swallowed it and answered as if nothing had happened. Asking anything at all
+    is enough evidence for that, which is why this is far weaker — and far less
+    wording-dependent — than assistant_raised_issue.
+    """
+    text = (message or "").strip()
+    return "?" in text or assistant_raised_issue(text)
 
 
 def is_visible_turn(msg: dict) -> bool:

@@ -15,8 +15,14 @@ from session_extractor import (
 from sql_db import DatabaseManager
 from utils import addAgentFilterLogger, get_current_logger, visible_turns
 from utils import load_past_session as _load
+from vector_db import MEDICINE_NOT_FOUND_MARKER
 
 logger = get_current_logger()
+
+# The one blocking cause no tool reports in an "issue" field: query_medicines
+# answers with document text, so a miss is only recognisable by its marker. It
+# belongs here because the checker's prompt forbids proceeding without the data.
+SIGNAL_MEDICINE_NOT_FOUND = "medicine_not_found"
 
 
 def build_first_message(therapy_json):
@@ -90,6 +96,12 @@ class Chat:
         self.database_manager = database_manager
         self.vector_db = vector_db
         self.conversation_history = []
+
+        # Causes the system itself detected while producing the current reply
+        # (reset by send_message) and over the whole session. See
+        # _record_issue_signals.
+        self._turn_issues: list[str] = []
+        self.issue_signals_seen: list[str] = []
 
         # Inject the vector DB into the tools module so all tool functions can use it
         if vector_db is not None:
@@ -244,8 +256,70 @@ class Chat:
         ):
             self._save_therapy_snapshot()
 
+        self._record_issue_signals(tool_name, result)
+
         logger.debug(f"[{agent.name.upper()}][TOOL] Results of {tool_name}: {result}")
         return result
+
+    def _record_issue_signals(self, tool_name: str, result) -> None:
+        """
+        Note that the system blocked something the caregiver has to decide on.
+
+        Every tool call of every agent goes through execute_tool, so this sees
+        the whole turn: the conflicts and dependency errors raised by tools.py
+        and a medicine missing from the knowledge base. It records the cause,
+        not the reaction: whether the assistant then passed it on to the
+        caregiver is a separate question, and the one the caller has to answer.
+
+        Only *blocking* causes count — the requested action did not happen and
+        cannot happen until the caregiver chooses. Two kinds are deliberately
+        left out:
+
+        - validation errors (bad category, malformed time, unknown activity_id):
+          the assistant's own slips, retried without involving the caregiver;
+        - patient-history hits, whether from get_patient_history_events or the
+          `patient_history_warnings` that add/update return alongside a
+          successful write. Measured on scenarios 14/17/18/20, one fires on
+          essentially every request — the history threshold is permissive on
+          purpose (see vector_db) and the checker queries it every time — while
+          the activity is still written. Treating that as a signal made the gate
+          fire on the second turn of every scenario: in 17 the caregiver was
+          handed its reaction instructions after "I found no conflicts" and
+          answered "yes, add it at the suggested alternative time" before any
+          alternative had been suggested. Whether a history note is worth
+          raising is the assistant's judgement, so it belongs to the textual
+          half of the gate, not to this one.
+        """
+        if not isinstance(result, str):
+            return
+
+        signals: list[str] = []
+
+        payload = None
+        if result.lstrip().startswith("{"):
+            try:
+                payload = json.loads(result)
+            except json.JSONDecodeError:
+                payload = None
+
+        if isinstance(payload, dict):
+            issue = payload.get("issue")
+            if issue:
+                signals.append(issue)
+        elif tool_name == "get_medicine_data" and MEDICINE_NOT_FOUND_MARKER in result:
+            signals.append(SIGNAL_MEDICINE_NOT_FOUND)
+
+        for signal in signals:
+            if signal not in self._turn_issues:
+                self._turn_issues.append(signal)
+            if signal not in self.issue_signals_seen:
+                self.issue_signals_seen.append(signal)
+            logger.info(f"[CHAT][ISSUE] {tool_name} raised '{signal}'")
+
+    @property
+    def turn_issues(self) -> list[str]:
+        """Causes detected while producing the last reply of send_message."""
+        return list(self._turn_issues)
 
     def _run_agent_loop(self, agent: Agent, user_message: str) -> str:
         """
@@ -315,6 +389,7 @@ class Chat:
         """Function used to send a message to the supervisor."""
         logger.info(f"[CHAT] USER: {user_message}")
         start = time()
+        self._turn_issues = []
         res = self._run_agent_loop(self.chat_agent, user_message)
         logger.debug(f"[TIMING] {time() - start:.2f}s")
         logger.info(f"[CHAT] ASSISTANT: {res}")

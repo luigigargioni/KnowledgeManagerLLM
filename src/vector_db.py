@@ -89,6 +89,13 @@ PATIENT_HISTORY_WARNING_THRESHOLD = 0.85
 # little risk – the LLM can simply ignore it.
 PREFERENCE_QUERY_THRESHOLD = 0.80
 
+# Phrase carried by every "the medicine is not in the knowledge base" answer of
+# query_medicines. The lookup returns raw document text, so there is no status
+# field to test: this marker is what makes the miss recognisable in code rather
+# than by guessing from how the assistant phrased it afterwards (see
+# chat.Chat._record_issue_signals). Keep it in all the no-match branches.
+MEDICINE_NOT_FOUND_MARKER = "not found in the local knowledge base"
+
 
 class VectorDBManager:
     def __init__(self, db_path: str = None):
@@ -304,7 +311,7 @@ class VectorDBManager:
         try:
             total = self._medicines.count()
             if total == 0:
-                return f"No medicine data available for: {query}"
+                return f"Medicine '{query}' was {MEDICINE_NOT_FOUND_MARKER} (collection empty)."
 
             results = self._medicines.query(
                 query_texts=[query],
@@ -315,7 +322,7 @@ class VectorDBManager:
             distances: list[float] = results.get("distances", [[]])[0]
 
             if not docs:
-                return f"No medicine information found for: {query}"
+                return f"Medicine '{query}' was {MEDICINE_NOT_FOUND_MARKER} (no result)."
 
             metadatas: list[dict] = results.get("metadatas", [[]])[0]
 
@@ -349,7 +356,7 @@ class VectorDBManager:
                     f"(best distance={distances[0]:.3f} > {MEDICINE_DISTANCE_THRESHOLD})"
                 )
                 return (
-                    f"Medicine '{query}' was not found in the local knowledge base "
+                    f"Medicine '{query}' was {MEDICINE_NOT_FOUND_MARKER} "
                     f"(no sufficiently similar entry; best distance={distances[0]:.3f}). "
                     "Do NOT proceed – ask the caregiver to verify contraindications manually."
                 )

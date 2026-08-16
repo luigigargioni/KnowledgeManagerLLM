@@ -23,7 +23,13 @@ from scenario_loader import (
     therapy_to_natural_language,
 )
 from therapy_diff import diff_therapies, render_diff
-from utils import assistant_raised_issue, build_transcript, is_exit_message, setup_logger
+from utils import (
+    assistant_handed_back,
+    assistant_raised_issue,
+    build_transcript,
+    is_exit_message,
+    setup_logger,
+)
 from vector_db import VectorDBManager
 
 
@@ -136,7 +142,27 @@ def run_scenario(
         # If the assistant never raises the point, the caregiver never learns it:
         # the branch was not exercised, which is precisely what the judge should
         # then record.
-        if deferred_script and not deferred_delivered and assistant_raised_issue(chatbot_response):
+        #
+        # Two ways to recognise the event, because there are two kinds of issue:
+        #  - `chat.turn_issues` is deterministic — the tools themselves reported a
+        #    conflict, a broken dependency, a history hit or a missing medicine
+        #    while producing this very reply. It cannot miss one for being worded
+        #    unusually, but it says nothing about whether the assistant passed it
+        #    on, hence the weak assistant_handed_back() confirmation.
+        #  - assistant_raised_issue() alone still covers what no tool can report:
+        #    a contraindication the model derives itself from the medicine data
+        #    and the patient's conditions, where every tool call succeeded.
+        signals = chat.turn_issues
+        raised = (signals and assistant_handed_back(chatbot_response)) or assistant_raised_issue(
+            chatbot_response
+        )
+        if signals and not raised:
+            logger.warning(
+                f"[SCENARIO {scenario_id}][TURN {turn + 1}] The system detected "
+                f"{signals} but the assistant did not hand the decision back – "
+                "reaction instructions withheld"
+            )
+        if deferred_script and not deferred_delivered and raised:
             caregiver.conversation_history.append(
                 {
                     "role": "system",
@@ -153,7 +179,8 @@ def run_scenario(
             )
             deferred_delivered = True
             logger.info(
-                f"[SCENARIO {scenario_id}][TURN {turn + 1}] Assistant raised the issue – "
+                f"[SCENARIO {scenario_id}][TURN {turn + 1}] Assistant raised the issue "
+                f"(signals: {signals or 'none – matched on wording'}) – "
                 "reaction instructions delivered"
             )
 
@@ -190,7 +217,8 @@ def run_scenario(
         logger.warning(
             f"[SCENARIO {scenario_id}] The assistant never raised the point on its "
             "own: the conditional branch was never exercised and the caregiver was "
-            "never given its reaction instructions"
+            "never given its reaction instructions. Detected by the system during "
+            f"the run: {chat.issue_signals_seen or 'nothing'}"
         )
 
     # ── Evaluation ───────────────────────────────────────────────────────
@@ -232,6 +260,10 @@ def run_scenario(
         # "partial" reads differently depending on this flag: False means the
         # branch under test never happened at all.
         evaluation["branch_exercised"] = deferred_delivered
+    # What the system itself detected over the conversation, regardless of what
+    # the assistant did with it. Together with branch_exercised it separates
+    # "there was nothing to raise" from "there was, and it was not raised".
+    evaluation["issue_signals"] = chat.issue_signals_seen
     evaluation["patient"] = (
         f"{scenario.get('patient_full_name', 'Unknown')}({scenario.get('patient_id', '-1')})"
     )
