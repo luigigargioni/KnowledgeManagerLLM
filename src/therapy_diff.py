@@ -106,6 +106,33 @@ def diff_therapies(initial: dict, final: dict) -> dict:
     }
 
 
+def summarise_touched(diff: dict) -> str:
+    """
+    One compact line naming every activity the conversation touched.
+
+    Deliberately *not* a detector of unrequested changes. Matching what changed
+    against what the caregiver asked for would mean matching activity names
+    against the words of someone who speaks like a person ("the walk after
+    lunch", never "Evening walk"), which produces false positives on the one
+    signal that has to be trusted. This lists the facts instead and leaves the
+    judgement to whoever reads the results — which is how these runs are
+    reviewed anyway.
+
+    Reading it is how a silent change gets noticed: an assistant once moved a
+    patient's lunch by 45 minutes to fit a medication around it, nobody had
+    asked, and the run was graded a full success because every scripted
+    objective had also been met.
+    """
+    parts: list[str] = []
+    parts += [f"+ {a.get('name')}" for a in diff.get("added", [])]
+    parts += [f"- {a.get('name')}" for a in diff.get("removed", [])]
+    parts += [f"~ {a.get('name')} (expired)" for a in diff.get("expired", [])]
+    for entry in diff.get("modified", []):
+        fields = ", ".join(c["field"] for c in entry["changes"])
+        parts.append(f"~ {entry['activity'].get('name')} ({fields})")
+    return " | ".join(parts) if parts else "no change"
+
+
 def render_diff(diff: dict) -> str:
     """Render a change set as the plain-text block handed to the JudgeAgent."""
     lines: list[str] = []

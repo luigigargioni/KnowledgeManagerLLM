@@ -12,7 +12,19 @@ from config_loader import RESULTS_DIR
 
 RESULTS_EXCEL_PATH = RESULTS_DIR / "all_results.xlsx"
 
-# Columns of the main sheet (one row per objective)
+# Columns of the main sheet (one row per scenario).
+#
+# The block after `elapsed_seconds` is what the run establishes in code rather
+# than by asking a model, and it is the part a reviewer should be able to read
+# without opening a log:
+#   changed_activities  – every activity the conversation touched, named
+#   applied_changes     – the same change set in full (what the judge was shown)
+#   issue_signals       – the blocking causes the system itself raised
+#   branch_outcome      – whether a conditional branch ran, was pre-empted, or was missed
+#   objectives_scripted – how many objectives the script asked for, vs the
+#                         per-objective outcomes in objectives_status
+# The first four were already computed at every scenario and stopped at the log
+# files; a change nobody asked for was therefore invisible in this report.
 _OBJECTIVE_COLUMNS = [
     "test_date",
     "batch_id",
@@ -21,8 +33,14 @@ _OBJECTIVE_COLUMNS = [
     "overall_status",
     "turns",
     "elapsed_seconds",
+    "changed_activities",
+    "issue_signals",
+    "branch_outcome",
+    "objectives_scripted",
+    "objectives_status",
     "objectives",
     "judge_check",
+    "applied_changes",
     "conversation",
     "initial_therapy",
     "final_therapy",
@@ -154,6 +172,12 @@ def _set_column_widths(ws, columns: list[str]) -> None:
         "conversation": 80,
         "initial_therapy": 50,
         "final_therapy": 50,
+        "changed_activities": 55,
+        "applied_changes": 55,
+        "issue_signals": 22,
+        "branch_outcome": 26,
+        "objectives_scripted": 10,
+        "objectives_status": 14,
     }
     for col_idx, col_name in enumerate(columns, start=1):
         ws.column_dimensions[get_column_letter(col_idx)].width = widths.get(col_name, 20)
@@ -167,6 +191,7 @@ def append_batch_results(
     initial_therapy: dict,
     final_therapy: dict,
     excel_path: Path = RESULTS_EXCEL_PATH,
+    change_summary: str = "",
 ) -> Path:
     """
     Append the results of a batch run to the global Excel file.
@@ -208,6 +233,12 @@ def append_batch_results(
         "objectives": scenario,
         "conversation": conversation or "",
         "initial_therapy": json.dumps(initial_therapy, indent=2),
+        "changed_activities": evaluation.get("changed_activities", ""),
+        "applied_changes": change_summary or "",
+        "issue_signals": ", ".join(evaluation.get("issue_signals") or []) or "none",
+        "branch_outcome": evaluation.get("branch_outcome", "n/a"),
+        "objectives_scripted": evaluation.get("objectives_scripted", ""),
+        "objectives_status": evaluation.get("objectives_status", ""),
     }
 
     if evaluation.get("status") == "error":

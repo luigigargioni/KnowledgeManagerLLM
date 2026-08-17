@@ -127,6 +127,24 @@ def split_objectives(objectives: str) -> tuple[str, str]:
     return initial, "\n\n".join(deferred_parts)
 
 
+_NUMBERED_OBJECTIVE_RE = re.compile(r"^\s*\d+\.\s", re.MULTILINE)
+
+
+def count_objectives(objectives: str) -> int:
+    """
+    How many numbered objectives the script asks the caregiver to carry out.
+
+    Counted from the script rather than from the judge's reply, so that the two
+    can be compared: the caregiver is a simulated user and does sometimes drop
+    an objective and end the conversation without ever raising it. That is not a
+    harsh grade, it is a test that never ran — the system under test was never
+    asked — and it is indistinguishable from a real failure unless the expected
+    count is recorded next to the outcome.
+    """
+    body = (objectives or "").split("## Objectives")[-1]
+    return len(_NUMBERED_OBJECTIVE_RE.findall(body))
+
+
 def therapy_to_natural_language(scenario: dict) -> str:
     """
     Convert the scenario's therapy into descriptive text to inject into the CaregiverAgent's context.

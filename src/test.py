@@ -16,12 +16,13 @@ from config_loader import MAIN_LLM, RESULTS_DIR, SCENARIOS_DIR, SIM_LLM
 from llm_client import DailyQuotaExceeded, make_sim_client, usage_report
 from results_extractor import append_batch_results
 from scenario_loader import (
+    count_objectives,
     install_scenario_therapy,
     load_scenario,
     split_objectives,
     therapy_to_natural_language,
 )
-from therapy_diff import diff_therapies, render_diff
+from therapy_diff import diff_therapies, render_diff, summarise_touched
 from utils import (
     assistant_handed_back,
     build_transcript,
@@ -264,10 +265,40 @@ def run_scenario(
         # "partial" reads differently depending on this flag: False means the
         # branch under test never happened at all.
         evaluation["branch_exercised"] = deferred_delivered
+        # ...except that False covers two opposite behaviours, and on its own it
+        # cannot tell them apart. The assistant may have missed the problem, or
+        # avoided it: in scenario 8 it moved a breathing exercise to the earliest
+        # slot that satisfies its dependency *before* calling the tool, so nothing
+        # ever blocked, the withheld instructions were never delivered, and the
+        # best possible conduct was recorded exactly like a failure to notice.
+        #
+        # A change having been applied anyway separates the two well enough to be
+        # worth writing down. It is a hint, not a verdict — the names say so, and
+        # the transcript settles it — but without it a reviewer cannot even tell
+        # which of the two happened.
+        if deferred_delivered:
+            evaluation["branch_outcome"] = "exercised"
+        else:
+            evaluation["branch_outcome"] = (
+                "not_raised_but_change_applied"
+                if changes["has_changes"]
+                else "not_raised_no_change"
+            )
     # What the system itself detected over the conversation, regardless of what
     # the assistant did with it. Together with branch_exercised it separates
     # "there was nothing to raise" from "there was, and it was not raised".
     evaluation["issue_signals"] = chat.issue_signals_seen
+    # Everything the conversation touched, named. This is the column a reviewer
+    # scans to catch a change nobody asked for; see therapy_diff.summarise_touched.
+    evaluation["changed_activities"] = summarise_touched(changes)
+    # Scripted vs graded: a caregiver that drops an objective and ends the
+    # conversation leaves a scenario that reads like a failure of the system
+    # under test, when in fact it was never asked. Recording both counts makes
+    # the two distinguishable at a glance.
+    evaluation["objectives_scripted"] = count_objectives(script)
+    evaluation["objectives_status"] = ",".join(
+        o.get("status", "?")[:1].upper() for o in evaluation.get("objectives", [])
+    )
     evaluation["patient"] = (
         f"{scenario.get('patient_full_name', 'Unknown')}({scenario.get('patient_id', '-1')})"
     )
@@ -280,7 +311,7 @@ def run_scenario(
     logger.info(
         f"[SCENARIO {scenario_id}] Evaluation complete – overall: {evaluation['overall_status']}"
     )
-    return evaluation, script, transcript, initial_therapy, final_therapy
+    return evaluation, script, transcript, initial_therapy, final_therapy, change_summary
 
 
 def print_scenario_summary(scenario_id: int, evaluation: dict) -> None:
@@ -396,7 +427,14 @@ def main():
         print(f"\n[{scenario_id}/{to_id}] Running scenario {scenario_id}...")
 
         try:
-            evaluation, scenario, transcript, initial_therapy, final_therapy = run_scenario(
+            (
+                evaluation,
+                scenario,
+                transcript,
+                initial_therapy,
+                final_therapy,
+                change_summary,
+            ) = run_scenario(
                 scenario_id=scenario_id,
                 vector_db=vector_db,
                 delay=args.delay,
@@ -421,6 +459,7 @@ def main():
                 transcript,
                 initial_therapy,
                 final_therapy,
+                change_summary=change_summary,
             )
             print_scenario_summary(scenario_id, evaluation)
 
@@ -503,6 +542,16 @@ def main():
         if entry["rpd_limit"] or entry["tpd_limit"]:
             line += f" (daily limits: {entry['rpd_limit']} RPD / {entry['tpd_limit']} TPD)"
         print(line)
+        # Say it out loud rather than leaving it to a warning buried in one
+        # scenario's log: these results were produced without these parameters,
+        # whatever the session header at the top of each log claims.
+        if entry["dropped_params"]:
+            note = (
+                f"    NOTE: {', '.join(entry['dropped_params'])} rejected by this model "
+                f"and dropped — the run did NOT use it"
+            )
+            print(note)
+            logger.warning(f"[BATCH] {entry['quota']}: {note.strip()}")
     if quota_exceeded:
         print(f"\n  BATCH INCOMPLETE – {quota_exceeded}")
 

@@ -158,7 +158,11 @@ def setup_logger(
         # across runs if the log says which sampling produced them, and an unset
         # temperature is a choice whose value depends on the backend (1.0 on
         # OpenAI, the Modelfile's value on Ollama).
-        sampling = [f"reasoning_effort={cfg.reasoning_effort or 'unset'}"]
+        # "requested", not a statement of fact: this line is written before the
+        # first call, and a parameter the model turns out to reject is dropped
+        # for the rest of the process. What was actually sent is only known at
+        # the end — see llm_client.usage_report()["dropped_params"].
+        sampling = [f"requested reasoning_effort={cfg.reasoning_effort or 'unset'}"]
         sampling.append(
             f"temperature={cfg.temperature if cfg.temperature is not None else 'provider default'}"
         )

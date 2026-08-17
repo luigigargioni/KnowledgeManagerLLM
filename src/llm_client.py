@@ -285,9 +285,28 @@ def _limiter_for(config: LLMConfig, model: str) -> _ModelRateLimiter:
 
 
 def usage_report() -> list[dict]:
-    """Per-quota request/token counters accumulated by this process."""
+    """
+    Per-quota request/token counters accumulated by this process, plus the
+    parameters that turned out to be unsupported and were dropped.
+
+    `dropped_params` is here because the session header is written before the
+    first request and can only state what was *configured*. When a model then
+    refuses a parameter, it is dropped for the rest of the process and the run
+    proceeds under settings the log still reports as being in force — measured on
+    gpt-5.4-mini, which rejects `reasoning_effort` alongside tool declarations, so
+    every batch so far ran with no reasoning effort while the header announced
+    `reasoning_effort=low`. A report that misdescribes the configuration it was
+    produced under silently contaminates anything concluded from it, so what was
+    actually sent has to be recorded at the end, when it is known.
+    """
+    # Snapshot first, so the two locks are never held at the same time.
+    with _unsupported_lock:
+        dropped = {key: sorted(names) for key, names in _unsupported.items()}
     with _limiters_lock:
-        return [limiter.usage() for limiter in _limiters.values()]
+        report = [limiter.usage() for limiter in _limiters.values()]
+    for entry in report:
+        entry["dropped_params"] = dropped.get(entry["quota"], [])
+    return report
 
 
 # Parameters the project adds by itself and can therefore drop again when a
