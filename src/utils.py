@@ -9,7 +9,6 @@ from pathlib import Path
 
 import psutil
 
-import prompts as prompts
 from config_loader import (
     CHECK_NVIDIA_GPU,
     FILE_LOG_LEVEL,
@@ -62,6 +61,10 @@ def minutes_to_hhmm(total_minutes):
 
 class StartWithFilter(logging.Filter):
     def __init__(self, filter_string: str = ""):
+        # logging.Filter.__init__ sets .name/.nlen, which the base class and any
+        # code inspecting the filter expect to exist. Skipping it happened to
+        # work only because filter() is fully overridden below.
+        super().__init__()
         self.filter_string = filter_string
 
     def filter(self, record):

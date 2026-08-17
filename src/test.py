@@ -3,7 +3,6 @@
 import argparse
 import json
 import logging
-import os
 import sys
 import traceback
 from datetime import datetime
@@ -307,13 +306,25 @@ def main():
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
 
-    # If --to is not specified, run all scenarios
-    to_id = (
-        args.to_id
-        if args.to_id is not None
-        else len([x for x in os.listdir(SCENARIOS_DIR) if x.endswith(".json")])
+    # If --to is not specified, run every numbered scenario that actually exists.
+    # Counting *.json instead gave the wrong bound twice over: the count includes
+    # the example*.json files, which are not numbered and are never run, so a full
+    # batch asked for ids past the last real scenario (105 files, scenarios 1–100)
+    # and recorded five FileNotFoundError as failures. Listing the ids also means
+    # a gap in the numbering no longer shows up as a failed scenario.
+    available_ids = sorted(
+        int(path.stem) for path in SCENARIOS_DIR.glob("*.json") if path.stem.isdigit()
     )
-    scenario_ids = list(range(args.from_id, to_id + 1))
+    if not available_ids:
+        raise RuntimeError(f"No numbered scenario found in {SCENARIOS_DIR}")
+
+    to_id = args.to_id if args.to_id is not None else available_ids[-1]
+    scenario_ids = [sid for sid in available_ids if args.from_id <= sid <= to_id]
+    if not scenario_ids:
+        raise RuntimeError(
+            f"No scenario in the requested range {args.from_id}–{to_id}; "
+            f"available: {available_ids[0]}–{available_ids[-1]}"
+        )
 
     # Output folder for this batch run
     batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")

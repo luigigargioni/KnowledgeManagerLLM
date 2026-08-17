@@ -1,6 +1,7 @@
 import copy
 import json
 import logging
+import os
 import re
 from datetime import datetime
 
@@ -174,15 +175,27 @@ def _load_therapy():
 
 
 def _save_therapy(data):
-    """Persist the given data dict to therapy.json."""
+    """
+    Persist the given data dict to therapy.json.
+
+    Written to a temporary file in the same directory and then moved into place:
+    opening THERAPY_FILE in "w" truncates it before the new content is written,
+    so an error (or a reader in another thread, which the Streamlit UI has) sees a
+    half-written file. os.replace is atomic on the same filesystem, so the file is
+    either the previous therapy or the new one, never a truncated mix — and
+    _load_therapy raising JSONDecodeError on a corrupted file kills the session.
+    """
     _ensure_data_dir()
 
+    tmp_path = THERAPY_FILE.with_suffix(THERAPY_FILE.suffix + ".tmp")
     try:
-        with open(THERAPY_FILE, "w", encoding="utf-8") as f:
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
+        os.replace(tmp_path, THERAPY_FILE)
         logger.debug(f"[THERAPY] Saved therapy data: {len(data.get('activities', []))} activities")
     except Exception as e:
         logger.error(f"[THERAPY] Error saving therapy.json: {e}")
+        tmp_path.unlink(missing_ok=True)
         raise
 
 
@@ -233,6 +246,20 @@ def _parse_activity_date(d):
             continue
     logger.warning(f"[TOOLS] Cannot parse date: {d!r} – treating as unbounded")
     return None
+
+
+def _normalise_optional_date(value):
+    """
+    Collapse the empty string to None for an optional date field.
+
+    Models routinely send "" for "no end date". Stored verbatim it is neither a
+    date nor absent: _parse_activity_date logs a "cannot parse" warning for it on
+    every single overlap comparison, and the value reaches the diff and the UI as
+    an empty string rather than as null.
+    """
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
 
 
 def _validate_date_field(value, field_name: str):
@@ -516,6 +543,13 @@ def add_therapy_activity(activity_data):
         if time_err:
             return _tool_json({"status": "error", "message": time_err})
 
+        # Normalise "" to None *in activity_data*, so the value that is stored
+        # below is the normalised one. Doing it on local copies only left the
+        # empty string in the saved activity.
+        for date_field in ("valid_from", "valid_until"):
+            if date_field in activity_data:
+                activity_data[date_field] = _normalise_optional_date(activity_data[date_field])
+
         # Validate optional date fields (must be YYYY-MM-DD or ISO 8601)
         for date_field in ("valid_from", "valid_until"):
             date_err = _validate_date_field(activity_data.get(date_field), date_field)
@@ -524,12 +558,7 @@ def add_therapy_activity(activity_data):
 
         # Validate that valid_from precedes valid_until when both are provided
         vf = activity_data.get("valid_from")
-        if vf:
-            vf = vf if len(vf) > 0 else None
-
         vu = activity_data.get("valid_until")
-        if vu:
-            vu = vu if len(vu) > 0 else None
         if vf and vu:
             vf_dt = _parse_activity_date(vf)
             vu_dt = _parse_activity_date(vu)
@@ -614,10 +643,9 @@ def add_therapy_activity(activity_data):
                                 "status": "error",
                                 "issue": ISSUE_TEMPORAL_ORDERING,
                                 "message": (
-                                    f"Temporal ordering violation: dependency '{dep_id}' "
-                                    f"({dep['name']}) ends at {minutes_to_hhmm(dep_end)}, "
-                                    f"which is after the scheduled start time {new_activity['time']} "
-                                    "of this activity."
+                                    f"Temporal ordering violation: '{new_activity['name']}' "
+                                    f"would start at {new_activity['time']}, but it depends on "
+                                    f"'{dep['name']}', which ends at {minutes_to_hhmm(dep_end)}."
                                 ),
                             },
                         )
@@ -693,14 +721,36 @@ def update_therapy_activity(activity_id, updates):
                 },
             )
 
+        # An update carrying no field to change is not a successful update: it is
+        # a malformed call. Reporting "successfully updated" for it produced the
+        # one thing the manager's prompt forbids above everything else — a tool
+        # result confirming a change that never happened.
+        effective_updates = {k: v for k, v in (updates or {}).items() if k != "activity_id"}
+        if not effective_updates:
+            return _tool_json(
+                {
+                    "status": "error",
+                    "message": (
+                        f"No field to update was provided for activity '{activity_id}'. "
+                        "Pass the fields that must change (e.g. time, duration_minutes, "
+                        "day_of_week); nothing was modified."
+                    ),
+                },
+            )
+        updates = effective_updates
+
+        # Normalise "" to None for the optional date fields before anything reads them.
+        for date_field in ("valid_from", "valid_until"):
+            if date_field in updates:
+                updates[date_field] = _normalise_optional_date(updates[date_field])
+
         old_activity = copy.deepcopy(data["activities"][activity_index])
 
         # Build the validated/updated activity on a *copy* so that the stored
         # data is never mutated before all checks pass.
         updated_activity = copy.deepcopy(old_activity)
         for key, value in updates.items():
-            if key != "activity_id":
-                updated_activity[key] = value
+            updated_activity[key] = value
 
         # Schedule without this activity for conflict/dependency checks
         temp_activities = [a for i, a in enumerate(data["activities"]) if i != activity_index]
@@ -784,10 +834,19 @@ def update_therapy_activity(activity_id, updates):
                     },
                 )
 
-            # Validate temporal ordering: every dependency must end before this activity starts
+        # Validate temporal ordering: every dependency must end before this activity
+        # starts. This is checked against the *effective* dependency list — the one
+        # the activity ends up with — and whenever anything that can break the
+        # ordering moves, not only when the dependencies themselves are restated.
+        # Gating it on `dependencies in updates` meant that changing just the time
+        # of an activity walked it in front of its own dependency and the write was
+        # accepted: exactly the constraint these tools exist to enforce, silently
+        # skipped in the most common way of expressing the move.
+        if new_deps is not None or "time" in updates or "duration_minutes" in updates:
+            effective_deps = updated_activity.get("dependencies") or []
             updated_start = hhmm_to_minutes(updated_activity["time"])
             activity_map = {act["activity_id"]: act for act in temp_activities}
-            for dep_id in new_deps:
+            for dep_id in effective_deps:
                 dep = activity_map.get(dep_id)
                 if dep:
                     dep_end = hhmm_to_minutes(dep["time"]) + dep["duration_minutes"]
@@ -797,10 +856,9 @@ def update_therapy_activity(activity_id, updates):
                                 "status": "error",
                                 "issue": ISSUE_TEMPORAL_ORDERING,
                                 "message": (
-                                    f"Temporal ordering violation: dependency '{dep_id}' "
-                                    f"({dep['name']}) ends at {minutes_to_hhmm(dep_end)}, "
-                                    f"which is after the scheduled start time {updated_activity['time']} "
-                                    "of this activity."
+                                    f"Temporal ordering violation: '{updated_activity['name']}' "
+                                    f"would start at {updated_activity['time']}, but it depends on "
+                                    f"'{dep['name']}', which ends at {minutes_to_hhmm(dep_end)}."
                                 ),
                             },
                         )
@@ -908,22 +966,26 @@ def remove_therapy_activity(activity_id):
             )
 
         # Second pass: check dependents using the activity's ID.
-        # Dependencies are stored as lists of activity IDs.
-        activity_name = removed_activity["activity_id"]
-        dependent_activities = [
-            act["activity_id"]
+        # Dependencies are stored as lists of activity IDs, but this message is
+        # the one the caregiver gets to hear: it is a blocking `issue`, so the
+        # assistant relays it. Naming the activities instead of their ids keeps
+        # it relayable — the previous wording ("Cannot remove 'ml_001' because it
+        # is a dependency of: med_001") gave the model nothing but the ids its
+        # own prompt forbids it to show, and no names to substitute for them.
+        dependent_names = [
+            act.get("name", act["activity_id"])
             for act in data["activities"]
             if activity_id in act.get("dependencies", [])
         ]
 
-        if dependent_activities:
+        if dependent_names:
             return _tool_json(
                 {
                     "status": "error",
                     "issue": ISSUE_DEPENDENCY_BLOCKED,
                     "message": (
-                        f"Cannot remove '{activity_name}' because it is a dependency "
-                        f"of: {', '.join(dependent_activities)}."
+                        f"Cannot remove '{removed_activity.get('name', activity_id)}' because "
+                        f"the following activities depend on it: {', '.join(dependent_names)}."
                     ),
                 },
             )

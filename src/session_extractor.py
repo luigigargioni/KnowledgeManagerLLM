@@ -19,6 +19,18 @@ from utils import get_current_logger, visible_turns
 
 logger = get_current_logger()
 
+# One client for the module. make_main_client() builds a fresh OpenAI instance —
+# and with it a fresh HTTP connection pool — on every call, and both extractors
+# run at every end of session.
+_client = None
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = make_main_client()
+    return _client
+
 
 def _format_conversation(conversation_history: list[dict]) -> str:
     """
@@ -41,9 +53,8 @@ def _call_llm(system_prompt: str, user_text: str) -> list[dict]:
     Works with every provider supported by llm_client.make_client().
     Returns the parsed JSON list, or an empty list on failure.
     """
-    client = make_main_client()
     try:
-        response = client.chat.completions.create(
+        response = _get_client().chat.completions.create(
             model=MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},

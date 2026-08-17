@@ -6,6 +6,7 @@ from pathlib import Path
 from time import sleep, time
 
 from langchain_core.messages import AIMessage
+from langgraph.errors import GraphRecursionError
 
 from agent_graph import build_therapy_graph
 from agents.caregiver_agent import CaregiverAgent
@@ -45,6 +46,12 @@ def parse_args() -> argparse.Namespace:
         default=0.0,
         help="Seconds to wait between turns in agent mode (default: 0).",
     )
+    parser.add_argument(
+        "--max-turns",
+        type=int,
+        default=30,
+        help="Max conversation turns in agent mode (default: 30, same as test.py).",
+    )
     return parser.parse_args()
 
 
@@ -65,7 +72,7 @@ def read_script(path: Path) -> str:
     return script
 
 
-def run_agent_mode(chat, script: str, delay: float) -> None:
+def run_agent_mode(chat, script: str, delay: float, max_turns: int = 30) -> None:
 
     caregiver = CaregiverAgent(script=script)
     graph = build_therapy_graph(chat, caregiver)
@@ -73,22 +80,37 @@ def run_agent_mode(chat, script: str, delay: float) -> None:
     first_message = chat.chat_agent.conversation_history[-1]["content"]
     print(f"Assistant: {first_message}\n")
 
-    for event in graph.stream(
-        {
-            "messages": [AIMessage(content=first_message)],
-            "session_ended": False,
-        },
-        {"recursion_limit": 30},
-    ):
-        for node_name, state in event.items():
-            last = state["messages"][-1].content
-            if node_name == "caregiver":
-                print(f"You (agent): {last}\n")
-            elif node_name == "therapy_manager":
-                print(f"Assistant: {last}\n")
+    # LangGraph counts super-steps, and one conversation turn is two of them
+    # (caregiver → therapy_manager), plus the final caregiver step that emits the
+    # exit. A flat limit of 30 therefore capped this driver at ~15 turns while
+    # test.py allowed 30 — the two drivers are meant to be behaviourally
+    # equivalent. Deriving the limit from max_turns keeps them aligned.
+    recursion_limit = 2 * max_turns + 2
 
-        if delay > 0:
-            sleep(delay)
+    try:
+        for event in graph.stream(
+            {
+                "messages": [AIMessage(content=first_message)],
+                "session_ended": False,
+            },
+            {"recursion_limit": recursion_limit},
+        ):
+            for node_name, state in event.items():
+                last = state["messages"][-1].content
+                if node_name == "caregiver":
+                    print(f"You (agent): {last}\n")
+                elif node_name == "therapy_manager":
+                    print(f"Assistant: {last}\n")
+
+            if delay > 0:
+                sleep(delay)
+    except GraphRecursionError:
+        # Running out of turns is the same non-event it is in test.py: the
+        # conversation is graded on what it managed to do. Left uncaught this
+        # propagated out of main()'s narrow except clause and killed the run
+        # *before* the evaluation below, throwing away the whole session.
+        logger.warning(f"[AGENT] Max turns ({max_turns}) reached without an exit message")
+        print(f"[Max turns ({max_turns}) reached – ending the conversation and grading it]\n")
 
     # ── Evaluation ───────────────────────────────────────────────────────
     print("\n" + "=" * 60)
@@ -276,7 +298,7 @@ def main():
     try:
         if args.input:
             script = read_script(args.input)
-            run_agent_mode(chat, script, args.delay)
+            run_agent_mode(chat, script, args.delay, args.max_turns)
         else:
             run_interactive_mode(chat)
 

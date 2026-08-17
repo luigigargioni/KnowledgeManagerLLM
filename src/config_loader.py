@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote_plus
 
 from dotenv import load_dotenv
 
@@ -162,7 +163,12 @@ DB_NAME = os.getenv("DB_NAME", "therapy_db")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
 
-DB_CONNECTION_STRING = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# quote_plus on the credentials: a password containing '@', ':', '/' or '#' —
+# ordinary in a generated one — otherwise splits the URL in the wrong place and
+# the connection fails with an error that points at the host, not at the password.
+DB_CONNECTION_STRING = (
+    f"postgresql://{quote_plus(DB_USER)}:{quote_plus(DB_PASSWORD)}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+)
 
 
 THERAPY_FILE = Path(__file__).parent.parent / "data" / "therapy.json"

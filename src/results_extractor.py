@@ -109,11 +109,26 @@ def _sync_headers(ws) -> list[str]:
     return existing
 
 
+# Hard limit of the xlsx format. openpyxl writes a longer string without
+# complaining and Excel then refuses to open the workbook, which would take out
+# every previously graded scenario at once — the file is cumulative.
+_EXCEL_MAX_CELL = 32767
+_TRUNCATION_NOTE = "\n\n[… truncated: value exceeded the 32767-character Excel cell limit]"
+
+
+def _fit_cell(value):
+    """Keep a cell value inside what xlsx can actually store."""
+    if isinstance(value, str) and len(value) > _EXCEL_MAX_CELL:
+        return value[: _EXCEL_MAX_CELL - len(_TRUNCATION_NOTE)] + _TRUNCATION_NOTE
+    return value
+
+
 def _append_row(ws, columns: list[str], values: dict, status: str | None) -> int:
     """Append one row, matching values to the sheet's columns by name."""
     row_idx = ws.max_row + 1
     for col_idx, col_name in enumerate(columns, start=1):
-        _style_cell(ws.cell(row=row_idx, column=col_idx, value=values.get(col_name, "")), status)
+        cell_value = _fit_cell(values.get(col_name, ""))
+        _style_cell(ws.cell(row=row_idx, column=col_idx, value=cell_value), status)
     return row_idx
 
 

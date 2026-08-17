@@ -367,7 +367,11 @@ class DatabaseManager:
         patient = patient_result["patient"]
         latest = self.get_latest_therapy(patient_id)
 
-        if latest["therapy"] is None:
+        if latest.get("status") == "error":
+            logger.error(f"[DB] load_session failed: {latest.get('message')}")
+            return latest
+
+        if latest.get("therapy") is None:
             logger.info(f"[DB] No therapy found for patient ID {patient_id}, creating empty JSON")
             data = {
                 "patient_id": patient["id"],
@@ -391,16 +395,25 @@ class DatabaseManager:
                         continue
                 raise ValueError(f"Unrecognised date format: {d!r}")
 
-            valid_activities = [
-                x
-                for x in therapy["activities"]
-                if not x["valid_until"] or _parse_date(x["valid_until"]) > datetime.now()
-            ]
-            expired_activities = [
-                x
-                for x in therapy["activities"]
-                if x["valid_until"] and _parse_date(x["valid_until"]) <= datetime.now()
-            ]
+            # .get, not [...]: an activity stored without the key (older rows, or
+            # anything written outside add_therapy_activity) made both list
+            # comprehensions raise KeyError and took the whole session load down.
+            def _is_expired(activity: dict) -> bool:
+                valid_until = activity.get("valid_until")
+                if not valid_until:
+                    return False
+                try:
+                    return _parse_date(valid_until) <= datetime.now()
+                except ValueError:
+                    logger.warning(
+                        f"[DB] Unparseable valid_until {valid_until!r} on "
+                        f"{activity.get('activity_id')} – treating as still valid"
+                    )
+                    return False
+
+            stored_activities = therapy.get("activities") or []
+            valid_activities = [x for x in stored_activities if not _is_expired(x)]
+            expired_activities = [x for x in stored_activities if _is_expired(x)]
             data = {
                 "patient_id": patient["id"],
                 "patient_full_name": patient["name"],
@@ -461,51 +474,73 @@ class DatabaseManager:
         folder = (patients_folder or PATIENTS_DATA_FOLDER) / str(patient_id)
         therapy_file = folder / "therapy.json"
 
+        # `therapy` used to be assigned only inside the try below, so a patient
+        # folder without a therapy.json — which is every one of them in this repo,
+        # they only carry history.json — reached `if therapy:` with the name
+        # unbound and raised UnboundLocalError. Both callers (main.py and the
+        # Streamlit app) invoke this as soon as PostgreSQL answers, so the crash
+        # was on the startup path whenever the database was reachable.
+        therapy = None
+
         if therapy_file.exists():
             try:
                 therapy = json.loads(therapy_file.read_text(encoding="utf-8"))
             except Exception as e:
-                logger.error(f"[DB] Failed to load therapy file{therapy_file}: {e}")
+                logger.error(f"[DB] Failed to load therapy file {therapy_file}: {e}")
         else:
             logger.debug(f"[DB] No therapy file found for patient {patient_id} at {therapy_file}")
 
-        if therapy:
-            name = therapy["patient_full_name"] or "John Doe"
-            result = self.get_patient_by_name(name)
+        if not therapy:
+            msg = f"No seed therapy for patient {patient_id} at {therapy_file}"
+            logger.info(f"[DB] seed skipped: {msg}")
+            return {"status": "skipped", "message": msg}
 
-            if result["status"] == "success":
-                patient_id = result["patient"]["id"]
-                logger.info(
-                    f"[DB] seed: patient {name} already exists (ID: {patient_id}), skipping"
-                )
-            else:
-                # Create the patient
-                birth_date = datetime.strptime(
-                    therapy["birth_date"], "%Y-%m-%dT%H:%M:%S"
-                ) or datetime(1957, 5, 15)
-                create_result = self.create_patient(
-                    name=name,
-                    gender=therapy["gender"] or "Unknown",
-                    birth_date=birth_date,
-                    medical_conditions=therapy["medical_conditions"] or [],
-                )
-                if create_result["status"] == "error":
-                    return create_result
+        name = therapy.get("patient_full_name") or "John Doe"
+        result = self.get_patient_by_name(name)
 
-                patient_id = create_result["patient"]["id"]
-                logger.info(f"[DB] seed: patient {name} created (ID: {patient_id})")
-
-            latest = self.get_latest_therapy(patient_id)
-            if latest["therapy"] is not None:
-                logger.info("[DB] seed: therapy version already exists, skipping")
-                return {"status": "success", "message": "Seed already applied"}
-
-            activities = therapy["activities"] or []
-
-            result = self.save_therapy_version(
-                patient_id=patient_id, activities=activities, notes="Initial seed data"
+        if result["status"] == "success":
+            patient_id = result["patient"]["id"]
+            logger.info(f"[DB] seed: patient {name} already exists (ID: {patient_id}), skipping")
+        else:
+            # Create the patient. strptime raises on an unexpected format rather
+            # than returning something falsy, so the default has to be a real
+            # fallback around the parse, not an `or` after it.
+            raw_birth = therapy.get("birth_date")
+            birth_date = datetime(1957, 5, 15)
+            if raw_birth:
+                for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+                    try:
+                        birth_date = datetime.strptime(raw_birth, fmt)
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    logger.warning(
+                        f"[DB] seed: unrecognised birth_date {raw_birth!r} for {name} – "
+                        f"using {birth_date:%Y-%m-%d}"
+                    )
+            create_result = self.create_patient(
+                name=name,
+                gender=therapy.get("gender") or "Unknown",
+                birth_date=birth_date,
+                medical_conditions=therapy.get("medical_conditions") or [],
             )
-            return result
+            if create_result["status"] == "error":
+                return create_result
+
+            patient_id = create_result["patient"]["id"]
+            logger.info(f"[DB] seed: patient {name} created (ID: {patient_id})")
+
+        latest = self.get_latest_therapy(patient_id)
+        if latest.get("therapy") is not None:
+            logger.info("[DB] seed: therapy version already exists, skipping")
+            return {"status": "success", "message": "Seed already applied"}
+
+        return self.save_therapy_version(
+            patient_id=patient_id,
+            activities=therapy.get("activities") or [],
+            notes="Initial seed data",
+        )
 
 
 # endregion

@@ -145,6 +145,13 @@ class Chat:
         current_idx = len(visible_turns(self.chat_agent.conversation_history)) - 1
         therapy = json.loads(THERAPY_FILE.read_text(encoding="utf-8"))
 
+        # A therapy tool that refused the write (a scheduling conflict, a blocked
+        # dependency) leaves the file untouched, so snapshotting it again only
+        # added an entry identical to the previous one.
+        if self._therapy_snapshots and self._therapy_snapshots[-1]["therapy"] == therapy:
+            logger.debug(f"[SNAPSHOT] Therapy unchanged at message_idx={current_idx} – not stored")
+            return
+
         self._therapy_snapshots.append(
             {
                 "message_idx": current_idx,
@@ -152,9 +159,12 @@ class Chat:
             }
         )
 
-        # Saving of snapshot on memory
-        if logger.session_dir:
-            snapshots_path = logger.session_dir / "therapy_snapshots.json"
+        # Saving of snapshot on memory. session_dir is attached to the logger by
+        # setup_logger, so it is absent on a plain logging.getLogger — getattr
+        # keeps a Chat usable (in-memory snapshots only) when it was not called.
+        session_dir = getattr(logger, "session_dir", None)
+        if session_dir:
+            snapshots_path = session_dir / "therapy_snapshots.json"
             snapshots_path.write_text(
                 json.dumps(self._therapy_snapshots, indent=2, ensure_ascii=False),
                 encoding="utf-8",
@@ -225,19 +235,48 @@ class Chat:
             f"{len(self._therapy_snapshots)} snapshots"
         )
 
-    def execute_tool(self, agent: Agent, tool_name: str, tool_arguments: dict) -> str:
+    def execute_tool(self, agent: Agent, tool_name: str, tool_arguments: str) -> str:
         """
         The orchestrator only handles:
         1. Delegation to worker agents
         2. save_session (requires db_manager and vector_db)
         Everything else is delegated to the chat_agent.
+
+        `tool_arguments` is what the SDK hands over: the raw JSON *string* of the
+        call. It is decoded once here and every branch below receives the dict,
+        which is what they all expect — the delegation branch used to forward the
+        undecoded string to json.dumps and hand the worker a quoted, escaped
+        blob ('"{\\"message\\": …}"') as its user message.
         """
         logger.debug(f"[{agent.name.upper()}][TOOL] Executing: {tool_name}({tool_arguments})")
+
+        if isinstance(tool_arguments, str):
+            try:
+                arguments = json.loads(tool_arguments or "{}")
+            except json.JSONDecodeError as e:
+                # A model emitting malformed arguments is a bad call, not a crash:
+                # returning the error as the tool result lets it correct itself on
+                # the next iteration instead of taking the whole turn down.
+                logger.warning(
+                    f"[{agent.name.upper()}][TOOL] {tool_name} called with invalid JSON "
+                    f"arguments: {e} – {tool_arguments!r}"
+                )
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": f"Arguments were not valid JSON ({e}). Call the tool again.",
+                    },
+                    ensure_ascii=False,
+                )
+        else:
+            arguments = tool_arguments
+        if not isinstance(arguments, dict):
+            arguments = {}
 
         # 1. Delegation
         if tool_name in self._agent_registry:
             agent_delegate = self._agent_registry[tool_name]
-            result = self._send_to_agent(agent_delegate, tool_arguments)
+            result = self._send_to_agent(agent_delegate, arguments)
 
         # 2. save_session: requires orchestrator dependencies
         elif tool_name == "save_session":
@@ -245,9 +284,11 @@ class Chat:
 
         # 3. Supervisor tools
         else:
-            result = agent.execute_tool(tool_name, json.loads(tool_arguments))
+            result = agent.execute_tool(tool_name, arguments)
 
-        # If is an action that changes the therapy i save a new snapshot of it
+        # If is an action that changes the therapy i save a new snapshot of it.
+        # _save_therapy_snapshot is a no-op when nothing actually changed, so a
+        # call blocked by a conflict no longer appends a duplicate snapshot.
         if tool_name in (
             "add_therapy_activity",
             "update_therapy_activity",
@@ -421,7 +462,7 @@ class Chat:
 
     def _send_to_agent(self, agent: Agent, tool_arguments: dict) -> str:
         """Delegation to a worker agent"""
-        return self._run_agent_loop(agent, json.dumps(tool_arguments))
+        return self._run_agent_loop(agent, json.dumps(tool_arguments, ensure_ascii=False))
 
     def get_history(self) -> list[dict]:
         """The conversation as exchanged with the caregiver."""

@@ -370,11 +370,22 @@ class VectorDBManager:
 
         return count
 
-    def query_medicines(self, query: str, n_results: int = 1) -> str:
+    def query_medicines(self, query: str, n_results: int = 1, candidates: int = 5) -> str:
         """
         RAG retrieval on the medicines collection.
         Returns the relevant document concatenated as a string ready for the LLM.
         Only 1 document is returned by default since each file contains comprehensive info about a single medicine.
+
+        `candidates` is how many neighbours the lexical filter below gets to look
+        at, and it is deliberately larger than `n_results`. Retrieving exactly one
+        made the filter decide identity from a single document, while the
+        measurement recorded at MEDICINE_DISTANCE_THRESHOLD says the two
+        populations overlap (present drugs 0.35–0.58, absent 0.53–0.92): the
+        nearest neighbour is demonstrably not always the right monograph, and when
+        it was not, an indexed medicine sitting second or third was reported as
+        "not found" — which the checker's prompt turns into a refusal to proceed.
+        Widening the candidate pool costs nothing at query time (one search, same
+        collection) because what is returned is still decided lexically.
         """
         try:
             total = self._medicines.count()
@@ -383,7 +394,7 @@ class VectorDBManager:
 
             results = self._medicines.query(
                 query_texts=[query],
-                n_results=min(n_results, total),
+                n_results=min(max(candidates, n_results), total),
                 include=["documents", "distances", "metadatas"],
             )
             docs: list[str] = results.get("documents", [[]])[0]
@@ -407,14 +418,21 @@ class VectorDBManager:
                     "medicine is involved."
                 )
 
-            matched: list[str] = []
+            # Rank by how strongly the document identifies itself, not by distance:
+            # a name match on the third neighbour beats a topic match on the first.
+            evidence_rank = {"name": 0, "name~": 1, "topic": 2}
+            scored: list[tuple[int, str, str]] = []
             for doc, meta, dist in zip(docs, metadatas, distances):
                 evidence = _document_answers(tokens, doc, meta.get("name", ""), dist)
                 if evidence:
                     logger.info(
-                        f"[VECTOR_DB] query_medicines: '{query}' → {meta.get('name')} ({evidence})"
+                        f"[VECTOR_DB] query_medicines: '{query}' → {meta.get('name')} "
+                        f"({evidence}, d={dist:.3f})"
                     )
-                    matched.append(doc)
+                    scored.append((evidence_rank[evidence], doc, meta.get("name", "")))
+
+            scored.sort(key=lambda item: item[0])  # stable: distance order kept per tier
+            matched = [doc for _, doc, _ in scored[:n_results]]
 
             if not matched:
                 logger.info(

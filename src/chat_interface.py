@@ -14,7 +14,7 @@ from config_loader import (
     THERAPY_FILE,
 )
 from sql_db import DatabaseManager
-from utils import get_system_info, setup_logger, visible_turns
+from utils import get_system_info, is_visible_turn, setup_logger
 from vector_db import VectorDBManager
 
 # Must be the first Streamlit command
@@ -172,7 +172,14 @@ if st.session_state.session_ended:
 #    st.markdown(st.session_state.first_message["content"])
 
 
-for idx, message in enumerate(visible_turns(st.session_state.chat.chat_agent.conversation_history)):
+_full_history = st.session_state.chat.chat_agent.conversation_history
+# Pair every visible turn with its position in the *full* history as we walk it.
+# Looking the position up afterwards with list.index() matched on dict equality,
+# so two identical turns — a caregiver answering "yes" twice is enough — always
+# resolved to the first one and the rewind jumped to the wrong point.
+_visible_with_pos = [(pos, msg) for pos, msg in enumerate(_full_history) if is_visible_turn(msg)]
+
+for idx, (full_idx, message) in enumerate(_visible_with_pos):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
@@ -180,7 +187,6 @@ for idx, message in enumerate(visible_turns(st.session_state.chat.chat_agent.con
             logger.info(
                 f"[REWIND] Conversation was reloaded from message {idx} - {message['role'].upper()}: {f'{message["content"][:80]}...' if len(message['content']) > 80 else message['content']}"
             )
-            full_idx = st.session_state.chat.chat_agent.conversation_history.index(message)
             st.session_state.chat.chat_agent.conversation_history = (
                 st.session_state.chat.chat_agent.conversation_history[: full_idx + 1]
             )
@@ -367,17 +373,28 @@ with st.sidebar:
     st.divider()
     st.subheader("📂 Past Sessions")
 
-    def get_available_sessions(patient_id: str) -> list[Path]:
-        """Return available session folders for the patient, sorted by date desc."""
-        logs_root = LOGS_FOLDER / patient_id
-        if not logs_root.exists():
+    def get_available_sessions() -> list[Path]:
+        """
+        Return the past session folders, most recent first.
+
+        This used to look under LOGS_FOLDER/<patient_id>, but setup_logger writes
+        sessions to LOGS_FOLDER/<timestamp> — nothing ever created a per-patient
+        directory, so the list was always empty and the feature never worked.
+        Sessions are not partitioned by patient on disk, so they are all listed;
+        batch_results holds the test runner's output, not chat sessions.
+        """
+        if not LOGS_FOLDER.exists():
             return []
         return sorted(
-            [d for d in logs_root.iterdir() if d.is_dir() and (d / "chat.log").exists()],
+            [
+                d
+                for d in LOGS_FOLDER.iterdir()
+                if d.is_dir() and d.name != "batch_results" and (d / "chat.log").exists()
+            ],
             reverse=True,  # most recent first
         )
 
-    available_sessions = get_available_sessions(st.session_state.selected_patient_id)
+    available_sessions = get_available_sessions()
 
     if not available_sessions:
         st.caption("No past sessions found.")
