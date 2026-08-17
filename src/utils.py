@@ -153,6 +153,17 @@ def setup_logger(
 
     for cfg in (MAIN_LLM, SIM_LLM):
         line = f"[SESSION] {cfg.role}: provider={cfg.provider} model={cfg.model}"
+        # Record what the run actually sampled with. "provider default" is a real
+        # answer and has to be written down as one: results are only comparable
+        # across runs if the log says which sampling produced them, and an unset
+        # temperature is a choice whose value depends on the backend (1.0 on
+        # OpenAI, the Modelfile's value on Ollama).
+        sampling = [f"reasoning_effort={cfg.reasoning_effort or 'unset'}"]
+        sampling.append(
+            f"temperature={cfg.temperature if cfg.temperature is not None else 'provider default'}"
+        )
+        sampling.append(f"seed={cfg.seed if cfg.seed is not None else 'unset'}")
+        line += " | " + " ".join(sampling)
         if cfg.rpm or cfg.tpm or cfg.rpd or cfg.tpd:
             line += f" | limits {cfg.rpm} RPM / {cfg.tpm} TPM / {cfg.rpd} RPD / {cfg.tpd} TPD"
         logger.info(line)

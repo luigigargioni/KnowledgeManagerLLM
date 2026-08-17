@@ -295,6 +295,13 @@ def usage_report() -> list[dict]:
 # gpt-oss family accepts it everywhere, plain chat models answer 400. Rather than
 # making the operator match the knob to the model when switching providers, the
 # offending parameter is dropped once per quota and the call is retried.
+#
+# `temperature` and `seed` are deliberately NOT in here. Dropping a rejected
+# sampling parameter would let a batch finish while sampling differently from the
+# configuration it reports, and the results would be attributed to settings that
+# were never in force — the one failure mode a measurement harness cannot absorb
+# quietly. A provider that refuses them (OpenAI's hosted reasoning models refuse a
+# non-default temperature alongside reasoning_effort) must fail the run instead.
 _DROPPABLE_PARAMS = ("reasoning_effort",)
 _unsupported: dict[str, set[str]] = {}
 _unsupported_lock = threading.Lock()
@@ -330,6 +337,12 @@ class _Completions:
         kwargs.setdefault("model", config.model)
         if config.reasoning_effort:
             kwargs.setdefault("reasoning_effort", config.reasoning_effort)
+        # Both are omitted entirely when unset, so the provider's own default
+        # applies and nothing changes for a config that does not mention them.
+        if config.temperature is not None:
+            kwargs.setdefault("temperature", config.temperature)
+        if config.seed is not None:
+            kwargs.setdefault("seed", config.seed)
         model = kwargs["model"]
         quota_key = f"{config.provider}:{model}"
         _drop_unsupported(quota_key, kwargs)

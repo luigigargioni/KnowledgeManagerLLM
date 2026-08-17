@@ -48,7 +48,26 @@ _RATE_LIMIT_DEFAULTS = {
 
 @dataclass(frozen=True)
 class LLMConfig:
-    """Everything needed to talk to one backend, for one role."""
+    """
+    Everything needed to talk to one backend, for one role.
+
+    `temperature` and `seed` are None when unset, and a None is not sent at all —
+    the provider's own default applies, which is what this project did for its
+    whole life before the two knobs existed. They are separate settings on
+    purpose: for reproducibility `seed` is the better lever, because it makes
+    draws repeatable while leaving the sampling distribution at the value the
+    model card recommends (temperature=1.0 for gpt-oss, see .env.example).
+
+    TO VERIFY on the intended test backend: OpenAI's *hosted* reasoning models
+    reject a non-default temperature whenever `reasoning_effort` is also sent
+    ("Unsupported value: 'temperature' does not support 0 with this model. Only
+    the default (1) value is supported." — measured on gpt-5.4-mini, reproducible
+    3/3). Ollama's OpenAI-compatibility docs list `temperature`, `seed` and
+    `reasoning_effort` together as supported, so the conflict is expected to be an
+    OpenAI API policy rather than a property of gpt-oss — but that has NOT been
+    confirmed empirically against gpt-oss:20b on Ollama. Check it before trusting
+    a run that sets temperature and reasoning_effort at the same time.
+    """
 
     role: str
     provider: str
@@ -57,6 +76,8 @@ class LLMConfig:
     base_url: str | None
     timeout: int
     reasoning_effort: str
+    temperature: float | None
+    seed: int | None
     rpm: int
     tpm: int
     rpd: int
@@ -111,6 +132,28 @@ def _int_env(name: str, prefix: str, default: int) -> int:
     return int(raw) if raw else default
 
 
+def _optional_num_env(name: str, prefix: str, base_value, cast):
+    """
+    An optional numeric setting: None means "do not send the parameter at all".
+
+    Follows the same three-way convention as REASONING_EFFORT, because a role has
+    to be able to opt out of a value the other one uses:
+      - variable absent          → inherit from the base role (None for MAIN)
+      - variable present, empty  → None, i.e. do not send it, no inheritance
+      - variable present, valued → that value
+    """
+    raw = os.getenv(f"{prefix}{name}")
+    if raw is None:
+        return base_value
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        return cast(raw)
+    except ValueError as e:
+        raise ValueError(f"{prefix}{name}='{raw}' in .env is not a valid {cast.__name__}") from e
+
+
 def _build_config(role: str, prefix: str, base: "LLMConfig | None" = None) -> LLMConfig:
     """
     Build one role's configuration. `base` is the config this role falls back to
@@ -135,6 +178,10 @@ def _build_config(role: str, prefix: str, base: "LLMConfig | None" = None) -> LL
         base_url=base_url,
         timeout=_int_env("LLM_TIMEOUT", prefix, base.timeout if base else 120),
         reasoning_effort=reasoning.strip(),
+        temperature=_optional_num_env(
+            "TEMPERATURE", prefix, base.temperature if base else None, float
+        ),
+        seed=_optional_num_env("SEED", prefix, base.seed if base else None, int),
         rpm=_int_env("LLM_RPM", prefix, limits["rpm"]),
         tpm=_int_env("LLM_TPM", prefix, limits["tpm"]),
         rpd=_int_env("LLM_RPD", prefix, limits["rpd"]),
