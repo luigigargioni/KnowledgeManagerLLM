@@ -12,8 +12,10 @@ Manages 4 collections:
   - patient_preferences:   Patient preferences per patient (personalise therapy suggestions)
 """
 
+import re
 import uuid
 from datetime import datetime
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from chromadb.utils import embedding_functions
@@ -54,15 +56,18 @@ CONFLICT_DEDUP_THRESHOLD = 0.25
 # the conflict is described with different wording across sessions.
 CONFLICT_QUERY_THRESHOLD = 0.65
 
-# Maximum cosine distance accepted for a medicine lookup to be considered a valid match
-# when NO name-based match is found.
-# A name-based match (query normalised ⊇ or == medicine name) always wins regardless of
-# distance, so this threshold only acts as a guard against returning completely unrelated
-# medicine data when the requested drug is genuinely absent from the knowledge base.
-# 0.80 is permissive on purpose: the embedding model compares a short drug name against
-# a full .md document, which structurally inflates the cosine distance even for correct
-# matches. Empirically, valid matches for all-MiniLM-L6-v2 on this corpus sit in the
-# 0.30–0.65 range, so 0.80 leaves a safe margin while still blocking truly unrelated docs.
+# Maximum cosine distance accepted when a medicine document is retained on the
+# strength of a *topic* word (see _document_answers). It no longer decides
+# whether an absent drug is "found": distance cannot make that call at all.
+#
+# Measured on this corpus with all-MiniLM-L6-v2, querying a drug name that IS
+# indexed lands at 0.35–0.58, and querying one that is NOT lands at 0.53–0.92 —
+# overlapping ranges. Levothyroxine (absent) sits at 0.526 against levodopa,
+# closer than Tachipirina (present) is to its own document at 0.582. The old
+# 0.80 therefore answered "Glipizide" with the Omeprazole monograph, and no
+# other value separates the two populations: the embedding is comparing
+# drug-name-shaped tokens, not identities. Lexical agreement decides identity
+# now, and this only keeps a topic match from dragging in a far-away document.
 MEDICINE_DISTANCE_THRESHOLD = 0.80
 
 # Cosine distance thresholds for patient history RAG queries.
@@ -95,6 +100,69 @@ PREFERENCE_QUERY_THRESHOLD = 0.80
 # than by guessing from how the assistant phrased it afterwards (see
 # chat.Chat._record_issue_signals). Keep it in all the no-match branches.
 MEDICINE_NOT_FOUND_MARKER = "not found in the local knowledge base"
+
+# Words that never identify a medicine: dosage units, galenic forms, and the
+# vocabulary an activity name is built from. Everything else in a query is
+# treated as something the answer has to account for — which is what stops
+# "Morning medication" from being answered with whichever monograph happens to
+# embed closest.
+_MEDICINE_NOISE_WORDS = frozenset(
+    """
+    mg mcg ml iu unit units tablet tablets capsule capsules pill pills drop drops
+    dose doses dosage drug drugs medicine medicines medication medications
+    therapy treatment daily morning evening afternoon night before after with
+    without for the and his her their patient take taking intake administration
+    data info information check activity
+    """.split()
+)
+
+# Tokens shorter than three characters carry no identity and numbers are dosages.
+_MEDICINE_TOKEN_RE = re.compile(r"[a-z][a-z0-9-]{2,}")
+
+# Minimum similarity between a query token and an indexed medicine name for the
+# two to be considered the same drug when neither contains the other. 0.85 was
+# chosen to accept a misspelling ("Metfromin" vs metformin = 0.89) while
+# rejecting different drugs that merely look alike ("Gliclazide" vs glipizide =
+# 0.74, "Levothyroxine" vs levodopa = 0.57).
+_MEDICINE_NAME_SIMILARITY = 0.85
+
+
+def _identifying_tokens(query: str) -> list[str]:
+    """The words of a medicine lookup that say what is being asked about."""
+    return [t for t in _MEDICINE_TOKEN_RE.findall(query.lower()) if t not in _MEDICINE_NOISE_WORDS]
+
+
+def _document_answers(tokens: list[str], document: str, name: str, distance: float) -> str | None:
+    """
+    Why this document may be returned for these tokens, or None to reject it.
+
+    Three kinds of evidence, in decreasing strength:
+      - the indexed name and a token contain one another ("Aspirina" → aspirin);
+      - they are one misspelling apart ("Metfromin" → metformin);
+      - the document body mentions a token, which is how a description finds its
+        drug ("anti-inflammatory for headache" → ibuprofen). This is the weak
+        one — a shared common word — so it is the only kind still subject to the
+        distance threshold.
+
+    A name match ignores the distance on purpose: a short name against a whole
+    monograph embeds far apart even when it is unquestionably the right document.
+    """
+    name_norm = name.lower()
+    body = document.lower()
+
+    for token in tokens:
+        if name_norm and (token in name_norm or name_norm in token):
+            return "name"
+        if (
+            name_norm
+            and SequenceMatcher(None, token, name_norm).ratio() >= _MEDICINE_NAME_SIMILARITY
+        ):
+            return "name~"
+
+    if distance <= MEDICINE_DISTANCE_THRESHOLD and any(token in body for token in tokens):
+        return "topic"
+
+    return None
 
 
 class VectorDBManager:
@@ -326,38 +394,36 @@ class VectorDBManager:
 
             metadatas: list[dict] = results.get("metadatas", [[]])[0]
 
-            # ── Step 1: name-based lookup (always wins) ──────────────────────
-            # Normalise the query and check whether any indexed medicine name is
-            # a substring of (or equal to) the query, or vice-versa.
-            # This handles cases like query="Aulin" matching metadata name="aulin"
-            # even when the embedding distance of the short name vs the full .md
-            # document would otherwise exceed the threshold.
-            query_norm = query.strip().lower()
-            name_matched = [
-                doc
-                for doc, meta in zip(docs, metadatas)
-                if query_norm in meta.get("name", "").lower()
-                or meta.get("name", "").lower() in query_norm
-            ]
-            if name_matched:
-                logger.info(f"[VECTOR_DB] query_medicines: name-based match for '{query}'")
-                return "\n\n---\n\n".join(name_matched)
+            # What the caller actually asked about. Nothing identifying left
+            # (an activity called "Morning medication") means the question names
+            # no medicine, and answering it with the nearest document would be
+            # inventing one.
+            tokens = _identifying_tokens(query)
+            if not tokens:
+                logger.info(f"[VECTOR_DB] query_medicines: '{query}' identifies no medicine")
+                return (
+                    f"Medicine '{query}' was {MEDICINE_NOT_FOUND_MARKER}: the request "
+                    "names no medicine. Do NOT proceed – ask the caregiver which "
+                    "medicine is involved."
+                )
 
-            # ── Step 2: distance-based fallback ─────────────────────────────
-            # Only used when the medicine name is not directly in the query
-            # (e.g. a description like "anti-inflammatory for headache").
-            matched = [
-                doc for doc, dist in zip(docs, distances) if dist <= MEDICINE_DISTANCE_THRESHOLD
-            ]
+            matched: list[str] = []
+            for doc, meta, dist in zip(docs, metadatas, distances):
+                evidence = _document_answers(tokens, doc, meta.get("name", ""), dist)
+                if evidence:
+                    logger.info(
+                        f"[VECTOR_DB] query_medicines: '{query}' → {meta.get('name')} ({evidence})"
+                    )
+                    matched.append(doc)
 
             if not matched:
                 logger.info(
-                    f"[VECTOR_DB] query_medicines: no match within threshold for '{query}' "
-                    f"(best distance={distances[0]:.3f} > {MEDICINE_DISTANCE_THRESHOLD})"
+                    f"[VECTOR_DB] query_medicines: nothing in the knowledge base mentions "
+                    f"{tokens} – nearest is '{metadatas[0].get('name')}' at {distances[0]:.3f}"
                 )
                 return (
                     f"Medicine '{query}' was {MEDICINE_NOT_FOUND_MARKER} "
-                    f"(no sufficiently similar entry; best distance={distances[0]:.3f}). "
+                    f"(nearest entry '{metadatas[0].get('name')}' does not mention it). "
                     "Do NOT proceed – ask the caregiver to verify contraindications manually."
                 )
 

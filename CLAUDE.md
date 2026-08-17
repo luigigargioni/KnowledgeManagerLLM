@@ -98,6 +98,8 @@ Keep both deduplicated. A tool's when-to-call instruction belongs in its schema 
 
 The judge is given a programmatic diff (`therapy_diff.diff_therapies` / `render_diff`) between the initial and final therapy, computed from `Chat._therapy_snapshots`, and its prompt states that the diff — not the transcript — is authoritative. This exists because the assistant reliably claims changes it never applied. Do not "simplify" the judge to read only the transcript.
 
+The one deliberate exception is that a conditional branch may prescribe *not* acting ("do not proceed with it", "keep it as it is" — 5 scenarios): there the expected end state is an empty diff, and the objective is `completed`. The two rules are in tension by design, so the prompt states both and says explicitly that the exception does not cover a change the assistant merely claimed. `probe_judge`-style checks belong on the second half: an objective whose branch was *not* taken and whose change is missing must still grade `failed`.
+
 Relatedly, `scenario_loader.split_objectives()` withholds the scenario title, the preamble and the conditional clauses (`If the assistant…`, `Verify that the assistant…`) from the caregiver, so it cannot leak the expected answer into its own opening message — 71 of the 105 scenarios have such a clause, and it usually fixes the expected end state ("accept its suggested alternative time", "do not proceed with it"), which is what the judge grades. `test.py` delivers the withheld part as a system message on the *event*, not on a turn number: only once the assistant has itself raised the point. If it never does, the caregiver never learns it and `evaluation["branch_exercised"]` records `False`.
 
 The gate has two independent halves, because there are two kinds of issue:
