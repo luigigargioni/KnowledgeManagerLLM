@@ -71,6 +71,17 @@ class StartWithFilter(logging.Filter):
         return record.getMessage().startswith(self.filter_string)
 
 
+class StartWithAnyFilter(logging.Filter):
+    """Keep records whose message starts with any of several prefixes."""
+
+    def __init__(self, prefixes: tuple[str, ...]):
+        super().__init__()
+        self.prefixes = prefixes
+
+    def filter(self, record):
+        return record.getMessage().startswith(self.prefixes)
+
+
 def setup_logger(
     logs_dir: Path = LOGS_FOLDER,
     session_folder_name=None,
@@ -112,7 +123,14 @@ def setup_logger(
     chat_handler.setLevel(FILE_LOG_LEVEL)
     chat_formatter = logging.Formatter("%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     chat_handler.setFormatter(chat_formatter)
-    chat_handler.addFilter(StartWithFilter(filter_string="[CHAT]"))
+    # Only the two turn markers, not every message starting with "[CHAT]".
+    # `[CHAT][ISSUE] …`, logged by Chat._record_issue_signals, also matched the
+    # bare "[CHAT]" prefix and landed in chat.log — where parse_chat_log does not
+    # recognise it as a turn and therefore appends it to the *previous* message as
+    # a continuation line. Every consumer of chat.log inherited the corruption,
+    # including the Streamlit "Load session" button, which fed the assistant a
+    # history with log noise glued onto the caregiver's words.
+    chat_handler.addFilter(StartWithAnyFilter(("[CHAT] USER:", "[CHAT] ASSISTANT:")))
 
     # Terminal Handler
     console_handler = logging.StreamHandler(sys.stdout)

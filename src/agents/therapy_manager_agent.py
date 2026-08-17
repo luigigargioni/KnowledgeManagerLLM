@@ -146,7 +146,7 @@ _MANAGER_TOOLS = [
                     },
                     "duration_minutes": {
                         "type": "integer",
-                        "description": "Duration in minutes",
+                        "description": "How long the activity occupies the schedule, in whole minutes. Must be > 0; a medication dose is typically 5-15. Never 0 or 1 for an 'instantaneous' action — it would be slotted into any one-minute gap of the day.",
                     },
                     "dependencies": {
                         "type": "array",
@@ -182,7 +182,10 @@ _MANAGER_TOOLS = [
                     "description": {"type": "string"},
                     "day_of_week": {"type": "array", "items": {"type": "integer"}},
                     "time": {"type": "string", "description": "HH:MM"},
-                    "duration_minutes": {"type": "integer"},
+                    "duration_minutes": {
+                        "type": "integer",
+                        "description": "Whole minutes the activity occupies, > 0 (a dose is typically 5-15).",
+                    },
                     "dependencies": {"type": "array", "items": {"type": "string"}},
                     "valid_from": {"type": "string", "description": "YYYY-MM-DD"},
                     "valid_until": {"type": "string", "description": "YYYY-MM-DD"},

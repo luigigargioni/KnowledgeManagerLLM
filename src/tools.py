@@ -295,6 +295,44 @@ def _validate_time_field(value, field_name: str = "time"):
     return None
 
 
+def _validate_duration_field(value):
+    """
+    Return (coerced_duration, error_message); error_message is None when valid.
+
+    The two ways of getting this wrong need different advice, and handing back the
+    wrong one steers the caller into a worse answer than it started with. A single
+    "must be a positive integer (e.g. 30, not 30.0)" reads as a complaint about the
+    *format*, so a model that sent 0 — a reasonable way to say "taking a pill is
+    instantaneous" — fixes the format and retries with 1. Observed in scenario 10:
+    the resulting one-minute medication then fit a one-minute gap and was scheduled
+    at 12:29 to end exactly as lunch began, which is correct scheduling of a
+    nonsense duration.
+    """
+    # bool is a subclass of int, so it would otherwise sail through as 0/1.
+    if isinstance(value, bool):
+        return value, "duration_minutes must be a number of minutes, not a boolean"
+
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)  # 30.0 → 30, which some models produce
+
+    if not isinstance(value, int):
+        return value, (
+            f"duration_minutes must be a whole number of minutes, got {value!r}. "
+            'Send it as an integer (e.g. 30 — not 30.0 and not "30").'
+        )
+
+    if value <= 0:
+        return value, (
+            f"duration_minutes must be greater than 0, got {value}. It is how long the "
+            "activity occupies the schedule, not how long the action takes, so give it a "
+            "realistic length: a medication dose is typically 5-15 minutes, a meal or an "
+            "outing longer. Do not use 1 to mean 'instantaneous' — an activity that short "
+            "gets placed in any one-minute gap of the day."
+        )
+
+    return value, None
+
+
 def _validate_day_of_week_field(value, field_name: str = "day_of_week"):
     """Return an error message if *value* is not a non-empty list of integers in [1, 7];
     return None if acceptable."""
@@ -575,19 +613,11 @@ def add_therapy_activity(activity_data):
         if dow_err:
             return _tool_json({"status": "error", "message": dow_err})
 
-        # Validate duration_minutes (must be a positive integer)
-        duration = activity_data.get("duration_minutes", 0)
-        # Auto-coerce whole-number floats (e.g. 30.0 → 30) that some LLMs produce
-        if isinstance(duration, float) and duration.is_integer():
-            duration = int(duration)
-            activity_data["duration_minutes"] = duration
-        if not isinstance(duration, int) or duration <= 0:
-            return _tool_json(
-                {
-                    "status": "error",
-                    "message": "duration_minutes must be a positive integer (e.g. 30, not 30.0)",
-                },
-            )
+        # Validate duration_minutes (positive whole number of minutes)
+        duration, duration_err = _validate_duration_field(activity_data.get("duration_minutes", 0))
+        if duration_err:
+            return _tool_json({"status": "error", "message": duration_err})
+        activity_data["duration_minutes"] = duration
 
         # Assign the activity_id here so it always follows the '<prefix>_<NNN>'
         # convention and can never collide with an existing or expired activity.
@@ -801,21 +831,13 @@ def update_therapy_activity(activity_id, updates):
             if dow_err:
                 return _tool_json({"status": "error", "message": dow_err})
 
-        # Validate duration_minutes if being updated (must be a positive integer)
+        # Validate duration_minutes if being updated (positive whole number of minutes)
         if "duration_minutes" in updates:
-            duration = updates["duration_minutes"]
-            # Auto-coerce whole-number floats (e.g. 30.0 → 30) that some LLMs produce
-            if isinstance(duration, float) and duration.is_integer():
-                duration = int(duration)
-                updates["duration_minutes"] = duration
-                updated_activity["duration_minutes"] = duration
-            if not isinstance(duration, int) or duration <= 0:
-                return _tool_json(
-                    {
-                        "status": "error",
-                        "message": "duration_minutes must be a positive integer (e.g. 30, not 30.0)",
-                    },
-                )
+            duration, duration_err = _validate_duration_field(updates["duration_minutes"])
+            if duration_err:
+                return _tool_json({"status": "error", "message": duration_err})
+            updates["duration_minutes"] = duration
+            updated_activity["duration_minutes"] = duration
 
         # Validate that updated dependencies exist in the schedule
         new_deps = updates.get("dependencies")

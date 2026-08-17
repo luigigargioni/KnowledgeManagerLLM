@@ -32,6 +32,14 @@ system *did*. When the two disagree, APPLIED CHANGES wins, always.
   confirmation as a partial success.
 - If APPLIED CHANGES says no change was applied, no add/remove/update objective
   can be "completed".
+- A time that differs from the one the objective named is NOT a failure when the
+  difference came from resolving a scheduling conflict. The tools refuse an
+  overlapping slot and offer alternatives; taking one is the correct outcome, not
+  a deviation. If APPLIED CHANGES shows the activity exists and only its time moved
+  to a conflict-free slot, the objective is "completed" — and this holds whether or
+  not the objective itself spelled out a conflict branch. Name the actual time in
+  the notes. This covers the *time* of an activity APPLIED CHANGES confirms exists;
+  it never excuses an activity that was never created, nor a change only claimed.
 - When an objective asks to re-order an activity relative to another one, emptying
   the dependency list is not the same as pointing it at the new activity. Check
   which of the two APPLIED CHANGES shows.
@@ -93,7 +101,6 @@ CHANGES, for conduct quote the transcript.
 ## Notes
 Additionally do respect the following rules:
 - The objective on ending the conversation is always implicitly satisfied as your task is executed only after the conversation was ended by either the caregiver or the assistant;
-- The action of changing an activity schedule to overcame a conflict supports the final objective and must be considered positively. Example if the objective is to schedule something at 8 but it will generate a conflict and the caregiver changes the time to avoid the conflict the task should be considered completed not partially completed. This applies to the *time* of an activity that APPLIED CHANGES confirms exists — it never excuses an activity that was never created.
 - Put the deviation in "notes" whenever you accept one, and name what deviated.
 """
 
