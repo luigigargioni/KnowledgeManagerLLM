@@ -52,6 +52,29 @@ ISSUE_TEMPORAL_ORDERING = "temporal_ordering"
 ISSUE_DEPENDENCY_BLOCKED = "dependency_blocked"
 
 
+# Appended to the blocking failures of add_therapy_activity — the ones whose
+# message names *another* activity (the dependency it must follow, or the one it
+# overlaps with).
+#
+# Those messages say what is wrong but not what happened, and the difference
+# matters: nothing was created, so the activity being added has no id yet. The
+# model has twice been observed reading such a failure as "it exists, it just
+# needs moving", and then calling update_therapy_activity with the only id in
+# scope — the one belonging to the activity named in the message. In fifty
+# scenarios that silently moved the patient's lunch by 45 minutes in one run and
+# the patient's dinner in another, while the medication was never added at all.
+# Both times the assistant reported the wrong outcome truthfully; both times the
+# change stayed. Saying "nothing was created, do not call update" closes the gap
+# at its source, the same way spelling out the duration rule stopped one-minute
+# medications.
+_NOTHING_CREATED = (
+    " NOTE: no activity was created and no activity_id was assigned, so there is "
+    "nothing to update. Call add_therapy_activity again with corrected values. Do "
+    "NOT call update_therapy_activity — any activity named above is a different "
+    "one, and moving it is not what was asked."
+)
+
+
 def _tool_json(payload) -> str:
     """
     Serialise a tool result for the model.
@@ -655,7 +678,7 @@ def add_therapy_activity(activity_data):
                         "issue": ISSUE_MISSING_DEPENDENCY,
                         "message": (
                             f"Dependencies not found in schedule: {', '.join(missing_deps)}. "
-                            "Use the exact activity_id."
+                            "Use the exact activity_id." + _NOTHING_CREATED
                         ),
                     },
                 )
@@ -675,7 +698,9 @@ def add_therapy_activity(activity_data):
                                 "message": (
                                     f"Temporal ordering violation: '{new_activity['name']}' "
                                     f"would start at {new_activity['time']}, but it depends on "
-                                    f"'{dep['name']}', which ends at {minutes_to_hhmm(dep_end)}."
+                                    f"'{dep['name']}', which ends at {minutes_to_hhmm(dep_end)}. "
+                                    f"Re-add it at {minutes_to_hhmm(dep_end)} or later."
+                                    + _NOTHING_CREATED
                                 ),
                             },
                         )
@@ -694,6 +719,11 @@ def add_therapy_activity(activity_data):
 
         if conflict:
             result = dict(conflict)
+            # find_scheduling_conflicts is shared with the update path, where the
+            # activity does exist; only here does the refusal mean nothing was
+            # created. The suggested alternative times read as "move it", which is
+            # exactly the reading that has to be steered away from update_*.
+            result["message"] = result.get("message", "") + _NOTHING_CREATED
             if history_warnings:
                 result["patient_history_warnings"] = history_warnings
             return _tool_json(result)
@@ -880,7 +910,9 @@ def update_therapy_activity(activity_id, updates):
                                 "message": (
                                     f"Temporal ordering violation: '{updated_activity['name']}' "
                                     f"would start at {updated_activity['time']}, but it depends on "
-                                    f"'{dep['name']}', which ends at {minutes_to_hhmm(dep_end)}."
+                                    f"'{dep['name']}', which ends at {minutes_to_hhmm(dep_end)}. "
+                                    f"It was NOT modified and still stands as it was; retry at "
+                                    f"{minutes_to_hhmm(dep_end)} or later."
                                 ),
                             },
                         )
