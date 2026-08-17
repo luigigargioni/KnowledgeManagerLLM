@@ -1,11 +1,11 @@
 # Branch `fix-after-tests` — note di consegna
 
-Branch staccato da `dev`. Contiene **11 commit**, 34 file toccati, ~3200 righe aggiunte e ~1170 rimosse.
+Branch staccato da `dev`. Contiene **14 commit**, 35 file toccati, ~3540 righe aggiunte e ~1170 rimosse.
 
 Il lavoro si divide in tre blocchi, che conviene leggere in quest'ordine perché ognuno dipende dal precedente:
 
-1. **Infrastruttura LLM** — client unico con rate limiting, due ruoli configurabili separatamente, parametri di sampling.
-2. **Harness di valutazione** — la valutazione passa dal transcript al diff programmatico dei dati.
+1. **Infrastruttura LLM** — client unico con rate limiting, due ruoli configurabili separatamente, parametri di sampling, e cosa il log dichiara davvero.
+2. **Harness di valutazione** — la valutazione passa dal transcript al diff programmatico dei dati, e ciò che il codice sa finisce nel report.
 3. **Correzione bug** — analisi statica del repo dopo i primi test, più i difetti emersi eseguendo gli scenari.
 
 > **Prerequisito di lettura:** `CLAUDE.md` è stato scritto su questo branch e documenta l'architettura in dettaglio (ruoli LLM, struttura multi-agente, dove vanno i token, soglie RAG, gotcha). Questo documento **non** lo duplica: racconta *cosa è cambiato e perché*, e rimanda lì per il *come funziona*.
@@ -49,6 +49,20 @@ Tre scelte da conoscere:
 - **Judge (`SIM_SEED`) → fissalo.** La valutazione dovrebbe essere una funzione deterministica del transcript. Misurato: sullo stesso input byte per byte il judge ha dato `completed×3/partial×2` in un campione e `partial×5/completed×1` in un altro. Un seed fisso rende confrontabile una rivalutazione, senza contropartite.
 - **Therapy manager (`SEED`) → attenzione.** Qui si misura la *capacità* dell'agente. Con un seed fisso non si misura quanto è bravo, si misura **una singola estrazione**: uno scenario sfortunato lo resterà a ogni riesecuzione, e uno fortunato sembrerà solido. Per i numeri da pubblicare servono N run con seed diversi, riportando media e dispersione.
 
+### Ciò che l'header del log dichiara non è ciò che è stato inviato
+
+L'intestazione di sessione viene scritta **prima** della prima richiesta, quindi può solo riportare la *configurazione*. Se poi il modello rifiuta un parametro, quello viene scartato per il resto del processo e la run continua sotto impostazioni che il log continua a dichiarare in vigore.
+
+Non è un caso teorico: **`gpt-5.4-mini` rifiuta `reasoning_effort` in presenza di tool declarations**, quindi ogni batch eseguito finora è girato **senza reasoning effort** mentre l'header annunciava `reasoning_effort=low`. Il warning esisteva già, ma sepolto nel log di un singolo scenario.
+
+Tre cambiamenti, tutti in questa direzione:
+
+- `llm_client.usage_report()` espone `dropped_params` per quota — cosa è stato effettivamente scartato, noto solo alla fine;
+- il riepilogo di `test.py` lo stampa in chiaro (`NOTE: reasoning_effort rejected by this model and dropped — the run did NOT use it`) e lo ripete come warning nel log di batch;
+- `utils.setup_logger` scrive ora `requested reasoning_effort=…`, non più un'affermazione di fatto.
+
+Un report che descrive male la configurazione sotto cui è stato prodotto contamina in silenzio tutto ciò che se ne conclude. Vale anche a ritroso: i numeri della sezione 4 vanno letti sapendo che il reasoning effort non era attivo.
+
 ---
 
 ## 2. Harness di valutazione
@@ -82,6 +96,26 @@ L'eccezione voluta: un ramo condizionale può prescrivere di *non* agire ("do no
 Gli ultimi due condividono ciò che li squalifica: **l'attività viene scritta lo stesso**. Il sistema ha osservato qualcosa, non ha fermato niente.
 
 Il costo è noto e va tenuto presente leggendo i risultati: dei 71 scenari condizionali, circa 30 hanno un trigger di forma bloccante e ricevono la clausola di reazione. Gli altri girano e vengono valutati sulla condotta, ma il caregiver improvvisa e il loro stato finale è meno determinato.
+
+### Ciò che il codice già sapeva ora arriva nel report
+
+Quattro informazioni erano calcolate a ogni scenario e si fermavano nei file di log: chi rilegge `all_results.xlsx` non le vedeva. Sono diventate colonne, insieme a due nuove misure. Tutte **deterministiche**, nessuna passa da un modello:
+
+| colonna | cosa dice |
+|---|---|
+| `changed_activities` | ogni attività toccata dalla conversazione, per nome (`therapy_diff.summarise_touched`) |
+| `applied_changes` | lo stesso change set per esteso — cioè esattamente ciò che il judge ha visto |
+| `issue_signals` | le cause bloccanti che il sistema ha sollevato da sé |
+| `branch_outcome` | se un ramo condizionale è stato esercitato, prevenuto o mancato |
+| `objectives_scripted` | quanti obiettivi lo script chiedeva, da confrontare con `objectives_status` |
+
+Due punti meritano il dettaglio, perché sono scelte e non dettagli implementativi:
+
+**`summarise_touched` non è un rilevatore di modifiche non richieste, ed è voluto.** Confrontare ciò che è cambiato con ciò che il caregiver ha chiesto significherebbe confrontare nomi di attività con le parole di qualcuno che parla come una persona ("la passeggiata dopo pranzo", mai "Evening walk"): falsi positivi proprio sull'unico segnale che deve essere affidabile. Elenca i fatti e lascia il giudizio a chi legge — che è come queste run vengono riviste comunque. È la colonna da scorrere per accorgersi di una modifica silenziosa.
+
+**`branch_outcome` esiste perché `branch_exercised=False` copriva due comportamenti opposti.** L'assistente può aver *mancato* il problema o averlo *prevenuto*: nello scenario 8 ha spostato un esercizio respiratorio nel primo slot compatibile con la sua dipendenza **prima** di chiamare il tool, quindi niente si è bloccato, le istruzioni trattenute non sono mai state consegnate, e la condotta migliore possibile è stata registrata identica a una disattenzione. Il fatto che una modifica sia stata comunque applicata separa i due casi abbastanza per valerne la scrittura: `exercised` / `not_raised_but_change_applied` / `not_raised_no_change`. È un indizio, non un verdetto — i nomi lo dicono, il transcript decide.
+
+**`objectives_scripted` vs `objectives_status`.** Il caregiver è un utente simulato e a volte lascia cadere un obiettivo, chiudendo la conversazione senza averlo mai sollevato. Non è una valutazione severa, è **un test che non è mai girato**: il sistema sotto test non è stato interrogato. Senza il conteggio atteso accanto all'esito, è indistinguibile da un fallimento reale.
 
 ---
 
@@ -123,6 +157,12 @@ Tutti verificati eseguendo il codice, non per lettura. I bug erano presenti anch
 
 **Judge — regola sui conflitti non applicata.** Il prompt diceva già che spostare l'orario per risolvere un conflitto va valutato `completed`, ma la regola stava in `## Notes` mentre la regola severa che la contraddiceva stava nella sezione dell'autorità. Spostata dove serve. Misurato su 11 estrazioni a input congelato: `completed` 4/11 → **11/11**, con gli altri scenari invariati.
 
+**`add_therapy_activity` — il fallimento non diceva che non era stato creato nulla.** I tre fallimenti bloccanti dell'`add` nominano *un'altra* attività: la dipendenza da rispettare, o quella con cui si sovrappone. Dicono cos'è sbagliato, non **cos'è successo** — e la differenza conta, perché non essendo stato creato nulla l'attività da aggiungere non ha ancora un id.
+
+Il modello è stato osservato **due volte su 50 scenari** leggere quel fallimento come "esiste, va solo spostata", e chiamare `update_therapy_activity` con l'unico id in suo possesso: quello dell'attività nominata nel messaggio. Ha spostato il **pranzo** del paziente di 45 minuti in una run e la **cena** in un'altra, mentre il farmaco non veniva aggiunto affatto. In entrambi i casi ha riportato onestamente l'esito sbagliato; in entrambi i casi la modifica è rimasta. Le due suggested alternative times peggioravano la cosa: si leggono come "spostala".
+
+Ora i tre messaggi si chiudono con `no activity was created and no activity_id was assigned … do NOT call update_therapy_activity`, e l'`add` per violazione di ordinamento aggiunge `Re-add it at HH:MM or later`. Simmetricamente, sul percorso di `update` il messaggio dichiara `It was NOT modified and still stands as it was`. Stessa forma della correzione su `duration_minutes`: nominare la conseguenza nel messaggio d'errore chiude il buco alla fonte, invece di sperare che il prompt lo copra.
+
 ---
 
 ## 4. Risultati dei test
@@ -136,6 +176,8 @@ Due batch degli scenari 1–10 (OpenAI / `gpt-5.4-mini` su entrambi i ruoli):
 | errori | 0 | 0 |
 
 **Attenzione a leggere questa tabella come un miglioramento netto.** Su 4 scenari che hanno cambiato stato, verificando a input congelato è risultato che almeno uno (il 7) era **varianza della conversazione**, non effetto delle correzioni. Con due LLM in serie e temperatura al default, il rumore fra due run identiche è dell'ordine di grandezza degli effetti cercati. Serviranno più seed per numeri difendibili.
+
+Va aggiunto un secondo caveat, scoperto dopo: questi batch sono girati **senza reasoning effort**, perché `gpt-5.4-mini` lo rifiuta con i tool dichiarati e il client lo scartava in silenzio (vedi sezione 1). L'header dei log di quelle run dichiara `reasoning_effort=low` e non è vero.
 
 **Condotta del therapy agent**, misurata deterministicamente dai log su 20 esecuzioni di scenario:
 
@@ -176,9 +218,11 @@ ruff check . && ruff format .
 
 ## 6. Punti aperti
 
-**Da verificare su Ollama (non fatto, macchina non disponibile).** Su `gpt-5.4-mini` via API OpenAI, `temperature` e `reasoning_effort` sono **mutuamente esclusivi**: con `reasoning_effort` presente, l'API accetta solo `temperature=1` (400 riproducibile 3/3). Ollama documenta `temperature`, `seed` e `reasoning_effort` come supportati insieme (<https://docs.ollama.com/api/openai-compatibility>), quindi il vincolo dovrebbe essere una policy dell'API OpenAI e non una proprietà di gpt-oss — **ma non è stato confermato empiricamente**. C'è una nota su `LLMConfig` che lo ricorda. Da verificare anche che il `seed` venga effettivamente onorato, e la scala della temperatura (range 0.0–2.0 OpenAI contro 0.0–1.0 di alcuni modelli locali, `ollama/ollama#3151`).
+**Da verificare su Ollama (non fatto, macchina non disponibile).** Su `gpt-5.4-mini` via API OpenAI, `temperature` e `reasoning_effort` sono **mutuamente esclusivi**: con `reasoning_effort` presente, l'API accetta solo `temperature=1` (400 riproducibile 3/3). Ollama documenta `temperature`, `seed` e `reasoning_effort` come supportati insieme (<https://docs.ollama.com/api/openai-compatibility>), quindi il vincolo dovrebbe essere una policy dell'API OpenAI e non una proprietà di gpt-oss — **ma non è stato confermato empiricamente**. C'è una nota su `LLMConfig` che lo ricorda. Sullo stesso modello è emerso anche che `reasoning_effort` viene rifiutato in presenza di tool declarations (sezione 1): su Ollama va verificato se sopravvive, altrimenti il confronto fra i due backend non è alla pari. Da verificare anche che il `seed` venga effettivamente onorato, e la scala della temperatura (range 0.0–2.0 OpenAI contro 0.0–1.0 di alcuni modelli locali, `ollama/ollama#3151`).
 
-**Modifica non richiesta alla terapia, non segnalata.** In uno scenario su 20 l'assistente ha spostato il **pranzo del paziente** di 45 minuti senza che nessuno lo chiedesse, e non è mai stato rimesso a posto. Aveva perso l'`add` di un farmaco (fallito, quindi senza id) e ha chiamato `update` con l'id della dipendenza. Da notare che le regole di condotta hanno tenuto — ha chiesto conferma prima di agire e ha **riportato onestamente** l'errore (*"The update did not affect Ibuprofen. It changed Lunch to 13:15 instead"*) — ma il danno è rimasto e il judge ha dato 3/3. Un controllo deterministico che confronti le attività toccate dal diff con quelle nominate dal caregiver, esposto come campo in `evaluation.json`, lo renderebbe visibile a chi rilegge i risultati. Non implementato.
+**Modifica non richiesta alla terapia — chiusa alla fonte, non rilevata automaticamente.** Era il punto aperto principale: in uno scenario su 20 l'assistente aveva spostato il **pranzo del paziente** di 45 minuti senza che nessuno lo chiedesse, dopo aver perso l'`add` di un farmaco e aver chiamato `update` con l'id della dipendenza. Le regole di condotta avevano tenuto — chiesta conferma, errore **riportato onestamente** (*"The update did not affect Ibuprofen. It changed Lunch to 13:15 instead"*) — ma il danno restava e il judge dava 3/3.
+
+Da allora sono state fatte due cose (commit `b99afe0` e `ce91a16`): la **causa** è stata rimossa dai messaggi d'errore dell'`add`, e la **visibilità** c'è nella colonna `changed_activities`. Resta aperto il terzo pezzo: **non esiste un controllo automatico** che dica "questa attività non era fra quelle chieste". Per il perché non lo sia — e perché un match sui nomi sarebbe peggio del nulla — vedi la sezione 2. Chi rilegge i risultati deve scorrere quella colonna a mano; ed è ancora da verificare, su un batch nuovo, che la correzione tenga.
 
 **`results.xlsx` (276 KB) è tracciato nella root del repo** e non è in `.gitignore`. È output di test: lo stesso motivo per cui `data/therapy.json` è stato tolto dal tracking nel commit `389c018`. Da valutare se rimuoverlo.
 
@@ -203,3 +247,6 @@ ruff check . && ruff format .
 | `7165085` | Correzione bug (analisi statica) — 11 file |
 | `be2837f` | `duration_minutes`, regola conflitti judge, filtro `chat.log` |
 | `2b9479a` | `TEMPERATURE` e `SEED` configurabili, sampling nel log |
+| `6fab0f8` | questo documento |
+| `ce91a16` | `dropped_params` nel riepilogo; `changed_activities`, `branch_outcome`, obiettivi attesi vs valutati nel report |
+| `b99afe0` | `add_therapy_activity`: i fallimenti dichiarano che non è stato creato nulla |
