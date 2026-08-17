@@ -166,6 +166,10 @@ DB_CONNECTION_STRING = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT
 
 
 THERAPY_FILE = Path(__file__).parent.parent / "data" / "therapy.json"
+# Seed for THERAPY_FILE, which is untracked because its content is whatever ran
+# last. This one is versioned, so a fresh clone starts from a real patient
+# instead of an empty stub. Never written to at runtime.
+THERAPY_SEED_FILE = Path(__file__).parent.parent / "data" / "therapy.example.json"
 LOGS_FOLDER = Path(__file__).parent.parent / "logs"
 MEDICINES_FOLDER = Path(__file__).parent.parent / "data" / "medicines"
 PATIENTS_DATA_FOLDER = Path(__file__).parent.parent / "data" / "patients"

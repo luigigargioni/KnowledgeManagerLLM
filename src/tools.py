@@ -4,7 +4,7 @@ import logging
 import re
 from datetime import datetime
 
-from config_loader import THERAPY_FILE
+from config_loader import THERAPY_FILE, THERAPY_SEED_FILE
 from utils import hhmm_to_minutes, minutes_to_hhmm
 
 CATEGORIES = [
@@ -152,10 +152,17 @@ def _load_therapy():
     _ensure_data_dir()
 
     if not THERAPY_FILE.exists():
-        logger.warning("[THERAPY] therapy.json not found, creating empty structure")
-        default_data = {"patient_id": "test", "patient_name": "Test", "activities": []}
-        _save_therapy(default_data)
-        return default_data
+        # therapy.json is untracked, so this is the normal state of a fresh
+        # clone rather than an error. Start from the versioned seed when it is
+        # there; the empty stub is the last resort.
+        if THERAPY_SEED_FILE.exists():
+            logger.info(f"[THERAPY] therapy.json not found – seeding from {THERAPY_SEED_FILE.name}")
+            data = json.loads(THERAPY_SEED_FILE.read_text(encoding="utf-8"))
+        else:
+            logger.warning("[THERAPY] therapy.json not found, creating empty structure")
+            data = {"patient_id": "test", "patient_name": "Test", "activities": []}
+        _save_therapy(data)
+        return data
 
     try:
         with open(THERAPY_FILE, "r", encoding="utf-8") as f:
@@ -330,50 +337,18 @@ def find_conflicting_activity(new_activity, schedule):
 
 
 def find_earlier_time(activity, schedule):
-    conflicting_activity = find_conflicting_activity(activity, schedule)
-    if conflicting_activity:
-        # loop to search for a new possible time
-        conflict_time = hhmm_to_minutes(conflicting_activity["time"])
-
-        # anticipate
-        new_time = conflict_time - activity["duration_minutes"]
-
-        if new_time < 0:
-            return None
-
-        activity["time"] = minutes_to_hhmm(new_time)
-        return find_earlier_time(activity, schedule)
-    else:
-        return activity["time"]
-
-
-def find_later_time(activity, schedule):
-    conflicting_activity = find_conflicting_activity(activity, schedule)
-    if conflicting_activity:
-        # loop to search for a new possible time
-        conflict_time = hhmm_to_minutes(conflicting_activity["time"])
-
-        # anticipate
-        new_time = conflict_time + conflicting_activity["duration_minutes"]
-
-        if new_time > 24 * 60:
-            return None
-
-        activity["time"] = minutes_to_hhmm(new_time)
-        return find_later_time(activity, schedule)
-    else:
-        return activity["time"]
-
-
-def find_earlier_time_new(activity, schedule):
     """Return the latest valid start time strictly before (or equal to) the
     current start time, fitting the activity in a free gap.
 
     Instead of recursing one slot at a time this function collects *all*
     candidate end-times (the start of every existing activity that sits at
     or before the current position) and tries them from latest to earliest.
-    This avoids the former recursive approach that could return None even
-    when a valid earlier gap exists.
+
+    It replaces a recursive version that walked back one conflicting activity at
+    a time. That one lived on here as the caller's choice long after this
+    replacement was written and left unused; its counterpart `find_later_time`
+    also returned "24:00" — a start time the tools' own validation rejects, so
+    the caregiver was offered an alternative that could not be applied.
     """
     duration = activity["duration_minutes"]
     if duration <= 0:
@@ -408,12 +383,14 @@ def find_earlier_time_new(activity, schedule):
     return None
 
 
-def find_later_time_new(activity, schedule):
+def find_later_time(activity, schedule):
     """Return the earliest valid start time at or after the current end time.
 
     Collects candidate start-times (the end of every existing activity that
     overlaps or immediately follows the current slot) and returns the first
-    one that fits within the day without conflicts.
+    one that fits within the day without conflicts — `None` when the activity
+    would have to cross midnight to fit, which is the case the recursive
+    version it replaces answered with "24:00".
     """
     duration = activity["duration_minutes"]
     if duration <= 0:

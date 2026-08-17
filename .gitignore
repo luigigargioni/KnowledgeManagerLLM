@@ -6,3 +6,4 @@ __pycache__
 chromadb
 KnowledgeManagerLLM.egg-info
 build
+data/therapy.json

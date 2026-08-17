@@ -1,9 +1,7 @@
 import json
 import logging
-import os
 import platform
 import re
-import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -19,7 +17,6 @@ from config_loader import (
     MAIN_LLM,
     SIM_LLM,
     TERMINAL_LOG_LEVEL,
-    THERAPY_FILE,
 )
 
 
@@ -89,8 +86,14 @@ def setup_logger(
     logger.setLevel(logging.DEBUG)
     logger.session_dir = session_dir
 
-    for hand in logger.handlers:
+    # Iterate over a copy: removeHandler mutates logger.handlers, so looping over
+    # the live list skipped every other handler. The batch runner calls this once
+    # per scenario, so the survivors stayed attached and kept writing — each
+    # scenario's lines landed in the previous scenarios' full.log and chat.log as
+    # well as its own. Closing them also releases the file handles.
+    for hand in list(logger.handlers):
         logger.removeHandler(hand)
+        hand.close()
 
     file_formatter = logging.Formatter(
         "%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
@@ -233,15 +236,6 @@ def populate_agent_history(agent, log_path: str | Path, keep_system_prompt: bool
         agent.conversation_history = agent.conversation_history + parsed_messages
     else:
         agent.conversation_history = parsed_messages
-
-
-def copy_session_therapy():
-    logger = get_current_logger()
-    session_log_dir = logger.session_dir
-
-    os.makedirs(session_log_dir, exist_ok=True)
-
-    shutil.copy2(THERAPY_FILE, os.path.join(session_log_dir, "therapy.json"))
 
 
 def load_past_session(

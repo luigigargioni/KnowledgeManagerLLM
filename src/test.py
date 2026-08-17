@@ -25,7 +25,6 @@ from scenario_loader import (
 from therapy_diff import diff_therapies, render_diff
 from utils import (
     assistant_handed_back,
-    assistant_raised_issue,
     build_transcript,
     is_exit_message,
     setup_logger,
@@ -143,19 +142,25 @@ def run_scenario(
         # the branch was not exercised, which is precisely what the judge should
         # then record.
         #
-        # Two ways to recognise the event, because there are two kinds of issue:
-        #  - `chat.turn_issues` is deterministic — the tools themselves reported a
-        #    conflict, a broken dependency, a history hit or a missing medicine
-        #    while producing this very reply. It cannot miss one for being worded
-        #    unusually, but it says nothing about whether the assistant passed it
-        #    on, hence the weak assistant_handed_back() confirmation.
-        #  - assistant_raised_issue() alone still covers what no tool can report:
-        #    a contraindication the model derives itself from the medicine data
-        #    and the patient's conditions, where every tool call succeeded.
+        # `chat.turn_issues` carries what the system *blocked* while producing
+        # this very reply: a tool refused the write over a conflict, a broken
+        # dependency or a missing medicine. Since a signal proves a problem was
+        # found but not that it was passed on, assistant_handed_back() adds the
+        # weak "did it ask anything at all" confirmation.
+        #
+        # Nothing softer than a block qualifies, and the alternatives were tried
+        # before settling here (see Chat._record_issue_signals): keyword-matching
+        # the reply fired on the word "warning" in "no conflicts were reported,
+        # but there was a history warning", and the checker's own verdict fired
+        # on remarks like "12:45 is not fasting". Both delivered the caregiver
+        # its reaction instructions for a problem that did not exist.
+        #
+        # The cost is that a scenario whose trigger is a judgement rather than a
+        # block never delivers, and records branch_exercised=False. That is the
+        # intended reading: the branch was not demonstrated. It does not stop the
+        # scenario from running or the judge from grading conduct.
         signals = chat.turn_issues
-        raised = (signals and assistant_handed_back(chatbot_response)) or assistant_raised_issue(
-            chatbot_response
-        )
+        raised = bool(signals) and assistant_handed_back(chatbot_response)
         if signals and not raised:
             logger.warning(
                 f"[SCENARIO {scenario_id}][TURN {turn + 1}] The system detected "
@@ -459,14 +464,18 @@ def main():
     n_errors = len(failed)
 
     obj_total = sum(len(r.get("objectives", [])) for r in results)
+    # .get, not [...]: a judge reply missing the field would otherwise raise here,
+    # after every scenario has run, and take the whole summary down with it.
     obj_completed = sum(
-        1 for r in results for o in r.get("objectives", []) if o["status"] == "completed"
+        1 for r in results for o in r.get("objectives", []) if o.get("status") == "completed"
     )
 
     print("\n" + "=" * 60)
     print("  Batch summary")
     print("=" * 60)
-    print(f"  Scenarios run:     {total + n_errors}")
+    print(f"  Scenarios graded:  {total}")
+    if n_errors:
+        print(f"  Not graded:        {n_errors} (error or quota abort)")
     print(f"Completed:      {n_completed}")
     print(f"Partial:        {n_partial}")
     print(f"Failed:         {n_failed}")

@@ -224,6 +224,14 @@ class _ModelRateLimiter:
             self.day_tokens -= entry[1]
             self.day_requests -= 1
             entry[1] = 0
+            # Zeroing the ledger entry frees the tokens but left the timestamp in
+            # the request window, so an attempt that never reached the provider
+            # still held an RPM slot for a whole minute. acquire() appends the
+            # same value to both deques.
+            try:
+                self._requests.remove(entry[0])
+            except ValueError:
+                pass  # already pruned out of the 60s window
 
     def _check_daily(self) -> None:
         if self.rpd and self.day_requests > self.rpd:

@@ -95,7 +95,6 @@ class Chat:
         self.session_ended = False
         self.database_manager = database_manager
         self.vector_db = vector_db
-        self.conversation_history = []
 
         # Causes the system itself detected while producing the current reply
         # (reset by send_message) and over the whole session. See
@@ -272,11 +271,20 @@ class Chat:
         caregiver is a separate question, and the one the caller has to answer.
 
         Only *blocking* causes count — the requested action did not happen and
-        cannot happen until the caregiver chooses. Two kinds are deliberately
-        left out:
+        cannot happen until the caregiver chooses. Three kinds are deliberately
+        left out, each after being tried and measured:
 
         - validation errors (bad category, malformed time, unknown activity_id):
           the assistant's own slips, retried without involving the caregiver;
+        - the checker's own verdict. Its prompt has it answer with
+          `check_result: [problems] | "NO_CONFLICTS"`, which looks like a
+          declared finding, and the format holds (64 replies out of 64 parsed).
+          It is not usable as a signal: the checker comments on everything, so
+          the absence of "NO_CONFLICTS" also covers quality remarks. In scenario
+          17 it observed that "12:45 is around lunch, so it is not fasting" —
+          accurate, and nothing for the caregiver to decide — which fired the
+          gate on turn 2 of four scenarios out of seven and recorded
+          branch_exercised=True for a scheduling conflict that never happened;
         - patient-history hits, whether from get_patient_history_events or the
           `patient_history_warnings` that add/update return alongside a
           successful write. Measured on scenarios 14/17/18/20, one fires on
@@ -286,9 +294,14 @@ class Chat:
           fire on the second turn of every scenario: in 17 the caregiver was
           handed its reaction instructions after "I found no conflicts" and
           answered "yes, add it at the suggested alternative time" before any
-          alternative had been suggested. Whether a history note is worth
-          raising is the assistant's judgement, so it belongs to the textual
-          half of the gate, not to this one.
+          alternative had been suggested.
+
+        What the last two have in common is that the activity still gets
+        written: the system observed something, it did not stop anything.
+        Whether such an observation deserves to be raised is the assistant's
+        judgement, and the harness does not try to second-guess it — a scenario
+        whose trigger is one of those records branch_exercised=False and is
+        graded on the transcript instead.
         """
         if not isinstance(result, str):
             return
@@ -383,7 +396,18 @@ class Chat:
                     }
                 )
 
-        return "Max iterations reached."
+        # The loop gave up with tool calls still pending. Close the turn the same
+        # way a normal reply does: a zero_shot agent that is not reset here keeps
+        # the exhausted history — including its dangling tool results — for every
+        # later delegation, and a supervisor whose reply never reaches its own
+        # history loses the turn from the transcript.
+        reply = "Max iterations reached."
+        logger.warning(f"[{agent.name.upper()}] Agent loop exhausted after 10 iterations")
+        if agent.zero_shot:
+            agent.reset_agent()
+        else:
+            agent.conversation_history.append({"role": "assistant", "content": reply})
+        return reply
 
     def send_message(self, user_message: str) -> str:
         """Function used to send a message to the supervisor."""
@@ -399,40 +423,9 @@ class Chat:
         """Delegation to a worker agent"""
         return self._run_agent_loop(agent, json.dumps(tool_arguments))
 
-    def _normalize_messages(self) -> list[dict]:
-        """
-        Return a copy of the conversation history suitable for the OpenAI API.
-
-        Rules applied:
-        1. role=tool messages WITHOUT tool_call_id (init context injections) are
-           converted to role=system so OpenAI accepts them.
-        2. Any role=assistant message that appears before the first role=user is
-           also converted to role=system (OpenAI requires conversations to start
-           with a user turn; Ollama is more lenient but OpenAI is not).
-        """
-        # Determine the index of the first user message
-        first_user_idx = next(
-            (i for i, m in enumerate(self.conversation_history) if m.get("role") == "user"),
-            len(self.conversation_history),
-        )
-
-        normalized = []
-        for i, msg in enumerate(self.conversation_history):
-            role = msg.get("role")
-            # Pre-conversation context: tool msgs without tool_call_id → system
-            if role == "tool" and "tool_call_id" not in msg:
-                normalized.append({"role": "system", "content": f"[Context] {msg['content']}"})
-            # Pre-conversation assistant msg (e.g. the welcome message) → system
-            elif role == "assistant" and i < first_user_idx:
-                normalized.append(
-                    {"role": "system", "content": f"[Assistant intro] {msg['content']}"}
-                )
-            else:
-                normalized.append(msg)
-        return normalized
-
-    def get_history(self):
-        return self.conversation_history
+    def get_history(self) -> list[dict]:
+        """The conversation as exchanged with the caregiver."""
+        return self.chat_agent.conversation_history
 
     def end_session(self) -> dict:
         """
@@ -456,12 +449,13 @@ class Chat:
             patient_id = tools._get_patient_id()
             logger.info(f"[SESSION] Running vector DB extraction for patient {patient_id}")
 
-            extract_and_save_conflict_resolutions(
-                self.conversation_history, self.vector_db, patient_id
-            )
-            extract_and_save_patient_preferences(
-                self.conversation_history, self.vector_db, patient_id
-            )
+            # The real conversation lives on the supervisor. This used to pass
+            # self.conversation_history, which no code path ever appends to, so
+            # both extractors received an empty list, found nothing to extract
+            # and wrote nothing to ChromaDB for the whole life of the feature.
+            history = self.chat_agent.conversation_history
+            extract_and_save_conflict_resolutions(history, self.vector_db, patient_id)
+            extract_and_save_patient_preferences(history, self.vector_db, patient_id)
         else:
             logger.warning("[SESSION] Vector DB not available – skipping knowledge extraction")
 

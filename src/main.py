@@ -3,11 +3,10 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from time import time
+from time import sleep, time
 
 from langchain_core.messages import AIMessage
 
-import tools as tools
 from agent_graph import build_therapy_graph
 from agents.caregiver_agent import CaregiverAgent
 from agents.judge_agent import JudgeAgent
@@ -89,7 +88,7 @@ def run_agent_mode(chat, script: str, delay: float) -> None:
                 print(f"Assistant: {last}\n")
 
         if delay > 0:
-            time.sleep(delay)
+            sleep(delay)
 
     # ── Evaluation ───────────────────────────────────────────────────────
     print("\n" + "=" * 60)
