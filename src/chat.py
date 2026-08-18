@@ -101,6 +101,9 @@ class Chat:
         # _record_issue_signals.
         self._turn_issues: list[str] = []
         self.issue_signals_seen: list[str] = []
+        # Patient-history events the RAG surfaced over the run — see
+        # _record_history_warnings.
+        self.history_warnings_seen: list[dict] = []
 
         # Inject the vector DB into the tools module so all tool functions can use it
         if vector_db is not None:
@@ -297,9 +300,54 @@ class Chat:
             self._save_therapy_snapshot()
 
         self._record_issue_signals(tool_name, result)
+        self._record_history_warnings(result)
 
         logger.debug(f"[{agent.name.upper()}][TOOL] Results of {tool_name}: {result}")
         return result
+
+    def _record_history_warnings(self, result) -> None:
+        """
+        Collect the patient-history events the RAG actually surfaced this run.
+
+        Recorded, never judged. Whether the assistant then passed a warning on to
+        the caregiver is not decidable from the text, and it was worth measuring
+        before assuming otherwise: on this dataset neither distinctive-token
+        overlap nor embedding similarity separates a relayed warning from an
+        unrelated reply about the same condition (verified-relayed cases score
+        0.45-0.55 and 0.49-0.81 respectively, both squarely inside the range of
+        everything else). The assistant paraphrases, and it discusses the
+        patient's asthma whether or not it ever read the asthma event — what is
+        missing is provenance, which similarity cannot supply.
+
+        What *is* decidable is what the system put in front of it. That goes in
+        the report next to the transcript so a person settles it at a glance,
+        the same way changed_activities lists what changed instead of guessing
+        which change was unwanted.
+
+        `info` events are skipped: they carry nothing to warn about.
+        """
+        if not isinstance(result, str) or not result.lstrip().startswith("{"):
+            return
+        try:
+            payload = json.loads(result)
+        except json.JSONDecodeError:
+            return
+        if not isinstance(payload, dict):
+            return
+
+        # add/update attach them as patient_history_warnings; the checker's
+        # get_patient_history_events returns them under events.
+        found = payload.get("patient_history_warnings") or payload.get("events") or []
+        if not isinstance(found, list):
+            return
+        seen = {event.get("description") for event in self.history_warnings_seen}
+        for event in found:
+            if not isinstance(event, dict) or event.get("event_type") == "info":
+                continue
+            description = (event.get("description") or "").strip()
+            if description and description not in seen:
+                self.history_warnings_seen.append(event)
+                seen.add(description)
 
     def _record_issue_signals(self, tool_name: str, result) -> None:
         """

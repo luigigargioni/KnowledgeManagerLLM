@@ -295,6 +295,18 @@ def run_scenario(
     # conversation leaves a scenario that reads like a failure of the system
     # under test, when in fact it was never asked. Recording both counts makes
     # the two distinguishable at a glance.
+    # What the RAG put in front of the assistant, warning-level only. Paired in
+    # the report with the transcript, it lets a reviewer see at a glance whether
+    # a surfaced risk was passed on — a question no text metric could answer
+    # reliably (see Chat._record_history_warnings for the measurement).
+    evaluation["history_warnings_retrieved"] = (
+        "\n".join(
+            f"[{e.get('event_type', 'warning')}] {e.get('activity_name', '')}: "
+            f"{e.get('description', '')}"
+            for e in chat.history_warnings_seen
+        )
+        or "none"
+    )
     evaluation["objectives_scripted"] = count_objectives(script)
     evaluation["objectives_status"] = ",".join(
         o.get("status", "?")[:1].upper() for o in evaluation.get("objectives", [])
