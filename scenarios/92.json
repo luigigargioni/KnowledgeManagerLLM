@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 92 — Add Safe Lisinopril Medication\n\n## Context\nCarol's cardiologist has prescribed Lisinopril as part of her heart failure management plan.\n\n## Objectives\n1. Add Lisinopril as a medication, 5mg, every day at 08:15 after breakfast."
+    "objectives": "# Scenario 92 — Add Safe Lisinopril Medication\n\n## Context\nCarol's caregiver wants to add Lisinopril as part of her heart failure management plan.\n\n## Objectives\n1. Add Lisinopril as a medication, 5mg, every day at 08:15 after breakfast."
 }

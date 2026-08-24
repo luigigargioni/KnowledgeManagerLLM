@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 21 — Add Safe Aspirin Medication\n\n## Context\nAnthony's cardiologist has recommended low-dose Aspirin as preventive therapy for his Ischemic Heart Disease.\n\n## Objectives\n1. Add Aspirin as a medication, 100mg, every day at 08:05 after breakfast."
+    "objectives": "# Scenario 21 — Add Safe Aspirin Medication\n\n## Context\nAnthony's caregiver wants to add low-dose Aspirin as preventive therapy for his Ischemic Heart Disease.\n\n## Objectives\n1. Add Aspirin as a medication, 100mg, every day at 08:05 after breakfast."
 }

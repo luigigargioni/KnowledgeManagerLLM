@@ -58,5 +58,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 83 — Add Overnight Travel with History Warning\n\n## Context\nRose's family wants to take her on an overnight trip. However, Rose has a history of increased disorientation after routine disruption from overnight stays.\n\n## Objectives\n1. Add an overnight travel activity, 'Weekend family trip', 2 days, every Saturday at 10:00. If the assistant warns about Rose's past disorientation from overnight stays, acknowledge the concern and ask if shorter day trips would be better, then follow the assistant's recommendation and confirm the final activity."
+    "objectives": "# Scenario 83 — Add Overnight Travel with History Warning\n\n## Context\nRose's caregiver wants to take her on an overnight trip. However, Rose has a history of increased disorientation after routine disruption from overnight stays.\n\n## Objectives\n1. Add an overnight travel activity, 'Weekend family trip', 2 days, every Saturday at 10:00. If the assistant warns about Rose's past disorientation from overnight stays, acknowledge the concern and ask if shorter day trips would be better, then follow the assistant's recommendation and confirm the final activity."
 }

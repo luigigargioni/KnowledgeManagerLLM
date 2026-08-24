@@ -46,5 +46,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 31 — Add Safe Paracetamol Medication\n\n## Context\nFrank is experiencing mild headaches. His doctor recommends Paracetamol as the preferred pain reliever for patients with Chronic Kidney Disease.\n\n## Objectives\n1. Add Paracetamol as a medication, 500mg, every day at 08:10 after breakfast."
+    "objectives": "# Scenario 31 — Add Safe Paracetamol Medication\n\n## Context\nFrank is experiencing mild headaches. His caregiver wants to add Paracetamol, the preferred pain reliever for patients with Chronic Kidney Disease.\n\n## Objectives\n1. Add Paracetamol as a medication, 500mg, every day at 08:10 after breakfast."
 }

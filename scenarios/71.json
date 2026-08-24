@@ -59,5 +59,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 71 — Add Safe Paracetamol Medication\n\n## Context\nJoan is experiencing joint pain from her rheumatoid arthritis. Her doctor recommends Paracetamol as it has no GI bleeding risk.\n\n## Objectives\n1. Add Paracetamol as a medication, 500mg, every day at 08:10 after breakfast."
+    "objectives": "# Scenario 71 — Add Safe Paracetamol Medication\n\n## Context\nJoan is experiencing joint pain from her rheumatoid arthritis. Her caregiver wants to add Paracetamol, as it has no GI bleeding risk.\n\n## Objectives\n1. Add Paracetamol as a medication, 500mg, every day at 08:10 after breakfast."
 }

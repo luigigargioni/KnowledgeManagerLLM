@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 1 — Add Evening Walk and Safe Ibuprofen\n\n## Context\nDavid's doctor has recommended a short evening walk to help maintain general fitness and support respiratory health. David also has mild joint pain and the doctor suggested Ibuprofen, which is safe given his conditions.\n\n## Objectives\n1. Add an evening walk activity, 20 minutes long, every Tuesday and Thursday at 17:00.\n2. Add Ibuprofen as a medication, 400mg, every day at 08:10 after breakfast."
+    "objectives": "# Scenario 1 — Add Evening Walk and Safe Ibuprofen\n\n## Context\nDavid's caregiver wants to add a short evening walk to help maintain general fitness and support respiratory health. David also has mild joint pain, so the caregiver wants to add Ibuprofen, which is safe given his conditions.\n\n## Objectives\n1. Add an evening walk activity, 20 minutes long, every Tuesday and Thursday at 17:00.\n2. Add Ibuprofen as a medication, 400mg, every day at 08:10 after breakfast."
 }

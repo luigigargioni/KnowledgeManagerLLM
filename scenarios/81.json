@@ -58,5 +58,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 81 — Add Safe Donepezil Medication\n\n## Context\nRose's neurologist has prescribed Donepezil to help manage her mild Alzheimer's dementia.\n\n## Objectives\n1. Add Donepezil as a medication, 5mg, every day at 20:00 after dinner."
+    "objectives": "# Scenario 81 — Add Safe Donepezil Medication\n\n## Context\nRose's caregiver wants to add Donepezil to help manage her mild Alzheimer's dementia.\n\n## Objectives\n1. Add Donepezil as a medication, 5mg, every day at 20:00 after dinner."
 }

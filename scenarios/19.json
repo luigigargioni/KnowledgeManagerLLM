@@ -47,5 +47,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 19 — Add Time-Limited Therapy Activity\n\n## Context\nRobert's doctor has prescribed a 6-week physiotherapy program to help with mobility and weight management.\n\n## Objectives\n1. Add a physiotherapy activity, 60 minutes, every Monday and Thursday at 15:00, valid from 2026-07-01 to 2026-08-15."
+    "objectives": "# Scenario 19 — Add Time-Limited Therapy Activity\n\n## Context\nRobert's caregiver wants to start a 6-week physiotherapy program to help with mobility and weight management.\n\n## Objectives\n1. Add a physiotherapy activity, 60 minutes, every Monday and Thursday at 15:00, valid from 2026-07-01 to 2026-08-15."
 }
