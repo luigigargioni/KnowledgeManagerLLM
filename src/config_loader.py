@@ -27,21 +27,35 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_URL = os.getenv("OPENAI_URL", "")  # empty = the SDK default
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_URL = os.getenv("GROQ_URL", "https://api.groq.com/openai/v1")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_URL = os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1")
 
-SUPPORTED_PROVIDERS = ("openai", "groq", "ollama")
+SUPPORTED_PROVIDERS = ("openai", "groq", "openrouter", "ollama")
 
 _DEFAULT_MODELS = {
     "groq": "openai/gpt-oss-120b",
     "openai": "gpt-5.4-mini",
+    # OpenRouter model ids are namespaced by publisher, and the *same* id can name
+    # a paid or a free listing ("openai/gpt-oss-20b" vs "openai/gpt-oss-20b:free"),
+    # which changes both the price and the rate limit. Spell it out in .env.
+    "openrouter": "openai/gpt-oss-20b",
     "ollama": "gpt-oss:20b",
 }
 
 # Client-side rate limits, per provider. The Groq figures are the free tier
-# (30 RPM, 8K TPM, 1K RPD, 200K TPD, counted per model); OpenAI and Ollama are
-# unthrottled here. 0 disables a limit.
+# (30 RPM, 8K TPM, 1K RPD, 200K TPD, counted per model); OpenAI, OpenRouter and
+# Ollama are unthrottled here. 0 disables a limit.
+#
+# OpenRouter is left at 0 because its limit is a property of the account, not of
+# the provider: on a credited account it scales with the balance, and there is no
+# single figure to hardcode. Its `:free` listings are the exception — capped at
+# 20 requests/minute and a low daily ceiling server-side — so a batch on one of
+# those needs LLM_RPM/LLM_RPD set explicitly, or it will spend the run bouncing
+# off 429s that the limiter could have paced.
 _RATE_LIMIT_DEFAULTS = {
     "groq": {"rpm": 30, "tpm": 8000, "rpd": 1000, "tpd": 200_000},
     "openai": {"rpm": 0, "tpm": 0, "rpd": 0, "tpd": 0},
+    "openrouter": {"rpm": 0, "tpm": 0, "rpd": 0, "tpd": 0},
     "ollama": {"rpm": 0, "tpm": 0, "rpd": 0, "tpd": 0},
 }
 
@@ -57,6 +71,27 @@ class LLMConfig:
     purpose: for reproducibility `seed` is the better lever, because it makes
     draws repeatable while leaving the sampling distribution at the value the
     model card recommends (temperature=1.0 for gpt-oss, see .env.example).
+
+    MEASURED 2026-08-24 — `seed` buys nothing on either cloud backend here, so do
+    not read a fixed seed as "this run is reproducible":
+
+    - `openrouter/openai/gpt-oss-20b`, seed=42, reasoning_effort=low, one prompt
+      repeated: 5 distinct outputs out of 5 on default routing, which also served
+      the request from four different upstreams (CoreWeave, SiliconFlow, Amazon
+      Bedrock, Novita). Pinning the upstream (`provider.order`, allow_fallbacks
+      off) does not help: 3 distinct out of 3 on each of Novita, SiliconFlow and
+      CoreWeave separately. OpenRouter advertises `seed` in supported_parameters
+      regardless.
+    - `openai/gpt-5.4-mini`, seed=42: 3 distinct out of 3, and no
+      `system_fingerprint` in the response, i.e. no reproducibility contract
+      offered at all.
+
+    Continuous batching on a shared serving stack makes bitwise repeatability
+    unavailable whatever the seed says, so the only sound way to attribute a
+    change to the code rather than to sampling is N repetitions with the spread
+    reported — for the judge as much as for the therapy manager. The knob is kept
+    because a backend that does honour it (a local Ollama with a fixed seed) makes
+    it meaningful, and because the run has to record what was requested.
 
     TO VERIFY on the intended test backend: OpenAI's *hosted* reasoning models
     reject a non-default temperature whenever `reasoning_effort` is also sent
@@ -115,6 +150,8 @@ def _resolve_provider(prefix: str, fallback: str | None) -> str:
         return "openai"
     if GROQ_API_KEY:
         return "groq"
+    if OPENROUTER_API_KEY:
+        return "openrouter"
     return "ollama"
 
 
@@ -123,6 +160,8 @@ def _credentials(provider: str) -> tuple[str, str | None]:
         return OPENAI_API_KEY, (OPENAI_URL or None)
     if provider == "groq":
         return GROQ_API_KEY, GROQ_URL
+    if provider == "openrouter":
+        return OPENROUTER_API_KEY, OPENROUTER_URL
     # Ollama ignores the key but the OpenAI SDK insists on a non-empty one
     return "ollama", f"{OLLAMA_URL}/v1"
 

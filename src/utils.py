@@ -347,6 +347,41 @@ def is_exit_message(message: str) -> bool:
     return bool(_EXIT_RE.search(text))
 
 
+# Control tokens of the gpt-oss "harmony" response format. When a provider's
+# parser does not strip them, they arrive glued to the tool name — measured on
+# OpenRouter serving openai/gpt-oss-20b, scenario 1: 11 of 22 tool calls came
+# through as "add_therapy_activity<|channel|>commentary", intermittently, in the
+# same run as clean ones. The arguments were valid JSON throughout, so only the
+# name needs cleaning.
+_TOOL_NAME_NOISE_RE = re.compile(r"<\|.*$|[^A-Za-z0-9_].*$", re.DOTALL)
+
+
+def clean_tool_name(name: str) -> str:
+    """
+    The tool name as the model meant it, with any provider noise cut off.
+
+    A function name can only be an identifier, so everything from the first
+    character that cannot appear in one is dropped. This corrects a serialisation
+    artefact of the backend; it does NOT invent a tool — a name the model made up
+    still fails to resolve, and should, which is how `get_medicine_activities`
+    was still caught as a hallucination in the run that motivated this.
+    """
+    return _TOOL_NAME_NOISE_RE.sub("", (name or "").strip())
+
+
+def strip_exit_keyword(message: str) -> str:
+    """
+    The message without the trailing exit keyword.
+
+    Needed where an exit is deliberately ignored — the caregiver's opening
+    message, see the guard in test.py — because the request it came attached to
+    still has to be delivered, and forwarding the keyword to the assistant only
+    invites it to answer the wrong thing.
+    """
+    text = (message or "").strip()
+    return _EXIT_RE.sub("", text).rstrip().rstrip(",;:-–—") or text
+
+
 # Vocabulary the assistant uses when it raises a problem and hands the decision
 # back to the caregiver. Two sources: the failure messages built in tools.py
 # ("cannot be scheduled at … overlaps with the activity named …", "Dependencies
@@ -437,6 +472,59 @@ def assistant_raised_issue(message: str) -> bool:
     """
     text = _NEGATED_ISSUE_RE.sub(" ", (message or "").lower())
     return any(marker in text for marker in _ISSUE_MARKERS)
+
+
+# Phrases with which a reply announces a change as done. Past tense and
+# passive voice only: "I will add", "shall I add", "would you like me to add"
+# are proposals and must not match, which is why the verb is looked for in a
+# completed form rather than as a bare stem.
+_APPLIED_CLAIM_RE = re.compile(
+    r"\b(?:has|have|was|were|been|i['’]?ve|we['’]?ve)\s+(?:\w+\s+){0,3}?"
+    r"(?:added|updated|removed|deleted|changed|moved|created|scheduled|rescheduled|"
+    r"extended|shortened|applied|saved)\b"
+    r"|\b(?:i|we)\s+(?:have\s+)?(?:just\s+)?"
+    r"(?:added|updated|removed|deleted|changed|moved|created|rescheduled)\b"
+    r"|\b(?:successfully|now)\s+"
+    r"(?:added|updated|removed|deleted|changed|moved|created|scheduled)\b"
+    # Asserting the new state instead of the act, which is how the most
+    # misleading confirmations are phrased: scenario 48 answered a caregiver
+    # asking for confirmation with "today's schedule now has: Vital signs check –
+    # 25 minutes", having never applied the 25 minutes.
+    r"|\b(?:now|currently)\s+(?:has|have|lasts?|runs?|stands?|starts?|is|are)\b",
+    re.IGNORECASE,
+)
+
+# The same phrase inside a question is the assistant asking, not reporting
+# ("would you like the walk moved to 20:30?"). Sentences ending in a question
+# mark are dropped before the claim is looked for.
+_QUESTION_SENTENCE_RE = re.compile(r"[^.!?\n]*\?")
+
+# …and the same phrase under a negation is the assistant reporting the opposite.
+# Measured: "nothing was created" and "it did not get added" both matched as
+# claims on the first live run of scenario 8, in a reply that was correctly
+# telling the caregiver the write had failed. Negated forms are cut out before
+# the claim is looked for, the same way _NEGATED_ISSUE_RE does it above.
+_NEGATED_CLAIM_RE = re.compile(
+    r"\b(?:not|never|nothing|no\s+changes?|n[o']t)\b[^.!?\n]*",
+    re.IGNORECASE,
+)
+
+
+def claims_applied_change(message: str) -> bool:
+    """
+    True when a reply announces a change to the therapy as already done.
+
+    Used only to *report* a reply that claims a change no tool performed (see
+    Chat._record_unsupported_claim). It is never a gate and never a grade: a
+    phrase match decides nothing here, it only marks an occurrence for a person
+    to look at, and it is paired with the deterministic half — whether any write
+    tool actually succeeded during the turn — which is what the claim is checked
+    against. That pairing is why matching on wording is acceptable here and was
+    not acceptable for the delivery gate.
+    """
+    text = _QUESTION_SENTENCE_RE.sub(" ", message or "")
+    text = _NEGATED_CLAIM_RE.sub(" ", text)
+    return bool(_APPLIED_CLAIM_RE.search(text))
 
 
 def assistant_handed_back(message: str) -> bool:

@@ -28,6 +28,7 @@ from utils import (
     build_transcript,
     is_exit_message,
     setup_logger,
+    strip_exit_keyword,
 )
 from vector_db import VectorDBManager
 
@@ -56,12 +57,93 @@ def parse_args() -> argparse.Namespace:
         help="Seconds to wait between turns (default: 0)",
     )
     parser.add_argument(
+        "--ids",
+        type=str,
+        default=None,
+        help=(
+            "Run only these scenarios, e.g. --ids 3,4,6,8,26 (also accepts ranges: "
+            "3-8,26,42-49). Overrides --from/--to. Use it to re-run the ones that "
+            "failed after a fix, instead of paying for the whole range: on "
+            "gpt-oss-20b a scenario costs 6-9 minutes of wall clock."
+        ),
+    )
+    parser.add_argument(
         "--max-turns",
         type=int,
         default=30,
         help="Max conversation turns per scenario (default: 30)",
     )
     return parser.parse_args()
+
+
+def parse_ids(spec: str) -> list[int]:
+    """
+    Expand an --ids specification into a sorted list of scenario ids.
+
+    Accepts single ids and inclusive ranges, comma-separated: "3,6,42-49".
+    Raises on anything else rather than silently running the wrong set — a typo
+    that quietly dropped half the selection would be attributed to the scenarios.
+    """
+    ids: set[int] = set()
+    for chunk in spec.replace(" ", "").split(","):
+        if not chunk:
+            continue
+        if "-" in chunk.lstrip("-"):
+            lo, _, hi = chunk.partition("-")
+            if not (lo.isdigit() and hi.isdigit()) or int(lo) > int(hi):
+                raise ValueError(f"--ids: '{chunk}' is not a valid range")
+            ids.update(range(int(lo), int(hi) + 1))
+        elif chunk.isdigit():
+            ids.add(int(chunk))
+        else:
+            raise ValueError(f"--ids: '{chunk}' is not a scenario id")
+    if not ids:
+        raise ValueError("--ids was given but named no scenario")
+    return sorted(ids)
+
+
+def clamp_undelivered_branch(evaluation: dict, scenario_id: int) -> None:
+    """
+    Cap a scenario whose conditional clause was never delivered at "partial".
+
+    The judge's own rules already say this: a branch the chatbot never triggered
+    is not demonstrated, and the caregiver is never to be graded. On the
+    2026-08-24 batch the judge broke that rule on six scenarios out of the
+    fifteen where the clause was withheld, failing them for what the caregiver
+    said — and since SIM_SEED is fixed, rerunning reproduces it rather than
+    averaging it out. Telling the judge about the delivery status (see
+    JudgeAgent.evaluate) is the real fix; this is the floor under it, so a weaker
+    model in the judge role cannot turn a harness limitation into a failure of
+    the system under test.
+
+    Deliberately narrow: it only ever raises "failed" to "partial", never touches
+    "completed" or "not_attempted", and records what it changed so a reader can
+    see the judge and the harness disagreed.
+    """
+    clamped: list[int] = []
+    for objective in evaluation.get("objectives", []):
+        if objective.get("status") == "failed":
+            objective["status"] = "partial"
+            objective["notes"] = (
+                (objective.get("notes") or "").strip()
+                + " [harness] Capped at partial: the chatbot never produced the "
+                "trigger, so the conditional clause was withheld from the "
+                "caregiver and cannot be graded."
+            ).strip()
+            clamped.append(objective.get("id"))
+
+    if not clamped:
+        evaluation["branch_clamped"] = "no"
+        return
+
+    # There is at least one "partial" now, so the scenario cannot be "completed".
+    evaluation["overall_status"] = "partial"
+    evaluation["branch_clamped"] = f"objectives {clamped} failed→partial"
+    logging.getLogger("batch_logger").warning(
+        f"[SCENARIO {scenario_id}] Judge failed objective(s) {clamped} while the "
+        "conditional clause was never delivered to the caregiver – capped at "
+        "partial by the harness"
+    )
 
 
 def run_scenario(
@@ -201,9 +283,29 @@ def run_scenario(
         )
 
         if is_exit_message(caregiver_message):
-            turns = turn + 1
-            logger.info(f"[SCENARIO {scenario_id}] Exit after {turns} turn(s)")
-            break
+            # …unless it is the caregiver's opening message. is_exit_message
+            # deliberately matches a *trailing* keyword, because the caregiver
+            # ends real turns with "Thanks! exit" — and that tolerance makes a
+            # first message ending in "exit" fatal. Measured on gpt-oss-20b via
+            # OpenRouter, scenario 1: the caregiver dumped both objectives and
+            # appended "exit" in one breath, before the assistant had said
+            # anything, and the scenario was graded `failed` on an empty diff
+            # after two requests. Nothing can have been completed before the
+            # assistant has replied even once, so an exit here is a slip of the
+            # simulation, not the end of the conversation: drop it and let the
+            # request through.
+            if turn == 0:
+                logger.warning(
+                    f"[SCENARIO {scenario_id}] The caregiver ended its opening "
+                    "message with an exit keyword before the assistant had "
+                    "replied – ignored, the conversation continues"
+                )
+                caregiver_message = strip_exit_keyword(caregiver_message)
+                caregiver.conversation_history[-1]["content"] = caregiver_message
+            else:
+                turns = turn + 1
+                logger.info(f"[SCENARIO {scenario_id}] Exit after {turns} turn(s)")
+                break
 
         if delay > 0:
             sleep(delay)
@@ -241,14 +343,21 @@ def run_scenario(
     change_summary = render_diff(changes)
     logger.info(f"[SCENARIO {scenario_id}] Applied changes:\n{change_summary}")
 
+    # The judge is given the two halves of the script separately, plus whether the
+    # withheld half ever reached the caregiver. Handing it the whole script with
+    # no delivery status made it grade the caregiver against instructions the
+    # caregiver had never been given — six objectives of the 2026-08-24 batch
+    # failed on the caregiver's improvised line, not on anything the chatbot did.
     judge = JudgeAgent()
     evaluation = judge.evaluate(
         client=sim_client,
         model=SIM_LLM.model,
-        script=script,
+        script=initial_script,
         transcript=transcript,
         therapy=json.dumps(final_therapy),
         changes=change_summary,
+        conditional_clause=deferred_script,
+        clause_delivered=deferred_delivered,
     )
 
     if evaluation.get("status") == "error":
@@ -259,6 +368,7 @@ def run_scenario(
 
     evaluation["scenario_id"] = scenario_id
     evaluation["turns"] = turns
+    evaluation["branch_clamped"] = "no"
     if deferred_script:
         # Whether the assistant raised the point by itself. A scenario graded
         # "partial" reads differently depending on this flag: False means the
@@ -283,10 +393,45 @@ def run_scenario(
                 if changes["has_changes"]
                 else "not_raised_no_change"
             )
+            clamp_undelivered_branch(evaluation, scenario_id)
     # What the system itself detected over the conversation, regardless of what
     # the assistant did with it. Together with branch_exercised it separates
     # "there was nothing to raise" from "there was, and it was not raised".
     evaluation["issue_signals"] = chat.issue_signals_seen
+    # What the checker judged, at which severity. The severity is what the write
+    # tools act on (see safety.py), so this column is where a reviewer reads why
+    # an activity was refused — or why one that should have been refused was not.
+    evaluation["safety_verdicts"] = (
+        "\n".join(
+            f"[turn {v['turn']}] {v['severity']}{'' if v['typed'] else ' (untyped)'} "
+            f"– {v['activity_name']}: "
+            + ("; ".join(f.get("finding", "") for f in v["findings"]) or "no finding")
+            for v in chat.safety_verdicts_seen
+        )
+        or "none"
+    )
+    evaluation["safety_verdicts_unparsed"] = chat.safety_verdicts_unparsed
+    evaluation["safety_checks_skipped"] = chat.safety_checks_skipped
+    # Both counters ride in the same column: an unparsed verdict means the gate
+    # failed open for that activity, and a skipped check means a write was called
+    # before the checker. Neither is visible in the verdict list itself.
+    notes = []
+    if chat.safety_verdicts_unparsed:
+        notes.append(
+            f"{chat.safety_verdicts_unparsed} verdict(s) unparsed/untyped - gate failed open"
+        )
+    if chat.safety_checks_skipped:
+        notes.append(f"{chat.safety_checks_skipped} write(s) attempted before any check")
+    if notes:
+        evaluation["safety_verdicts"] += "\n[!] " + "; ".join(notes)
+    # Replies that announced a change with no successful write behind them. Not a
+    # grade — the judge's diff already decides the outcome — but the defect is
+    # invisible in a diff that simply lacks the change, and it happened twice on
+    # the 2026-08-24 batch (scenarios 18 and 48, the second one while answering a
+    # caregiver asking for explicit confirmation).
+    evaluation["unsupported_claims"] = (
+        "\n".join(f"[turn {c['turn']}] {c['reply']}" for c in chat.unsupported_claims) or "none"
+    )
     # Everything the conversation touched, named. This is the column a reviewer
     # scans to catch a change nobody asked for; see therapy_diff.summarise_touched.
     evaluation["changed_activities"] = summarise_touched(changes)
@@ -360,13 +505,24 @@ def main():
     if not available_ids:
         raise RuntimeError(f"No numbered scenario found in {SCENARIOS_DIR}")
 
-    to_id = args.to_id if args.to_id is not None else available_ids[-1]
-    scenario_ids = [sid for sid in available_ids if args.from_id <= sid <= to_id]
-    if not scenario_ids:
-        raise RuntimeError(
-            f"No scenario in the requested range {args.from_id}–{to_id}; "
-            f"available: {available_ids[0]}–{available_ids[-1]}"
-        )
+    if args.ids:
+        requested = parse_ids(args.ids)
+        missing = [sid for sid in requested if sid not in available_ids]
+        if missing:
+            raise RuntimeError(
+                f"--ids names scenarios that do not exist: {missing}; "
+                f"available: {available_ids[0]}–{available_ids[-1]}"
+            )
+        scenario_ids = requested
+        to_id = scenario_ids[-1]
+    else:
+        to_id = args.to_id if args.to_id is not None else available_ids[-1]
+        scenario_ids = [sid for sid in available_ids if args.from_id <= sid <= to_id]
+        if not scenario_ids:
+            raise RuntimeError(
+                f"No scenario in the requested range {args.from_id}–{to_id}; "
+                f"available: {available_ids[0]}–{available_ids[-1]}"
+            )
 
     # Output folder for this batch run
     batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -387,8 +543,14 @@ def main():
     logger.addHandler(file_handler)
 
     # Global batch logger
+    # Name the actual selection, not the range: with --ids a "1→49" header would
+    # describe a batch that ran 23 scenarios out of those 49, and a reader
+    # comparing two runs has no way to tell which ones were left out.
+    selection = (
+        ",".join(str(sid) for sid in scenario_ids) if args.ids else f"{args.from_id}→{to_id}"
+    )
     logger.info(
-        f"[BATCH] Starting – scenarios {args.from_id}→{to_id} "
+        f"[BATCH] Starting – scenarios {selection} "
         f"({len(scenario_ids)} total) | batch_id={batch_id}"
     )
 
@@ -428,6 +590,22 @@ def main():
     print(f"  Assistant:      {MAIN_LLM.provider} / {MAIN_LLM.model}")
     print(f"  Caregiver+judge: {SIM_LLM.provider} / {SIM_LLM.model}")
     print(f"  Output: {batch_log_dir}")
+
+    # The two roles exist to be configurable apart (see config_loader): the point
+    # is that the harness is not the thing being measured. Running them on one
+    # model couples the two, and the coupling is not symmetric — the judge has to
+    # apply a multi-clause rubric that a small model applies unreliably, and every
+    # such slip is charged to the assistant. On the 2026-08-24 batch, both roles on
+    # gpt-oss-20b, six objectives were failed for what the caregiver said. Not an
+    # error: a run this way is valid, its numbers just have to be read knowing it.
+    if (MAIN_LLM.provider, MAIN_LLM.model) == (SIM_LLM.provider, SIM_LLM.model):
+        warning = (
+            f"  NOTE: caregiver and judge run on the model under test "
+            f"({MAIN_LLM.model}). The harness is not independent of what it "
+            f"measures; set SIM_PROVIDER/SIM_MODEL to separate them."
+        )
+        print(warning)
+        logger.warning(f"[BATCH]{warning.strip()}")
     print("=" * 60)
 
     results = []

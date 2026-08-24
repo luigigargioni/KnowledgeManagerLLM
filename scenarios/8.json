@@ -23,8 +23,8 @@
         },
         {
             "activity_id": "med_001",
-            "name": "Antihistamine",
-            "description": "Allergy medication taken after breakfast.",
+            "name": "Cetirizine (antihistamine)",
+            "description": "Cetirizine 10 mg, antihistamine for seasonal allergies, taken after breakfast.",
             "day_of_week": [1, 2, 3, 4, 5, 6, 7],
             "time": "08:15",
             "duration_minutes": 5,

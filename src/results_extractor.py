@@ -21,6 +21,13 @@ RESULTS_EXCEL_PATH = RESULTS_DIR / "all_results.xlsx"
 #   applied_changes     – the same change set in full (what the judge was shown)
 #   issue_signals       – the blocking causes the system itself raised
 #   branch_outcome      – whether a conditional branch ran, was pre-empted, or was missed
+#   branch_clamped      – where the judge failed an objective whose conditional
+#                         clause the caregiver never received, and the harness
+#                         capped it at partial (see test.clamp_undelivered_branch)
+#   safety_verdicts     – what the checker judged and at which severity; this is
+#                         what the write tools acted on, so it is where a refused
+#                         activity is explained (see safety.py)
+#   unsupported_claims  – replies that announced a change no write performed
 #   history_warnings_retrieved – the risks RAG surfaced, to read against the transcript
 #   objectives_scripted – how many objectives the script asked for, vs the
 #                         per-objective outcomes in objectives_status
@@ -37,6 +44,9 @@ _OBJECTIVE_COLUMNS = [
     "changed_activities",
     "issue_signals",
     "branch_outcome",
+    "branch_clamped",
+    "safety_verdicts",
+    "unsupported_claims",
     "history_warnings_retrieved",
     "objectives_scripted",
     "objectives_status",
@@ -176,8 +186,11 @@ def _set_column_widths(ws, columns: list[str]) -> None:
         "final_therapy": 50,
         "changed_activities": 55,
         "applied_changes": 55,
-        "issue_signals": 22,
+        "issue_signals": 26,
         "branch_outcome": 26,
+        "branch_clamped": 24,
+        "safety_verdicts": 60,
+        "unsupported_claims": 60,
         "history_warnings_retrieved": 60,
         "objectives_scripted": 10,
         "objectives_status": 14,
@@ -240,6 +253,9 @@ def append_batch_results(
         "applied_changes": change_summary or "",
         "issue_signals": ", ".join(evaluation.get("issue_signals") or []) or "none",
         "branch_outcome": evaluation.get("branch_outcome", "n/a"),
+        "branch_clamped": evaluation.get("branch_clamped", "no"),
+        "safety_verdicts": evaluation.get("safety_verdicts", ""),
+        "unsupported_claims": evaluation.get("unsupported_claims", ""),
         "history_warnings_retrieved": evaluation.get("history_warnings_retrieved", ""),
         "objectives_scripted": evaluation.get("objectives_scripted", ""),
         "objectives_status": evaluation.get("objectives_status", ""),

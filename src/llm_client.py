@@ -410,6 +410,20 @@ class _Completions:
                 logger.warning(f"[LLM][{limiter.key}] {type(e).__name__}, retrying in {wait}s")
                 sleep(wait)
             except APIStatusError as e:
+                if e.status_code == 402:
+                    # No credit left on the account. Not a rate limit and not
+                    # retryable: every subsequent call fails the same way, so the
+                    # batch has to stop the way an exhausted daily quota stops it,
+                    # keeping the scenarios already graded instead of losing them
+                    # to a traceback on scenario N+1. Seen on OpenRouter, whose
+                    # paid listings answer 402 the moment the balance runs out.
+                    limiter.release(entry)
+                    raise DailyQuotaExceeded(
+                        f"'{limiter.key}' refused the request for lack of credit "
+                        f"(HTTP 402). This is an account balance, not a rate limit: "
+                        f"no wait makes it succeed. Top the account up, or point the "
+                        f"role at a provider that has budget.\n{e}"
+                    ) from e
                 if e.status_code == 413:
                     # "Request too large … on tokens per minute": the prompt alone
                     # is over the per-minute budget, so no amount of waiting helps.
@@ -464,7 +478,7 @@ class RateLimitedClient:
 
 def make_client(config: LLMConfig) -> RateLimitedClient:
     """Return a rate-limited, OpenAI-compatible client for one role's backend."""
-    if config.provider in ("openai", "groq") and not config.api_key:
+    if config.provider in ("openai", "groq", "openrouter") and not config.api_key:
         raise ValueError(
             f"{config.describe()}: {config.provider.upper()}_API_KEY is not set in .env"
         )

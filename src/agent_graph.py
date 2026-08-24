@@ -42,7 +42,14 @@ def build_therapy_graph(chat, caregiver):
         return {"messages": [AIMessage(content=response)]}
 
     def should_continue(state: TherapyState) -> str:
-        if is_exit_message(state["messages"][-1].content):
+        # An exit on the caregiver's opening message is a slip of the simulation,
+        # not the end of the conversation: is_exit_message matches a *trailing*
+        # keyword, so a first message that states the request and then appends
+        # "exit" ends the run before the assistant has said anything. Measured on
+        # gpt-oss-20b. `messages` holds the assistant's greeting plus the
+        # caregiver's reply at this point, hence the length test. Kept in step
+        # with the same guard in test.py: the two drivers have to behave alike.
+        if len(state["messages"]) > 2 and is_exit_message(state["messages"][-1].content):
             return "end"
         return "therapy_manager"
 
