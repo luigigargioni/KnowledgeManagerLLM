@@ -51,13 +51,21 @@ def _format_value(field: str, value) -> str:
 
 
 def _describe(activity: dict) -> str:
-    return (
+    # The description is printed because it is the one field the scheduler never
+    # reads. An assistant asked to place an activity "after X" sometimes writes
+    # that into the description instead of dependencies — the ordering is then
+    # recorded nowhere it can be enforced, and the diff used to render such an
+    # activity identically to one whose constraint was honestly dropped
+    # ("depends on: none"). Showing it lets the judge tell the two apart.
+    described = (
         f"'{activity.get('name')}' [{activity.get('activity_id')}] "
         f"at {activity.get('time')} for {activity.get('duration_minutes')}min "
         f"on {_format_value('day_of_week', activity.get('day_of_week'))} "
         f"(category: {activity.get('category')}, "
         f"depends on: {_format_value('dependencies', activity.get('dependencies'))})"
     )
+    description = (activity.get("description") or "").strip()
+    return f'{described} description: "{description}"' if description else described
 
 
 def diff_therapies(initial: dict, final: dict) -> dict:

@@ -44,7 +44,11 @@ and the activities.
    activities and broken dependency sequences, so YOU DON'T NEED to do those
    checks yourself. When an update is meant to re-order an activity relative to
    another one, set dependencies to that activity_id: emptying the dependency list
-   removes the ordering constraint altogether, which is not the same thing.
+   removes the ordering constraint altogether, which is not the same thing. If the
+   caregiver orders an activity relative to something that is NOT in the schedule,
+   do not settle it yourself: never invent the missing activity, never drop the
+   ordering silently, and never restate it in the description, where nothing
+   enforces it. Say it is not in the schedule and ask how to proceed.
 6. CONFLICTS. When one of those functions reports a scheduling conflict, present
    the conflict, the suggested alternative times and any past_resolution_hints it
    returned, and ALWAYS ask the caregiver how to resolve it. Never resolve a
@@ -132,7 +136,7 @@ _MANAGER_TOOLS = [
                     "name": {"type": "string", "description": "Name of the activity"},
                     "description": {
                         "type": "string",
-                        "description": "Detailed description",
+                        "description": "Free-text detail about the activity itself. Never encode a scheduling relation here: an ordering such as 'after X' belongs in dependencies, the only field the scheduler enforces.",
                     },
                     "day_of_week": {
                         "type": "array",
@@ -179,7 +183,10 @@ _MANAGER_TOOLS = [
                         "description": "ID of the activity to update",
                     },
                     "name": {"type": "string"},
-                    "description": {"type": "string"},
+                    "description": {
+                        "type": "string",
+                        "description": "Free-text detail; never an ordering, which belongs in dependencies.",
+                    },
                     "day_of_week": {"type": "array", "items": {"type": "integer"}},
                     "time": {"type": "string", "description": "HH:MM"},
                     "duration_minutes": {
