@@ -92,7 +92,7 @@ L'eccezione voluta: un ramo condizionale può prescrivere di *non* agire ("do no
 | trigger scartato | perché |
 |---|---|
 | keyword nella risposta | scatta sulla parola "warning" in *"no conflicts were reported, but there was a history warning"*. Nello scenario 17 ha consegnato le istruzioni un turno in anticipo |
-| verdetto del checker | il formato tiene (64/64 parsate) ma il checker commenta tutto, quindi l'assenza di `NO_CONFLICTS` copre anche osservazioni di qualità |
+| verdetto del checker | il formato tiene (64/64 parsate) ma il checker commenta tutto, quindi un `check_result` non vuoto copre anche osservazioni di qualità |
 | hit sulla storia paziente | ne scatta uno praticamente a ogni richiesta, mentre la scrittura va comunque a buon fine |
 
 Gli ultimi due condividono ciò che li squalifica: **l'attività viene scritta lo stesso**. Il sistema ha osservato qualcosa, non ha fermato niente.

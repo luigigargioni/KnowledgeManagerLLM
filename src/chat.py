@@ -366,13 +366,13 @@ class Chat:
         - validation errors (bad category, malformed time, unknown activity_id):
           the assistant's own slips, retried without involving the caregiver;
         - the checker's own verdict. Its prompt has it answer with
-          `check_result: [problems] | "NO_CONFLICTS"`, which looks like a
-          declared finding, and the format holds (64 replies out of 64 parsed).
-          It is not usable as a signal: the checker comments on everything, so
-          the absence of "NO_CONFLICTS" also covers quality remarks. In scenario
-          17 it observed that "12:45 is around lunch, so it is not fasting" —
-          accurate, and nothing for the caregiver to decide — which fired the
-          gate on turn 2 of four scenarios out of seven and recorded
+          `check_result: [problems]` (empty array when it found none), which
+          looks like a declared finding, and the format holds (64 replies out
+          of 64 parsed). It is not usable as a signal: the checker comments on
+          everything, so a non-empty check_result also covers quality remarks.
+          In scenario 17 it observed that "12:45 is around lunch, so it is not
+          fasting" — accurate, and nothing for the caregiver to decide — which
+          fired the gate on turn 2 of four scenarios out of seven and recorded
           branch_exercised=True for a scheduling conflict that never happened;
         - patient-history hits, whether from get_patient_history_events or the
           `patient_history_warnings` that add/update return alongside a
