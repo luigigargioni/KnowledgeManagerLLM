@@ -185,8 +185,7 @@ def run_scenario(
             deferred_delivered = True
             logger.info(
                 f"[SCENARIO {scenario_id}][TURN {turn + 1}] Assistant raised the issue "
-                f"(signals: {signals or 'none – matched on wording'}) – "
-                "reaction instructions delivered"
+                f"(signals: {signals}) – reaction instructions delivered"
             )
 
         # The caregiver is a simulation agent, not the system under test: it runs

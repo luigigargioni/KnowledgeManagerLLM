@@ -354,12 +354,14 @@ def is_exit_message(message: str) -> bool:
 # because it is a dependency of …"), and the safety findings the checker agent
 # returns for medicines and patient history.
 #
-# This gates the delivery of a scenario's withheld reaction clauses
-# (scenario_loader.split_objectives): the caregiver receives them only once the
-# assistant has actually said the thing, so it can react instead of predicting.
-# Recall matters more than precision here — a false positive puts the caregiver
-# back where it was before this gate existed, while a false negative leaves it
-# without its instructions for a branch that really was exercised.
+# This used to gate the delivery of a scenario's withheld reaction clauses
+# (scenario_loader.split_objectives), on a recall-over-precision trade-off. That
+# was measured out and the trade-off no longer holds: matched on wording alone
+# this fires on "warning" in "no conflicts were reported, but there was a
+# history warning", which in scenario 17 handed the caregiver its instructions a
+# turn early. Delivery is now gated on the blocking signals in Chat.turn_issues,
+# and the only remaining use of this vocabulary is inside assistant_handed_back,
+# as the fallback for a reply that asks no question at all.
 _ISSUE_MARKERS = (
     # scheduling
     "conflict",

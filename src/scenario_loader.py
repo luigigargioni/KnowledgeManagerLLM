@@ -84,8 +84,11 @@ def split_objectives(objectives: str) -> tuple[str, str]:
       - initial:  the bare imperative requests, with no title and no context
       - deferred: the context and the conditional clauses, to be revealed only
                   once the assistant has actually raised the point (the gate is
-                  in test.py: a deterministic signal from Chat.turn_issues, or
-                  utils.assistant_raised_issue for the findings no tool reports)
+                  in test.py: a blocking signal from Chat.turn_issues, confirmed
+                  by utils.assistant_handed_back). Wording alone never
+                  delivers: a branch whose trigger is a clinical judgement
+                  rather than a refused write is not delivered at all, and
+                  is recorded as branch_exercised=False.
 
     Scenarios without a conditional clause keep their context, minus the title,
     and get an empty deferred part.
