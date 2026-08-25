@@ -429,8 +429,9 @@ def find_earlier_time(activity, schedule):
     current start time, fitting the activity in a free gap.
 
     Instead of recursing one slot at a time this function collects *all*
-    candidate end-times (the start of every existing activity that sits at
-    or before the current position) and tries them from latest to earliest.
+    candidate end-times (the start of every existing activity that could be
+    reached by moving backwards, the conflicting one included) and tries them
+    from latest to earliest.
 
     It replaces a recursive version that walked back one conflicting activity at
     a time. That one lived on here as the caller's choice long after this
@@ -443,10 +444,18 @@ def find_earlier_time(activity, schedule):
         return activity["time"]
 
     current_start = hhmm_to_minutes(activity["time"])
+    current_end = current_start + duration
 
     # Build a sorted (descending) list of candidate end-times.
     # Each candidate places the new activity to end exactly when an existing
     # one begins, working from the current position backwards.
+    # The bound is on the *resulting* start (it must not be later than the
+    # current one), i.e. `act_start <= current_end` — not on the anchor itself:
+    # an activity beginning after the current start but before the current end
+    # is exactly the one being conflicted with, and anchoring on it gives the
+    # latest slot that still ends before it. Bounding by `current_start`
+    # dropped that anchor and moved the activity a whole extra `duration`
+    # earlier than needed.
     # Only consider activities that share at least one day with the new activity
     # so that cross-day activities don't distort the available time windows.
     new_days = set(activity["day_of_week"])
@@ -454,9 +463,14 @@ def find_earlier_time(activity, schedule):
         {
             hhmm_to_minutes(act["time"])
             for act in schedule
-            if hhmm_to_minutes(act["time"]) <= current_start and new_days & set(act["day_of_week"])
+            if hhmm_to_minutes(act["time"]) <= current_end and new_days & set(act["day_of_week"])
         }
-        | {current_start},
+        # `current_end`, not `current_start`: these are *end* times, so the
+        # anchor standing for "the requested slot is already fine" is the end
+        # of that slot. Anchoring on `current_start` made the best reachable
+        # answer `current_start - duration`, i.e. a whole duration earlier
+        # than asked even when nothing was in the way.
+        | {current_end},
         reverse=True,
     )
 
@@ -472,31 +486,34 @@ def find_earlier_time(activity, schedule):
 
 
 def find_later_time(activity, schedule):
-    """Return the earliest valid start time at or after the current end time.
+    """Return the earliest valid start time strictly after the current one.
 
-    Collects candidate start-times (the end of every existing activity that
-    overlaps or immediately follows the current slot) and returns the first
-    one that fits within the day without conflicts — `None` when the activity
-    would have to cross midnight to fit, which is the case the recursive
-    version it replaces answered with "24:00".
+    Collects candidate start-times (the end of every existing activity that is
+    still running at the current start time or begins later — the conflicting
+    one included) and returns the first one that fits within the day without
+    conflicts — `None` when the activity would have to cross midnight to fit,
+    which is the case the recursive version it replaces answered with "24:00".
     """
     duration = activity["duration_minutes"]
     if duration <= 0:
         return activity["time"]
 
     current_start = hhmm_to_minutes(activity["time"])
-    current_end = current_start + duration
 
-    # Candidate start-times: begin right after each activity whose end time
-    # falls at or after the current activity's end (i.e. all activities that
-    # could conflict or immediately follow).
+    # Candidate start-times: begin right after each activity that is still
+    # running when the current slot starts, or that starts later.
+    # The bound is `act_end > current_start`, not `act_end >= current_end`:
+    # an activity longer than the overlap ends *before* the current slot does,
+    # so the latter dropped the conflicting activity itself from the anchors
+    # and picked the next unrelated one — a lunch conflict was answered with
+    # "postpone to after dinner" instead of "postpone to when lunch ends".
     # Only consider activities that share at least one day with the new activity.
     new_days = set(activity["day_of_week"])
     candidate_starts = sorted(
         {
             hhmm_to_minutes(act["time"]) + act["duration_minutes"]
             for act in schedule
-            if hhmm_to_minutes(act["time"]) + act["duration_minutes"] >= current_end
+            if hhmm_to_minutes(act["time"]) + act["duration_minutes"] > current_start
             and new_days & set(act["day_of_week"])
         }
     )
