@@ -21,6 +21,7 @@ from scenario_loader import (
     load_scenario,
     split_objectives,
     therapy_to_natural_language,
+    validate_scenario_therapy,
 )
 from therapy_diff import diff_therapies, render_diff, summarise_touched
 from utils import (
@@ -72,6 +73,16 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=30,
         help="Max conversation turns per scenario (default: 30)",
+    )
+    parser.add_argument(
+        "--allow-invalid-scenarios",
+        action="store_true",
+        help=(
+            "Run even if a selected scenario starts from a therapy the scheduler "
+            "would refuse to build (see scenario_loader.validate_scenario_therapy). "
+            "All 100 scenarios are clean, so the check aborts by default and this "
+            "is only for deliberately measuring the assistant on a broken seed."
+        ),
     )
     return parser.parse_args()
 
@@ -282,6 +293,7 @@ def run_scenario(
             f"[SCENARIO {scenario_id}][TURN {turn + 1}] CAREGIVER: {caregiver_message[:120]}"
         )
 
+        last_turn = False
         if is_exit_message(caregiver_message):
             # …unless it is the caregiver's opening message. is_exit_message
             # deliberately matches a *trailing* keyword, because the caregiver
@@ -294,14 +306,44 @@ def run_scenario(
             # assistant has replied even once, so an exit here is a slip of the
             # simulation, not the end of the conversation: drop it and let the
             # request through.
+            #
+            # …and unless the assistant was still asking something. An exit keyword
+            # ends the loop *and discards the message it came attached to*, which is
+            # right for "Thanks! exit" and wrong for an answer: the assistant never
+            # receives it, so it cannot act on it, and it is missing from the
+            # transcript the judge reads. Scenario 26, gpt-oss-20b via OpenRouter,
+            # 2026-08-25: the assistant asked "Shall I proceed with changing the
+            # activity so it depends on breakfast instead of Aspirin?", the caregiver
+            # replied "Yes, please proceed with that change.exit", and the scenario
+            # was graded `failed` on an empty diff — the one write it ever attempted
+            # was the one the tools had already refused. Same class of simulation
+            # slip as the opening-message case above, one turn later.
+            #
+            # The condition is assistant_handed_back(), the same weak "did it ask
+            # anything at all" check the deferred-clause gate uses, and not a guess
+            # at whether the caregiver's words are a farewell or an instruction: a
+            # vocabulary that has to tell "Yes, please proceed" from "Yes, thanks"
+            # is the kind of wording heuristic this harness has already measured out
+            # once. Erring towards delivery costs at most one extra turn, and only
+            # in a conversation that ended on an open question.
+            stripped = strip_exit_keyword(caregiver_message)
             if turn == 0:
                 logger.warning(
                     f"[SCENARIO {scenario_id}] The caregiver ended its opening "
                     "message with an exit keyword before the assistant had "
                     "replied – ignored, the conversation continues"
                 )
-                caregiver_message = strip_exit_keyword(caregiver_message)
+                caregiver_message = stripped
                 caregiver.conversation_history[-1]["content"] = caregiver_message
+            elif stripped != caregiver_message and assistant_handed_back(chatbot_response):
+                logger.warning(
+                    f"[SCENARIO {scenario_id}][TURN {turn + 1}] The caregiver "
+                    "answered an open question and appended an exit keyword – "
+                    "the answer is delivered, then the conversation ends"
+                )
+                caregiver_message = stripped
+                caregiver.conversation_history[-1]["content"] = caregiver_message
+                last_turn = True
             else:
                 turns = turn + 1
                 logger.info(f"[SCENARIO {scenario_id}] Exit after {turns} turn(s)")
@@ -312,6 +354,11 @@ def run_scenario(
 
         chatbot_response = chat.send_message(caregiver_message)
         logger.info(f"[SCENARIO {scenario_id}][TURN {turn + 1}] CHATBOT: {chatbot_response[:120]}")
+
+        if last_turn:
+            turns = turn + 1
+            logger.info(f"[SCENARIO {scenario_id}] Exit after {turns} turn(s)")
+            break
 
         if delay > 0:
             sleep(delay)
@@ -553,6 +600,38 @@ def main():
         f"[BATCH] Starting – scenarios {selection} "
         f"({len(scenario_ids)} total) | batch_id={batch_id}"
     )
+
+    # Seed pre-flight, before anything expensive runs.
+    #
+    # A scenario's therapy goes into therapy.json verbatim, so an initial state
+    # the tools would have refused to build reaches the assistant unchallenged and
+    # is then graded as if it had. Reported for the whole selection at once rather
+    # than per scenario, because the pattern is what matters: on the 2026-08-24
+    # batch 15 scenarios shared one seed defect, and read one at a time in a log
+    # 100 scenarios long it read as noise instead of as a dataset-wide bug.
+    seed_problems = {}
+    for scenario_id in scenario_ids:
+        problems = validate_scenario_therapy(load_scenario(scenario_id))
+        if problems:
+            seed_problems[scenario_id] = problems
+    if seed_problems:
+        header = (
+            f"{len(seed_problems)} of the {len(scenario_ids)} selected scenarios "
+            "start from a therapy the scheduler would refuse to build:"
+        )
+        detail = "\n".join(
+            f"  - scenario {scenario_id}: " + "; ".join(problems)
+            for scenario_id, problems in sorted(seed_problems.items())
+        )
+        if not args.allow_invalid_scenarios:
+            raise RuntimeError(
+                f"{header}\n{detail}\nThe batch is aborted rather than measuring "
+                "the assistant on a state it did not create. Repair the scenario, "
+                "or pass --allow-invalid-scenarios to run anyway."
+            )
+        print(f"  WARNING: {header}")
+        print(detail)
+        logger.warning(f"[BATCH] {header}\n{detail}")
 
     # Vector DB shared across all scenarios.
     # It is rebuilt from scratch at every batch: seeding is idempotent by document

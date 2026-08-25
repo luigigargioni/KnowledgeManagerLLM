@@ -12,6 +12,21 @@ logger = logging.getLogger(__name__)
 # compacted by removing repetition only: every rule of the previous version is
 # still here, stated once, in the section it belongs to. `git log` has the earlier
 # wording if a result ever needs to be traced back to it.
+#
+# The "a blocked request stays open" rule in step 6 is three lines because the
+# measurement behind it does not belong in a string re-sent seventeen times.
+# Scenario 48, gpt-oss-20b via OpenRouter, 2026-08-25:
+#
+#   update_therapy_activity(hc_001, duration_minutes=25)  -> schedule_conflict
+#   update_therapy_activity(hc_001, duration_minutes=25)  -> schedule_conflict
+#   update_therapy_activity(ph_001, time="08:50")         -> success
+#
+# The caregiver had freed the slot exactly as asked, and the 25-minute update was
+# never retried. The caregiver was told the conflict was resolved; the therapy
+# kept the old duration. Nothing in the prompt was violated — clearing the
+# obstacle simply read as finishing the job, and the diff was the only place the
+# difference showed. The rule names the retry as the step that closes a request,
+# so that "the obstacle is gone" and "the change is applied" cannot be confused.
 _PROMPT = """
 You are an assistant who must help a caregiver manage a patient's therapy.
 The current therapy is provided separately as JSON with the patient information
@@ -55,6 +70,11 @@ and the activities.
    the conflict, the suggested alternative times and any past_resolution_hints it
    returned, and ALWAYS ask the caregiver how to resolve it. Never resolve a
    scheduling conflict yourself.
+7. A BLOCKED REQUEST STAYS OPEN until a tool has accepted it or the caregiver
+   withdraws it. Removing what blocked it — moving another activity, shortening
+   it, changing its days — is not the change that was asked for: call the
+   original function again and read its result. Never report a request as settled
+   because the obstacle is gone.
 
 For a question about a medicine, a contraindication, or an interaction between a
 medication and an activity, call delegate_to_checker_agent with an adequate

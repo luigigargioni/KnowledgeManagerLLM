@@ -1,9 +1,14 @@
 # scenario_loader.py
 
 import json
+import logging
 import re
 
 from config_loader import SCENARIOS_DIR, THERAPY_FILE
+from tools import find_conflicting_activity
+from utils import hhmm_to_minutes, minutes_to_hhmm
+
+logger = logging.getLogger("knowledge_manager")
 
 DAYS_MAP = {
     1: "Monday",
@@ -17,11 +22,100 @@ DAYS_MAP = {
 
 
 def load_scenario(scenario_id: int) -> dict:
-    """Read the scenario.json file from the scenario folder."""
+    """
+    Read the scenario.json file from the scenario folder.
+
+    Reports — but does not raise on — a therapy the scheduler itself would refuse
+    to build; see validate_scenario_therapy for why the two are kept apart.
+    """
     path = SCENARIOS_DIR / f"{str(scenario_id)}.json"
     if not path.exists():
         raise FileNotFoundError(f"Scenario {scenario_id} not found: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    scenario = json.loads(path.read_text(encoding="utf-8"))
+    for problem in validate_scenario_therapy(scenario):
+        logger.warning(f"[SCENARIO {scenario_id}] invalid seed - {problem}")
+    return scenario
+
+
+def validate_scenario_therapy(scenario: dict) -> list[str]:
+    """
+    Check a scenario's initial therapy against the invariants tools.py enforces on
+    every write, and return one line per violation (empty list = clean).
+
+    A scenario's therapy is installed into therapy.json verbatim by
+    `install_scenario_therapy`, bypassing the tools — so nothing has ever checked
+    that the starting point is a state the tools would accept. On the 2026-08-24
+    batch of 100 scenarios, 15 started from one they would not:
+
+        Breakfast 08:00 +20min       -> ends 08:20
+        <medication> 08:10 +5min  dependencies=[br_001]
+
+    which both violates the ordering rule (the dependency ends *after* the
+    dependent starts) and overlaps it. Harmless while nothing touches that chain —
+    11 of the 15 still graded "completed" — and decisive when something does: it
+    is where 26, 68, 38 and 48 all failed, the assistant made to repair an
+    inconsistency it did not create and then graded on the result.
+
+    The same three rules as the write path, in the same order, so a violation here
+    names what would be refused there:
+      - every declared dependency exists;
+      - every dependency ends at or before the dependent activity starts
+        (in tools.py, dep_end > start is a temporal_ordering error);
+      - no two activities overlap in time and day-of-week and validity range —
+        `tools.find_conflicting_activity` is reused rather than reimplemented, so
+        the seed check and the write check cannot drift apart.
+
+    All 15 have since been repaired — 26, 68 and 88 by moving the whole morning
+    or evening block, the other 12 by moving the meal earlier so it ends five
+    minutes before the medication starts. That direction was chosen because it
+    survives either answer to the question still open about the ordering rule
+    ("after breakfast": after it starts, or after it ends?): a dependency that
+    ends before the dependent begins satisfies both readings.
+
+    Returns problems instead of raising, and the caller decides: `load_scenario`
+    logs them, `test.py` aborts on them unless --allow-invalid-scenarios is set.
+    Aborting is the right default now that the dataset is clean — the check earns
+    its keep by catching the next scenario written by hand, not by re-reporting
+    known damage.
+    """
+    problems: list[str] = []
+    activities = scenario.get("activities") or []
+
+    by_id: dict[str, dict] = {}
+    for act in activities:
+        activity_id = act.get("activity_id")
+        if activity_id in by_id:
+            problems.append(f"duplicate activity_id '{activity_id}'")
+        by_id[activity_id] = act
+
+    for act in activities:
+        for dep_id in act.get("dependencies") or []:
+            dep = by_id.get(dep_id)
+            if dep is None:
+                problems.append(
+                    f"'{act['name']}' depends on '{dep_id}', which is not in the schedule"
+                )
+                continue
+            dep_end = hhmm_to_minutes(dep["time"]) + dep["duration_minutes"]
+            if dep_end > hhmm_to_minutes(act["time"]):
+                problems.append(
+                    f"temporal ordering: '{act['name']}' starts at {act['time']} but "
+                    f"depends on '{dep['name']}', which ends at {minutes_to_hhmm(dep_end)}"
+                )
+
+    reported: set[tuple[str, str]] = set()
+    for act in activities:
+        others = [other for other in activities if other is not act]
+        clash = find_conflicting_activity(act, others)
+        if clash is None:
+            continue
+        pair = tuple(sorted((act["name"], clash["name"])))
+        if pair in reported:
+            continue
+        reported.add(pair)
+        problems.append(f"overlap: '{pair[0]}' and '{pair[1]}' run at the same time")
+
+    return problems
 
 
 def install_scenario_therapy(scenario: dict) -> None:

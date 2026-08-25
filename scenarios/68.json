@@ -14,7 +14,7 @@
             "name": "Breakfast",
             "description": "Breakfast",
             "day_of_week": [1, 2, 3, 4, 5, 6, 7],
-            "time": "08:00",
+            "time": "07:30",
             "duration_minutes": 20,
             "dependencies": [],
             "valid_from": null,
@@ -26,7 +26,7 @@
             "name": "Metformin",
             "description": "Diabetes medication after breakfast.",
             "day_of_week": [1, 2, 3, 4, 5, 6, 7],
-            "time": "08:10",
+            "time": "08:20",
             "duration_minutes": 5,
             "dependencies": ["br_001"],
             "valid_from": null,
@@ -38,7 +38,7 @@
             "name": "Glucose check",
             "description": "Glucose check after medication.",
             "day_of_week": [1, 2, 3, 4, 5, 6, 7],
-            "time": "08:20",
+            "time": "08:30",
             "duration_minutes": 10,
             "dependencies": ["med_001"],
             "valid_from": null,
@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 68 — Update Breaking Activity Ordering\n\n## Context\nAnne's caregiver wants to move the glucose check earlier, which would break the scheduling order with the Metformin medication.\n\n## Objectives\n1. Update the glucose check to start at 08:08 instead of 08:20. If the assistant detects a temporal ordering violation with the Metformin medication, acknowledge the error, then ask to change it so it takes place after breakfast instead of after the Metformin medication, and confirm the corrected update."
+    "objectives": "# Scenario 68 — Update Breaking Activity Ordering\n\n## Context\nAnne's caregiver wants to move the glucose check earlier, which would break the scheduling order with the Metformin medication.\n\n## Objectives\n1. Update the glucose check to start at 08:08 instead of 08:30. If the assistant detects a temporal ordering violation with the Metformin medication, acknowledge the error, then ask to change it so it takes place after breakfast instead of after the Metformin medication, and confirm the corrected update."
 }

@@ -14,7 +14,7 @@
             "name": "Breakfast",
             "description": "Breakfast",
             "day_of_week": [1, 2, 3, 4, 5, 6, 7],
-            "time": "08:00",
+            "time": "07:30",
             "duration_minutes": 20,
             "dependencies": [],
             "valid_from": null,
@@ -26,7 +26,7 @@
             "name": "Aspirin",
             "description": "Preventive aspirin after breakfast.",
             "day_of_week": [1, 2, 3, 4, 5, 6, 7],
-            "time": "08:10",
+            "time": "08:20",
             "duration_minutes": 5,
             "dependencies": ["br_001"],
             "valid_from": null,
@@ -38,7 +38,7 @@
             "name": "Blood pressure check",
             "description": "BP check after aspirin.",
             "day_of_week": [1, 2, 3, 4, 5, 6, 7],
-            "time": "08:20",
+            "time": "08:30",
             "duration_minutes": 10,
             "dependencies": ["med_001"],
             "valid_from": null,
@@ -71,5 +71,5 @@
         }
     ],
     "expired_activities": [],
-    "objectives": "# Scenario 26 — Update Breaking Activity Ordering\n\n## Context\nAnthony's caregiver wants to move the blood pressure check earlier, but this would break the scheduling order since it would start before the aspirin ends.\n\n## Objectives\n1. Update the blood pressure check to start at 08:08 instead of 08:20. If the assistant detects a temporal ordering violation with the aspirin medication, acknowledge the error, then keep the 08:08 start time and ask to change what the blood pressure check follows: it must come after breakfast instead of after the aspirin medication. Confirm that corrected update."
+    "objectives": "# Scenario 26 — Update Breaking Activity Ordering\n\n## Context\nAnthony's caregiver wants to move the blood pressure check earlier, but this would break the scheduling order since it would start before the aspirin ends.\n\n## Objectives\n1. Update the blood pressure check to start at 08:08 instead of 08:30. If the assistant detects a temporal ordering violation with the aspirin medication, acknowledge the error, then keep the 08:08 start time and ask to change what the blood pressure check follows: it must come after breakfast instead of after the aspirin medication. Confirm that corrected update."
 }
