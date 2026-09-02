@@ -1,63 +1,69 @@
-# Colonne del foglio Excel dei risultati
+# Columns of the results Excel sheet
 
-File: `logs/batch_results/all_results.xlsx`, foglio **Results** — una riga per scenario.
-Le colonne sono definite in `src/results_extractor.py` (`_OBJECTIVE_COLUMNS`) e popolate in
-`src/test.py` (`run_scenario`) a partire dal verdetto del `JudgeAgent` arricchito dall'harness.
+File: `logs/batch_results/all_results.xlsx`, sheet **Results** — one row per scenario.
+The columns are defined in `src/results_extractor.py` (`_OBJECTIVE_COLUMNS`) and populated in
+`src/test.py` (`run_scenario`) from the `JudgeAgent` verdict enriched by the harness.
 
-Il file è **cumulativo**: ogni batch appende righe senza toccare quelle precedenti. Una
-colonna aggiunta da una versione più recente del codice viene accodata in fondo al foglio
-esistente (`_sync_headers`), quindi le righe sono sempre scritte per nome di colonna e mai
-per posizione. Le celle sono troncate a 32767 caratteri (limite del formato xlsx) con una
-nota `[… truncated]` in coda.
+The file is **cumulative**: every batch appends rows without touching the previous ones. A
+column introduced by a newer version of the code is appended at the end of the existing
+sheet (`_sync_headers`), so rows are always written by column name and never by position —
+which is why columns added by hand at the end (e.g. the review ones) survive later batches.
+Cells are truncated at 32767 characters (the xlsx format limit) with a `[… truncated]` note.
 
 ---
 
-## Identificazione della run
+## Run identification
 
-| Colonna | Significato |
+| Column | Meaning |
 |---|---|
-| `test_date` | Data/ora in cui la riga è stata scritta |
-| `batch_id` | Identificativo del batch (es. `20260630_143000`) |
-| `scenario_id` | Numero dello scenario in `scenarios/` |
-| `patient` | `Nome Cognome(patient_id)` del paziente dello scenario |
+| `test_date` | Date/time the row was written |
+| `batch_id` | Batch identifier; used to locate the log directory at `logs/batch_results/<batch_id>/` |
+| `scenario_id` | Scenario number in `scenarios/` (1 to 100) |
+| `patient` | `First Last(patient_id)` of the scenario's patient |
 
-## Esito e costi
+## Outcome and cost
 
-| Colonna | Significato |
+| Column | Meaning |
 |---|---|
-| `overall_status` | Verdetto complessivo del `JudgeAgent`: `completed` / `partial` / `failed` / `not_attempted` / `error`. Colora l'intera riga (verde / giallo / rosso / grigio / rosso scuro) |
-| `turns` | Numero di turni di conversazione consumati |
-| `elapsed_seconds` | Durata dello scenario in secondi |
+| `overall_status` | Overall status according to the `JudgeAgent`: `completed` / `partial` / `failed` / `not_attempted`, or `error` if the scenario crashed and there is no verdict. In the cases flagged by `branch_clamped` the harness overrides the judge and caps it at `partial`. Colours the whole row |
+| `turns` | Number of conversation turns consumed |
+| `elapsed_seconds` | Scenario duration in seconds |
 
-## Blocco deterministico — ciò che il codice constata, non ciò che un modello giudica
+## Deterministic block — what the code establishes, not what a model judges
 
-È la parte che un revisore dovrebbe poter leggere senza aprire i log: sono tutti dati
-calcolati in codice durante la run.
+This is the part a reviewer should be able to read without opening the logs: all of it is
+computed in code during the run.
 
-| Colonna | Significato |
+| Column | Meaning |
 |---|---|
-| `changed_activities` | Elenco nominale di **tutte** le attività toccate dalla conversazione. È la colonna da scorrere per beccare una modifica che nessuno aveva chiesto |
-| `issue_signals` | Le cause bloccanti sollevate dal sistema stesso: `schedule_conflict`, `missing_dependency`, `temporal_ordering`, `dependency_blocked`, medicina non trovata, più i rifiuti del safety gate `safety_blocked` / `safety_caution` / `safety_check_required`. `none` se nulla ha bloccato |
-| `branch_outcome` | Se il ramo condizionale dello scenario è stato attivato: `exercised` (l'assistente ha sollevato il punto da solo e la clausola condizionale gli è stata quindi consegnata), `not_raised_but_change_applied` (non l'ha sollevato ma ha comunque modificato — verosimilmente ha aggirato il problema), `not_raised_no_change`, oppure `n/a` se lo scenario non ha clausola condizionale |
-| `branch_clamped` | `no`, oppure `objectives [n] failed→partial`: il judge ha bocciato un obiettivo la cui clausola condizionale non era mai stata consegnata al caregiver, e l'harness ha alzato il voto a `partial`. Segnala un limite dell'harness, non una colpa del sistema testato (`test.clamp_undelivered_branch`) |
-| `safety_verdicts` | Ogni verdetto del checker con turno, severità (`blocking` / `caution` / `remark`, con `(untyped)` se non tipizzato) e nome attività. È qui che si legge **perché** una scrittura è stata rifiutata — o perché una che andava rifiutata non lo è stata. Eventuale riga finale `[!]`: verdetti non parsati (il gate ha fallito in apertura) o scritture tentate prima di qualsiasi controllo |
-| `unsupported_claims` | Risposte in cui l'assistente ha annunciato una modifica che nessuna scrittura ha effettivamente eseguito, con il numero di turno. `none` se nessuna |
-| `history_warnings_retrieved` | I rischi che il RAG ha messo davanti all'assistente (solo livello warning), da leggere contro il transcript per capire se sono stati riferiti al caregiver |
+| `changed_activities` | A single line naming every activity the conversation touched: prefix `+` (added), `-` (removed), `~` (modified, followed by the names of the changed fields only). This is the column to scan to catch a change nobody asked for; what actually changed is in `applied_changes` |
+| `issue_signals` | The blocking causes the system itself raised: `schedule_conflict`, `missing_dependency`, `temporal_ordering`, `dependency_blocked`, the medicine-not-found marker, plus the safety gate's `safety_blocked` / `safety_caution` / `safety_check_required` refusals. `none` if nothing blocked |
+| `branch_outcome` | Whether the scenario's conditional part ("if the assistant detects X…") was delivered to the caregiver agent, which only happens once the chatbot raises the point on its own: `exercised` (delivered), `not_raised_no_change` (never raised, nothing changed), `not_raised_but_change_applied` (never raised but the therapy was changed anyway — often the model sidestepped the problem upstream rather than missing it), `n/a` if the scenario has no conditional clause |
+| `branch_clamped` | `no`, or `objectives [n] failed→partial`: the judge failed an objective whose conditional clause was never delivered to the caregiver, which therefore could not follow it, and the harness capped the grade at `partial`. It marks a limitation of the harness, not a defect of the system under test (`test.clamp_undelivered_branch`) |
+| `safety_verdicts` | Every verdict of the agent that checks whether an action is safe, with turn, severity (`blocking` / `caution` / `remark`, plus `(untyped)` when the severity is missing) and activity name. This is where to read **why** a write was refused — or why one that should have been refused was not. A trailing `[!]` line reports unparsable verdicts (the gate failed open) or writes attempted before any check |
+| `unsupported_claims` | Replies announcing a change with no write tool behind it, with the turn number. `none` if there were none |
+| `history_warnings_retrieved` | Patient-history events retrieved by RAG, warning level only (`info` events are excluded): they feed the **safety** checks and should be passed on to the caregiver. Scheduling conflicts do not come from here — they are computed deterministically by `tools.py`. Read alongside the transcript to see whether a surfaced risk was actually relayed |
 
-## Obiettivi
+## Objectives
 
-| Colonna | Significato |
+| Column | Meaning |
 |---|---|
-| `objectives_scripted` | Quanti obiettivi lo script dello scenario prevedeva |
-| `objectives_status` | Stringa compatta con l'iniziale dello stato di ogni obiettivo giudicato, es. `C,P,F` (Completed / Partial / Failed / Not attempted). Confrontata con `objectives_scripted` distingue "fallito" da "mai chiesto dal caregiver" |
-| `objectives` | Il testo dello scenario / script degli obiettivi (l'input) |
-| `judge_check` | JSON completo della valutazione per obiettivo del judge (stato + note). Se `overall_status = error` contiene invece il messaggio d'errore e i primi 500 caratteri dell'output grezzo non parsato del judge |
+| `objectives_scripted` | How many objectives (steps) the scenario's script asked for |
+| `objectives_status` | Compact string with the initial of each graded objective's status, e.g. `C,P,F`: **C** completed, **P** partial, **F** failed, **N** not_attempted (never raised by the caregiver). Compared against `objectives_scripted` it separates "failed" from "never asked" |
+| `objectives` | The full scenario text. The caregiver only receives part of it: the title, the preamble and the conditional clauses are withheld so it cannot leak the expected answer (`scenario_loader.split_objectives`) |
+| `judge_check` | The judge's output **per objective**: task description, status, supporting evidence and notes. The judge's overall `summary` is not included. If `overall_status = error` it holds the error message and the first 500 characters of the judge's unparsed raw output instead |
 
-## Materiale grezzo per l'ispezione
+## Raw material for inspection
 
-| Colonna | Significato |
+| Column | Meaning |
 |---|---|
-| `applied_changes` | Il diff programmatico completo iniziale→finale, cioè esattamente ciò che è stato mostrato al judge (la valutazione è diff-based, non basata sul transcript) |
-| `conversation` | Il transcript completo della conversazione |
-| `initial_therapy` | JSON della terapia installata prima della conversazione |
-| `final_therapy` | JSON della terapia a fine conversazione (vuoto in caso di `error`) |
+| `applied_changes` | The full list of changes applied during the conversation: the programmatic initial→final diff, i.e. exactly what the judge was shown (grading is diff-based, not transcript-based) |
+| `conversation` | The full transcript between the caregiver agent and the system |
+| `initial_therapy` | JSON of the starting therapy |
+| `final_therapy` | JSON of the therapy at the end of the conversation (empty on `error`) |
+
+## Manually added columns
+
+`reviewer`, `reviewer_status` and `notes` do not exist in the code: they were appended to the
+sheet by hand for the manual analysis phase — respectively the initials of whoever reviews
+that row, the scenario's actual status after review, and any notes for the team.
