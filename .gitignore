@@ -8,3 +8,4 @@ KnowledgeManagerLLM.egg-info
 build
 data/therapy.json
 .ruff_cache
+manuscript
