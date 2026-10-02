@@ -169,6 +169,7 @@ def run_scenario(
     Run a single scenario and return the evaluation result.
     Raises exceptions on error — the caller decides whether to continue.
     """
+    reset_and_seed_vector(vector_db=vector_db)
     start = time()
     logger = setup_logger(
         logs_dir=batch_log_dir,
@@ -529,6 +530,28 @@ def print_scenario_summary(scenario_id: int, evaluation: dict) -> None:
     )
 
 
+def reset_and_seed_vector(vector_db: VectorDBManager):
+    if not vector_db.initialize():
+        raise RuntimeError(
+            "Vector DB initialization failed – aborting: without it the RAG "
+            "checks under test cannot run and the results would be meaningless."
+        )
+
+    if not vector_db.reset():
+        raise RuntimeError("Vector DB reset failed – aborting batch")
+
+    vector_db.seed_medicines()
+    vector_db.seed_all_patients()
+
+    problems = vector_db.verify_seed()
+    if problems:
+        raise RuntimeError(
+            "Vector DB seeding is incomplete – aborting batch so the run does "
+            "not report results measured against a wrong knowledge base:\n  - "
+            + "\n  - ".join(problems)
+        )
+
+
 def main():
     args = parse_args()
 
@@ -639,25 +662,9 @@ def main():
     # with documents that no longer match the current patients, and the whole
     # batch would silently measure the wrong knowledge base.
     vector_db = VectorDBManager()
-    if not vector_db.initialize():
-        raise RuntimeError(
-            "Vector DB initialization failed – aborting: without it the RAG "
-            "checks under test cannot run and the results would be meaningless."
-        )
 
-    if not vector_db.reset():
-        raise RuntimeError("Vector DB reset failed – aborting batch")
+    reset_and_seed_vector(vector_db=vector_db)
 
-    vector_db.seed_medicines()
-    vector_db.seed_all_patients()
-
-    problems = vector_db.verify_seed()
-    if problems:
-        raise RuntimeError(
-            "Vector DB seeding is incomplete – aborting batch so the run does "
-            "not report results measured against a wrong knowledge base:\n  - "
-            + "\n  - ".join(problems)
-        )
     logger.info(f"[BATCH] Vector DB ready – {vector_db.counts()}")
 
     # One simulation client for the whole batch, so its rate-limit window and
